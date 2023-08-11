@@ -1886,6 +1886,7 @@ void TabPrint::build()
         optgroup->append_single_option_line("top_solid_infill_flow_ratio");
         optgroup->append_single_option_line("bottom_solid_infill_flow_ratio");
         optgroup->append_single_option_line("only_one_wall_top");
+        optgroup->append_single_option_line("min_width_top_surface");
         optgroup->append_single_option_line("only_one_wall_first_layer");
         optgroup->append_single_option_line("detect_overhang_wall");
         optgroup->append_single_option_line("make_overhang_printable");
@@ -1953,7 +1954,11 @@ void TabPrint::build()
         line.append_option(optgroup->get_option("overhang_3_4_speed"));
         line.append_option(optgroup->get_option("overhang_4_4_speed"));
         optgroup->append_line(line);
-        optgroup->append_single_option_line("bridge_speed");
+        optgroup->append_separator();
+        line = { L("Bridge"), L("Set speed for external and internal bridges") };
+        line.append_option(optgroup->get_option("bridge_speed"));
+        line.append_option(optgroup->get_option("internal_bridge_speed"));
+        optgroup->append_line(line);
 
         optgroup = page->new_optgroup(L("Travel speed"), L"param_travel_speed", 15);
         optgroup->append_single_option_line("travel_speed");
@@ -2676,9 +2681,8 @@ void TabFilament::build()
         optgroup->append_single_option_line("bed_temperature_difference");
 
         optgroup = page->new_optgroup(L("Print temperature"), L"param_temperature");
-        optgroup->split_multi_line = true;
-        optgroup->option_label_at_right = true;
         optgroup->append_single_option_line("chamber_temperature");
+        optgroup->append_separator();
 
 
         line = { L("Nozzle"), L("Nozzle temperature when printing") };
