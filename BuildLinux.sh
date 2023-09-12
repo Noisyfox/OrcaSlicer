@@ -4,8 +4,8 @@ set -e # exit on first error
 export ROOT=`pwd`
 export NCORES=`nproc --all`
 export CMAKE_BUILD_PARALLEL_LEVEL=${NCORES}
-FOUND_GTK2=$(dpkg -l libgtk* | grep gtk2)
-FOUND_GTK3=$(dpkg -l libgtk* | grep gtk-3)
+FOUND_GTK2=$(dpkg -l libgtk* | grep gtk2 || echo '')
+FOUND_GTK3=$(dpkg -l libgtk* | grep gtk-3 || echo '')
 
 function check_available_memory_and_disk() {
     FREE_MEM_GB=$(free -g -t | grep 'Mem:' | rev | cut -d" " -f1 | rev)
@@ -93,10 +93,10 @@ then
     if [[ -z "$FOUND_GTK3" ]]
     then
         echo -e "\nInstalling: libgtk2.0-dev libglew-dev libudev-dev libdbus-1-dev cmake git\n"
-        apt install -y libgtk2.0-dev libglew-dev libudev-dev libdbus-1-dev cmake git
+        apt install -y libgtk2.0-dev libglew-dev libudev-dev libdbus-1-dev cmake git g++
     else
         echo -e "\nFind libgtk-3, installing: libgtk-3-dev libglew-dev libudev-dev libdbus-1-dev cmake git\n"
-        apt install -y libgtk-3-dev libglew-dev libudev-dev libdbus-1-dev cmake git
+        apt install -y libgtk-3-dev libglew-dev libudev-dev libdbus-1-dev cmake git g++
     fi
     # for ubuntu 22+ and 23+:
     ubu_major_version="$(grep VERSION_ID /etc/os-release | cut -d "=" -f 2 | cut -d "." -f 1 | tr -d /\"/)"
@@ -163,7 +163,10 @@ then
     if [[ -n "$BUILD_DEBUG" ]]
     then
         # have to build deps with debug & release or the cmake won't find evrything it needs
-        mkdir deps/build/release
+        if [ ! -d "deps/build/release" ]
+        then
+            mkdir deps/build/release
+        fi
         pushd deps/build/release
             cmake ../.. -DDESTDIR="../destdir" $BUILD_ARGS
             make -j$NCORES
