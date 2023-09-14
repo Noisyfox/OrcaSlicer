@@ -201,7 +201,8 @@ jobs:
       - name: Create installer Win
         if: matrix.os == 'windows-2019'
         working-directory: ${{ github.workspace }}/build
-        run: cpack -G NSIS
+        run: |
+          cpack -G NSIS
 
       # - name: pack app
         # if: matrix.os == 'windows-2019'
