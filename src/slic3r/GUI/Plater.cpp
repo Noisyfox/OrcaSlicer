@@ -2463,12 +2463,10 @@ Plater::priv::priv(Plater *q, MainFrame *main_frame)
         view3D_canvas->Bind(EVT_GLCANVAS_REMOVE_OBJECT, [q](SimpleEvent&) { q->remove_selected(); });
         view3D_canvas->Bind(EVT_GLCANVAS_ARRANGE, [this](SimpleEvent& evt) {
             //BBS arrage from EVT set default state.
-            this->q->set_prepare_state(Job::PREPARE_STATE_DEFAULT);
-            this->q->arrange(); });
+            this->q->arrange(false); });
         view3D_canvas->Bind(EVT_GLCANVAS_ARRANGE_PARTPLATE, [this](SimpleEvent& evt) {
             //BBS arrage from EVT set default state.
-            this->q->set_prepare_state(Job::PREPARE_STATE_MENU);
-            this->q->arrange(); });
+            this->q->arrange(true); });
         view3D_canvas->Bind(EVT_GLCANVAS_ORIENT, [this](SimpleEvent& evt) {
             //BBS oriant from EVT set default state.
             this->q->set_prepare_state(Job::PREPARE_STATE_DEFAULT);
@@ -2518,8 +2516,7 @@ Plater::priv::priv(Plater *q, MainFrame *main_frame)
             this->q->orient(); });
         view3D_canvas->Bind(EVT_GLTOOLBAR_ARRANGE, [this](SimpleEvent&) {
             //BBS arrage from EVT set default state.
-            this->q->set_prepare_state(Job::PREPARE_STATE_DEFAULT);
-            this->q->arrange();
+            this->q->arrange(false);
             });
         view3D_canvas->Bind(EVT_GLTOOLBAR_CUT, [q](SimpleEvent&) { q->cut_selection_to_clipboard(); });
         view3D_canvas->Bind(EVT_GLTOOLBAR_COPY, [q](SimpleEvent&) { q->copy_selection_to_clipboard(); });
@@ -11501,10 +11498,15 @@ GLCanvas3D* Plater::get_current_canvas3D(bool exclude_preview)
     return p->get_current_canvas3D(exclude_preview);
 }
 
-void Plater::arrange()
-{
+void Plater::arrange(bool selected) {
     if (!p->m_ui_jobs.is_any_running()) {
-        p->m_ui_jobs.arrange();
+        if (selected) {
+            // Single plate arrange, use new algorithm from Prusa
+        } else {
+            // Multi-plate arrange, use old algorithm
+            // TODO: Figure out how to use the new one
+            p->m_ui_jobs.arrange();
+        }
     }
 }
 
@@ -12165,8 +12167,7 @@ int Plater::select_plate_by_hover_id(int hover_id, bool right_click, bool isModi
         if (!ret)
         {
             if (last_arrange_job_is_finished()) {
-                set_prepare_state(Job::PREPARE_STATE_MENU);
-                arrange();
+                arrange(true);
             }
         }
         else

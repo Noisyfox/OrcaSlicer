@@ -5466,8 +5466,7 @@ bool GLCanvas3D::_render_arrange_menu(float left, float right, float bottom, flo
     ImGui::Separator();
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(15.0f, 10.0f));
     if (imgui->button(_L("Arrange"))) {
-        wxGetApp().plater()->set_prepare_state(Job::PREPARE_STATE_DEFAULT);
-        wxGetApp().plater()->arrange();
+        wxGetApp().plater()->arrange(false);
     }
 
     ImGui::SameLine();
