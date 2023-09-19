@@ -398,15 +398,16 @@ void ArrangeJob::prepare()
     Plater::setExtruderParams(Model::extruderParamsMap);
     Plater::setPrintSpeedTable(Model::printSpeedMap);
 
-    int state = m_plater->get_prepare_state();
-    if (state == Job::JobPrepareState::PREPARE_STATE_DEFAULT) {
+    // Orca: use for multi-plate arrange only
+    // int state = m_plater->get_prepare_state();
+    // if (state == Job::JobPrepareState::PREPARE_STATE_DEFAULT) {
         only_on_partplate = false;
         prepare_all();
-    }
-    else if (state == Job::JobPrepareState::PREPARE_STATE_MENU) {
-        only_on_partplate = true;   // only arrange items on current plate
-        prepare_partplate();
-    }
+    // }
+    // else if (state == Job::JobPrepareState::PREPARE_STATE_MENU) {
+    //     only_on_partplate = true;   // only arrange items on current plate
+    //     prepare_partplate();
+    // }
 
 
 #if SAVE_ARRANGE_POLY
@@ -748,12 +749,15 @@ arrangement::ArrangeParams init_arrange_params(Plater *p)
     params.bed_shrink_x                        = settings.bed_shrink_x;
     params.bed_shrink_y                        = settings.bed_shrink_y;
 
+    // Orca: use for multi-plate arrange only
+    /*
     int state = p->get_prepare_state();
     if (state == Job::JobPrepareState::PREPARE_STATE_MENU) {
         PartPlateList &plate_list = p->get_partplate_list();
         PartPlate *    plate      = plate_list.get_curr_plate();
         params.is_seq_print       = plate->get_real_print_seq() == PrintSequence::ByObject;
     }
+    */
 
     if (params.is_seq_print)
         params.min_obj_distance = std::max(params.min_obj_distance, scaled(params.cleareance_radius + 0.001)); // +0.001mm to avoid clearance check fail due to rounding error
