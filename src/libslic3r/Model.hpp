@@ -1333,6 +1333,7 @@ public:
         set_offset(Y, unscale<double>(offs(Y)));
         this->object->invalidate_bounding_box();
     }
+    void invalidate_object_bounding_box() { object->invalidate_bounding_box(); }
 
 protected:
     friend class Print;

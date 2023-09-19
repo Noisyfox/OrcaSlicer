@@ -1386,9 +1386,9 @@ int CLI::run(int argc, char **argv)
 
     // Loop through transform options.
     bool user_center_specified = false;
-    Points beds = get_bed_shape(m_print_config);
-    ArrangeParams arrange_cfg;
-    arrange_cfg.min_obj_distance = scaled(min_object_distance(m_print_config));
+    arr2::ArrangeBed bed = arr2::to_arrange_bed(get_bed_shape(m_print_config));
+    arr2::ArrangeSettings arrange_cfg;
+    arrange_cfg.set_distance_from_objects(min_object_distance(m_print_config));
 
     BOOST_LOG_TRIVIAL(info) << "will start transforms, commands count " << m_transforms.size() << "\n";
 #if defined(__linux__) || defined(__LINUX__)
@@ -1412,7 +1412,7 @@ int CLI::run(int argc, char **argv)
                 if (this->has_print_action())
                     arrange_objects(m, bed, arrange_cfg);
                 else
-                    arrange_objects(m, InfiniteBed{}, arrange_cfg);
+                    arrange_objects(m, arr2::InfiniteBed{}, arrange_cfg);
             }
             m_models.clear();
             m_models.emplace_back(std::move(m));*/

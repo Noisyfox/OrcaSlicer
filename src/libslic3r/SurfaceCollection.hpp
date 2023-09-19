@@ -3,6 +3,7 @@
 
 #include "libslic3r.h"
 #include "Surface.hpp"
+#include <initializer_list>
 #include <vector>
 
 namespace Slic3r {
@@ -53,6 +54,13 @@ public:
             if (surface.surface_type == type) return true;
         return false;
     }
+
+    Surfaces::const_iterator    cbegin() const { return this->surfaces.cbegin(); }
+    Surfaces::const_iterator    cend()   const { return this->surfaces.cend(); }
+    Surfaces::const_iterator    begin()  const { return this->surfaces.cbegin(); }
+    Surfaces::const_iterator    end()    const { return this->surfaces.cend(); }
+    Surfaces::iterator          begin()        { return this->surfaces.begin(); }
+    Surfaces::iterator          end()          { return this->surfaces.end(); }
 
     void set(const SurfaceCollection &coll) { surfaces = coll.surfaces; }
     void set(SurfaceCollection &&coll) { surfaces = std::move(coll.surfaces); }

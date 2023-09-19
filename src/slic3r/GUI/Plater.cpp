@@ -84,7 +84,7 @@
 #include "Tab.hpp"
 #include "Jobs/OrientJob.hpp"
 #include "Jobs/ArrangeJob.hpp"
-#include "Jobs/FillBedJob.hpp"
+#include "Jobs/ArrangeJob2.hpp"
 #include "Jobs/RotoptimizeJob.hpp"
 #include "Jobs/SLAImportJob.hpp"
 #include "Jobs/PrintJob.hpp"
@@ -1827,7 +1827,7 @@ struct Plater::priv
         size_t m_arrange_id, m_fill_bed_id, m_rotoptimize_id, m_sla_import_id, m_orient_id;
         std::shared_ptr<NotificationProgressIndicator> m_pri;
         //BBS
-        size_t m_print_id;
+        size_t m_print_id, m_arrange2_id;
 
         void before_start() override { m->background_process.stop(); }
 
@@ -1837,8 +1837,9 @@ struct Plater::priv
             m_pri{std::make_shared<NotificationProgressIndicator>(m->notification_manager.get())}
         {
             m_arrange_id = add_job(std::make_unique<ArrangeJob>(m_pri, m->q));
+            m_arrange2_id = JOB_NONE; // add_job(std::make_unique<ArrangeJob>(m_pri, m->q));
             m_orient_id = add_job(std::make_unique<OrientJob>(m_pri, m->q));
-            m_fill_bed_id = add_job(std::make_unique<FillBedJob>(m_pri, m->q));
+            m_fill_bed_id = JOB_NONE; // add_job(std::make_unique<FillBedJob>(m_pri, m->q));
             m_rotoptimize_id = add_job(std::make_unique<RotoptimizeJob>(m_pri, m->q));
             m_sla_import_id = add_job(std::make_unique<SLAImportJob>(m_pri, m->q));
             //BBS add print id
@@ -1851,15 +1852,31 @@ struct Plater::priv
             start(m_arrange_id);
         }
 
+        void arrange2(arr2::Scene &&scene, const ArrangeJob2::Callbacks &cbs)
+        {
+            m->take_snapshot("Arrange");
+            if (m_arrange2_id == JOB_NONE) {
+                m_arrange2_id = add_job(std::make_unique<ArrangeJob2>(std::move(scene), cbs));
+            } else {
+                replace_job(m_arrange2_id, std::make_unique<ArrangeJob2>(std::move(scene), cbs));
+            }
+            start(m_arrange2_id);
+        }
+
         void orient()
         {
             m->take_snapshot("Orient");
             start(m_orient_id);
         }
 
-        void fill_bed()
+        void fill_bed(arr2::Scene &&scene, const FillBedJob2::Callbacks &cbs)
         {
             m->take_snapshot("Fill bed");
+            if (m_fill_bed_id == JOB_NONE) {
+                m_fill_bed_id = add_job(std::make_unique<FillBedJob2>(std::move(scene), cbs));
+            } else {
+                replace_job(m_fill_bed_id, std::make_unique<FillBedJob2>(std::move(scene), cbs));
+            }
             start(m_fill_bed_id);
         }
 
@@ -4321,6 +4338,7 @@ void Plater::priv::mirror(Axis axis)
     view3D->mirror_selection(axis);
 }
 
+/*
 void Plater::find_new_position(const ModelInstancePtrs &instances)
 {
     arrangement::ArrangePolygons movable, fixed;
@@ -4353,6 +4371,7 @@ void Plater::find_new_position(const ModelInstancePtrs &instances)
     for (auto & m : movable)
         m.apply();
 }
+*/
 
 void Plater::priv::split_object()
 {
@@ -9857,8 +9876,48 @@ void Plater::set_number_of_copies(/*size_t num*/)
 
 void Plater::fill_bed_with_instances()
 {
-    if (!p->m_ui_jobs.is_any_running())
-        p->m_ui_jobs.fill_bed();
+    if (!p->m_ui_jobs.is_any_running()) {
+        FillBedJob2::Callbacks cbs;
+        cbs.on_processed = [this](arr2::ArrangeTaskBase &t) { p->take_snapshot(_u8L("Fill bed")); };
+
+        auto scene = arr2::Scene{build_scene(*this, ArrangeSelectionMode::SelectionOnly)};
+
+        cbs.on_finished = [this](arr2::FillBedTaskResult &result) {
+            auto [prototype_mi, pos] = arr2::find_instance_by_id(model(), result.prototype_id);
+
+            if (!prototype_mi)
+                return;
+
+            ModelObject *model_object = prototype_mi->get_object();
+            assert(model_object);
+
+            model_object->ensure_on_bed();
+
+            size_t inst_cnt = model_object->instances.size();
+            if (inst_cnt == 0)
+                return;
+
+            int object_idx = pos.obj_idx;
+
+            if (object_idx < 0 || object_idx >= int(model().objects.size()))
+                return;
+
+            update(static_cast<unsigned int>(priv::UpdateParams::FORCE_FULL_SCREEN_REFRESH));
+
+            if (!result.to_add.empty()) {
+                auto added_cnt = result.to_add.size();
+
+                // FIXME: somebody explain why this is needed for
+                // increase_object_instances
+                if (result.arranged_items.size() == 1)
+                    added_cnt++;
+
+                sidebar().obj_list()->increase_object_instances(object_idx, added_cnt);
+            }
+        };
+
+        p->m_ui_jobs.fill_bed(std::move(scene), cbs);
+    }
 }
 
 bool Plater::is_selection_empty() const
@@ -11548,10 +11607,55 @@ GLCanvas3D* Plater::get_current_canvas3D(bool exclude_preview)
     return p->get_current_canvas3D(exclude_preview);
 }
 
+static std::string concat_strings(const std::set<std::string> &strings,
+                                  const std::string &delim = "\n")
+{
+    return std::accumulate(
+        strings.begin(), strings.end(), std::string(""),
+        [delim](const std::string &s, const std::string &name) {
+            return s + name + delim;
+        });
+}
+
 void Plater::arrange(bool selected) {
     if (!p->m_ui_jobs.is_any_running()) {
         if (selected) {
             // Single plate arrange, use new algorithm from Prusa
+            arr2::Scene arrscene{build_scene(*this, ArrangeSelectionMode::Full)};
+
+            ArrangeJob2::Callbacks cbs;
+
+            cbs.on_processed = [this](arr2::ArrangeTaskBase &t) { p->take_snapshot(_u8L("Arrange")); };
+
+            cbs.on_finished = [this](arr2::ArrangeTaskResult &t) {
+                std::set<std::string> names;
+
+                auto collect_unarranged = [this, &names](const arr2::TrafoOnlyArrangeItem &itm) {
+                    if (!arr2::is_arranged(itm)) {
+                        std::optional<ObjectID> id = arr2::retrieve_id(itm);
+                        if (id) {
+                            auto [mi, pos] = arr2::find_instance_by_id(p->model, *id);
+                            if (mi && mi->get_object()) {
+                                names.insert(mi->get_object()->name);
+                            }
+                        }
+                    }
+                };
+
+                for (const arr2::TrafoOnlyArrangeItem &itm : t.items)
+                    collect_unarranged(itm);
+
+                if (!names.empty()) {
+                    get_notification_manager()->push_notification(GUI::format(_L("Arrangement ignored the following objects which "
+                                                                                 "can't fit into a single bed:\n%s"),
+                                                                              concat_strings(names, "\n")));
+                }
+
+                update(static_cast<unsigned int>(priv::UpdateParams::FORCE_FULL_SCREEN_REFRESH));
+                // wxGetApp().obj_manipul()->set_dirty();
+            };
+
+            p->m_ui_jobs.arrange2(std::move(arrscene), cbs);
         } else {
             // Multi-plate arrange, use old algorithm
             // TODO: Figure out how to use the new one

@@ -108,6 +108,10 @@ protected:
     virtual void before_start() {}
     
 public:
+    ExclusiveJobGroup();
+
+    constexpr static size_t JOB_NONE = 0;
+
     virtual ~ExclusiveJobGroup() = default;
     
     size_t add_job(std::unique_ptr<GUI::Job> &&job)
@@ -115,6 +119,8 @@ public:
         m_jobs.emplace_back(std::move(job));
         return m_jobs.size() - 1;
     }
+
+    void replace_job(size_t jid, std::unique_ptr<GUI::Job> &&job);
     
     void start(size_t jid);
     

@@ -438,7 +438,7 @@ public:
 
     void arrange(bool selected);
     void orient();
-    void find_new_position(const ModelInstancePtrs  &instances);
+    //void find_new_position(const ModelInstancePtrs  &instances);
     //BBS: add job state related functions
     void set_prepare_state(int state);
     int get_prepare_state();

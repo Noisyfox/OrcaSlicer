@@ -1108,7 +1108,12 @@ int GLCanvas3D::GetHoverId()
 }
 
 PrinterTechnology GLCanvas3D::current_printer_technology() const {
-    return m_process->current_printer_technology();
+    return m_process ? m_process->current_printer_technology() : ptFFF;
+}
+
+bool GLCanvas3D::is_arrange_alignment_enabled() const
+{
+    return m_config ? is_XL_printer(*m_config) && !this->get_wipe_tower_info() : false;
 }
 
 GLCanvas3D::GLCanvas3D(wxGLCanvas* canvas, Bed3D &bed)
@@ -1149,6 +1154,8 @@ GLCanvas3D::GLCanvas3D(wxGLCanvas* canvas, Bed3D &bed)
     , m_render_sla_auxiliaries(true)
     , m_labels(*this)
     , m_slope(m_volumes)
+    , m_arrange_settings_db{wxGetApp().app_config}
+    , m_arrange_settings_dialog{wxGetApp().imgui(), &m_arrange_settings_db}
 {
     if (m_canvas != nullptr) {
         m_timer.SetOwner(m_canvas);
@@ -1161,6 +1168,13 @@ GLCanvas3D::GLCanvas3D(wxGLCanvas* canvas, Bed3D &bed)
     load_arrange_settings();
 
     m_selection.set_volumes(&m_volumes.volumes);
+
+    m_arrange_settings_dialog.show_xl_align_combo([this](){
+        return this->is_arrange_alignment_enabled();
+    });
+    m_arrange_settings_dialog.on_arrange_btn([]{
+        wxGetApp().plater()->arrange(false);
+    });
 }
 
 GLCanvas3D::~GLCanvas3D()
@@ -1467,6 +1481,29 @@ void GLCanvas3D::set_config(const DynamicPrintConfig* config)
 {
     m_config = config;
     m_layers_editing.set_config(config);
+
+    if (config) {
+        PrinterTechnology ptech = current_printer_technology();
+
+        auto slot = ArrangeSettingsDb_AppCfg::slotFFF;
+
+        if (ptech == ptSLA) {
+            slot = ArrangeSettingsDb_AppCfg::slotSLA;
+        } else if (ptech == ptFFF) {
+            auto co_opt = config->option<ConfigOptionBool>("complete_objects");
+            if (co_opt && co_opt->value)
+                slot = ArrangeSettingsDb_AppCfg::slotFFFSeqPrint;
+            else
+                slot = ArrangeSettingsDb_AppCfg::slotFFF;
+        }
+
+        m_arrange_settings_db.set_active_slot(slot);
+
+        double objdst = min_object_distance(*config);
+        double min_obj_dst = slot == ArrangeSettingsDb_AppCfg::slotFFFSeqPrint ? objdst : 0.;
+        m_arrange_settings_db.set_distance_from_obj_range(slot, min_obj_dst, 100.);
+        m_arrange_settings_db.get_defaults(slot).d_obj = objdst;
+    }
 }
 
 void GLCanvas3D::set_process(BackgroundSlicingProcess *process)
@@ -5340,136 +5377,9 @@ bool GLCanvas3D::_render_orient_menu(float left, float right, float bottom, floa
 //BBS: GUI refactor: adjust main toolbar position
 bool GLCanvas3D::_render_arrange_menu(float left, float right, float bottom, float top)
 {
-    ImGuiWrapper *imgui = wxGetApp().imgui();
+    m_arrange_settings_dialog.render(pos_x, m_main_toolbar.get_height());
 
-    auto canvas_w = float(get_canvas_size().get_width());
-    auto canvas_h = float(get_canvas_size().get_height());
-    //BBS: GUI refactor: move main toolbar to the right
-    //original use center as {0.0}, and top is (canvas_h/2), bottom is (-canvas_h/2), also plus inv_camera
-    //now change to left_up as {0,0}, and top is 0, bottom is canvas_h
-#if BBS_TOOLBAR_ON_TOP
-    float zoom = (float)wxGetApp().plater()->get_camera().get_zoom();
-    float left_pos = m_main_toolbar.get_item("arrange")->render_left_pos;
-    const float x = 0.5 * canvas_w + left_pos * zoom;
-    imgui->set_next_window_pos(x, m_main_toolbar.get_height(), ImGuiCond_Always, 0.0f, 0.0f);
-
-#else
-    const float x = canvas_w - m_main_toolbar.get_width();
-    const float y = 0.5f * canvas_h - top * float(wxGetApp().plater()->get_camera().get_zoom());
-    imgui->set_next_window_pos(x, y, ImGuiCond_Always, 1.0f, 0.0f);
-#endif
-
-    //BBS
-    ImGuiWrapper::push_toolbar_style(get_scale());
-
-    imgui->begin(_L("Arrange options"), ImGuiWindowFlags_NoMove | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar);
-
-    ArrangeSettings settings = get_arrange_settings();
-    ArrangeSettings &settings_out = get_arrange_settings();
-    const float slider_icon_width = imgui->get_slider_icon_size().x;
-    const float cursor_slider_left = imgui->calc_text_size(_L("Spacing")).x + imgui->scaled(1.5f);
-    const float minimal_slider_width = imgui->scaled(4.f);
-    float window_width  = minimal_slider_width + 2 * slider_icon_width;
-    auto &appcfg = wxGetApp().app_config;
-    PrinterTechnology ptech = current_printer_technology();
-
-    bool settings_changed = false;
-    float dist_min = 0.1f;  // should be larger than 0 so objects won't touch
-    std::string dist_key = "min_object_distance", rot_key = "enable_rotation";
-    std::string bed_shrink_x_key = "bed_shrink_x", bed_shrink_y_key = "bed_shrink_y";
-    std::string multi_material_key = "allow_multi_materials_on_same_plate";
-    std::string avoid_extrusion_key = "avoid_extrusion_cali_region";
-    std::string postfix;
-    //BBS:
-    bool seq_print = false;
-
-    if (ptech == ptSLA) {
-        dist_min     = 0.1f;
-        postfix      = "_sla";
-    } else if (ptech == ptFFF) {
-        auto co_opt = m_config->option<ConfigOptionEnum<PrintSequence>>("print_sequence");
-        if (co_opt && (co_opt->value == PrintSequence::ByObject)) {
-            dist_min     = float(min_object_distance(*m_config));
-            postfix      = "_fff_seq_print";
-            //BBS:
-            seq_print = true;
-        } else {
-            dist_min     = 0.1f;
-            postfix     = "_fff";
-        }
-    }
-
-    dist_key += postfix;
-    rot_key  += postfix;
-    bed_shrink_x_key += postfix;
-    bed_shrink_y_key += postfix;
-
-    ImGui::AlignTextToFramePadding();
-    imgui->text(_L("Spacing"));
-    ImGui::SameLine(1.2 * cursor_slider_left);
-    ImGui::PushItemWidth(window_width - slider_icon_width);
-    bool b_Spacing = imgui->bbl_slider_float_style("##Spacing", &settings.distance, dist_min, 100.0f, "%5.2f") || dist_min > settings.distance;
-    ImGui::SameLine(window_width - slider_icon_width + 1.3 * cursor_slider_left);
-    ImGui::PushItemWidth(1.5 * slider_icon_width);
-    bool b_spacing_input = ImGui::BBLDragFloat("##spacing_input", &settings.distance, 0.05f, 0.0f, 0.0f, "%.2f");
-    if (b_Spacing || b_spacing_input)
-    {
-        settings.distance = std::max(dist_min, settings.distance);
-        settings_out.distance = settings.distance;
-        appcfg->set("arrange", dist_key.c_str(), float_to_string_decimal_point(settings_out.distance));
-        settings_changed = true;
-    }
-    ImGui::Separator();
-    if (imgui->bbl_checkbox(_L("Auto rotate for arrangement"), settings.enable_rotation)) {
-        settings_out.enable_rotation = settings.enable_rotation;
-        appcfg->set("arrange", rot_key.c_str(), settings_out.enable_rotation);
-        settings_changed = true;
-    }
-
-    if (imgui->bbl_checkbox(_L("Allow multiple materials on same plate"), settings.allow_multi_materials_on_same_plate)) {
-        settings_out.allow_multi_materials_on_same_plate = settings.allow_multi_materials_on_same_plate;
-        appcfg->set("arrange", multi_material_key.c_str(), settings_out.allow_multi_materials_on_same_plate );
-        settings_changed = true;
-    }
-
-    // only show this option if the printer has micro Lidar and can do first layer scan
-    DynamicPrintConfig &current_config = wxGetApp().preset_bundle->printers.get_edited_preset().config;
-    const bool has_lidar = wxGetApp().preset_bundle->is_bbl_vendor();
-    auto                op             = current_config.option("scan_first_layer");
-    if (has_lidar && op && op->getBool()) {
-        if (imgui->bbl_checkbox(_L("Avoid extrusion calibration region"), settings.avoid_extrusion_cali_region)) {
-            settings_out.avoid_extrusion_cali_region = settings.avoid_extrusion_cali_region;
-            appcfg->set("arrange", avoid_extrusion_key.c_str(), settings_out.avoid_extrusion_cali_region ? "1" : "0");
-            settings_changed = true;
-        }
-    } else {
-        settings_out.avoid_extrusion_cali_region = false;
-    }
-
-    ImGui::Separator();
-    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(15.0f, 10.0f));
-    if (imgui->button(_L("Arrange"))) {
-        wxGetApp().plater()->arrange(false);
-    }
-
-    ImGui::SameLine();
-
-    if (imgui->button(_L("Reset"))) {
-        settings_out = ArrangeSettings{};
-        settings_out.distance = std::max(dist_min, settings_out.distance);
-        //BBS: add specific arrange settings
-        if (seq_print) settings_out.is_seq_print = true;
-        appcfg->set("arrange", dist_key.c_str(), float_to_string_decimal_point(settings_out.distance));
-        appcfg->set("arrange", rot_key.c_str(), settings_out.enable_rotation? "1" : "0");
-        settings_changed = true;
-    }
-    ImGui::PopStyleVar(1);
-    imgui->end();
-
-    //BBS
-    ImGuiWrapper::pop_toolbar_style();
-
-    return settings_changed;
+    return true;
 }
 
 #define ENABLE_THUMBNAIL_GENERATOR_DEBUG_OUTPUT 0
@@ -9202,13 +9112,13 @@ const SLAPrint* GLCanvas3D::sla_print() const
     return (m_process == nullptr) ? nullptr : m_process->sla_print();
 }
 
-void GLCanvas3D::WipeTowerInfo::apply_wipe_tower() const
+void GLCanvas3D::WipeTowerInfo::apply_wipe_tower(Vec2d pos, double rot) const
 {
     // BBS: add partplate logic
     DynamicConfig& proj_cfg = wxGetApp().preset_bundle->project_config;
     Vec3d plate_origin = wxGetApp().plater()->get_partplate_list().get_plate(m_plate_idx)->get_origin();
-    ConfigOptionFloat wipe_tower_x(m_pos(X) - plate_origin(0));
-    ConfigOptionFloat wipe_tower_y(m_pos(Y) - plate_origin(1));
+    ConfigOptionFloat wipe_tower_x(pos(X) - plate_origin(0));
+    ConfigOptionFloat wipe_tower_y(pos(Y) - plate_origin(1));
 
     ConfigOptionFloats* wipe_tower_x_opt = proj_cfg.option<ConfigOptionFloats>("wipe_tower_x", true);
     ConfigOptionFloats* wipe_tower_y_opt = proj_cfg.option<ConfigOptionFloats>("wipe_tower_y", true);
@@ -9216,6 +9126,11 @@ void GLCanvas3D::WipeTowerInfo::apply_wipe_tower() const
     wipe_tower_y_opt->set_at(&wipe_tower_y, m_plate_idx, 0);
 
     //q->update();
+}
+
+void GLCanvas3D::WipeTowerInfo::apply_wipe_tower() const
+{
+    apply_wipe_tower(m_pos, m_rotation);
 }
 
 void GLCanvas3D::RenderTimer::Notify()

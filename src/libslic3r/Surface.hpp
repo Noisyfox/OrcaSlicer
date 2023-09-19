@@ -112,7 +112,7 @@ public:
 };
 
 typedef std::vector<Surface> Surfaces;
-typedef std::vector<Surface*> SurfacesPtr;
+typedef std::vector<const Surface*> SurfacesPtr;
 
 inline Polygons to_polygons(const Surface &surface)
 {
@@ -167,7 +167,7 @@ inline ExPolygons to_expolygons(Surfaces &&src)
 {
 	ExPolygons expolygons;
 	expolygons.reserve(src.size());
-	for (Surfaces::const_iterator it = src.begin(); it != src.end(); ++it)
+	for (auto it = src.begin(); it != src.end(); ++it)
 		expolygons.emplace_back(ExPolygon(std::move(it->expolygon)));
 	src.clear();
 	return expolygons;
@@ -229,8 +229,9 @@ inline void polygons_append(Polygons &dst, const SurfacesPtr &src)
     }
 }
 
-inline void polygons_append(Polygons &dst, SurfacesPtr &&src)
-{
+/*
+inline void polygons_append(Polygons &dst, SurfacesPtr &&src) 
+{ 
     dst.reserve(dst.size() + number_polygons(src));
     for (SurfacesPtr::const_iterator it = src.begin(); it != src.end(); ++ it) {
         dst.emplace_back(std::move((*it)->expolygon.contour));
@@ -238,6 +239,7 @@ inline void polygons_append(Polygons &dst, SurfacesPtr &&src)
         (*it)->expolygon.holes.clear();
     }
 }
+*/
 
 // Append a vector of Surfaces at the end of another vector of polygons.
 inline void surfaces_append(Surfaces &dst, const ExPolygons &src, SurfaceType surfaceType)
@@ -268,8 +270,8 @@ inline void surfaces_append(Surfaces &dst, ExPolygons &&src, SurfaceType surface
 inline void surfaces_append(Surfaces &dst, ExPolygons &&src, const Surface &surfaceTempl)
 {
     dst.reserve(dst.size() + number_polygons(src));
-    for (ExPolygons::const_iterator it = src.begin(); it != src.end(); ++ it)
-        dst.emplace_back(Surface(surfaceTempl, std::move(*it)));
+    for (ExPolygon& explg : src)
+        dst.emplace_back(Surface(surfaceTempl, std::move(explg)));
     src.clear();
 }
 
