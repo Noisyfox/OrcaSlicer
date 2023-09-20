@@ -116,7 +116,7 @@ Polygon convex_hull(const ExPolygons &expolygons)
     return convex_hull(pp);
 }
 
-Polygon convex_hulll(const Polylines &polylines)
+Polygon convex_hull(const Polylines &polylines)
 {
     Points pp;
     size_t sz = 0;

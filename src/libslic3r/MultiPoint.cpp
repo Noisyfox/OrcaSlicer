@@ -251,7 +251,7 @@ struct vis_node{
     // other node if it's area is less than the other node's area
     bool operator<(const vis_node& other) { return (this->area < other.area); }
 };
-Points MultiPoint::visivalingam(const Points& pts, const double tolerance)
+Points MultiPoint::visivalingam(const Points& pts, const double& tolerance)
 {
     // Make sure there's enough points in "pts" to bother with simplification.
     assert(pts.size() >= 2);

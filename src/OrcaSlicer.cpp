@@ -1456,9 +1456,9 @@ int CLI::run(int argc, char **argv)
                 try {
                     if (dups > 1) {
                         // if all input objects have defined position(s) apply duplication to the whole model
-                        duplicate(model, size_t(dups), beds, arrange_cfg);
+                        duplicate(model, size_t(dups), arr2::to_arrange_bed(beds), arrange_cfg);
                     } else {
-                        arrange_objects(model, beds, arrange_cfg);
+                        arrange_objects(model, arr2::to_arrange_bed(beds), arrange_cfg);
                     }
                 } catch (std::exception &ex) {
                     boost::nowide::cerr << "error: " << ex.what() << std::endl;

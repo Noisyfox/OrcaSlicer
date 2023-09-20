@@ -372,6 +372,22 @@ inline BoundingBoxf3 bounding_box(const indexed_triangle_set& its)
     return {bmin.cast<double>(), bmax.cast<double>()};
 }
 
+inline BoundingBoxf3 bounding_box(const indexed_triangle_set& its, const Transform3f &tr)
+{
+    if (its.vertices.empty())
+        return {};
+
+    Vec3f bmin = tr * its.vertices.front(), bmax = tr * its.vertices.front();
+
+    for (const Vec3f &p : its.vertices) {
+        Vec3f pp = tr * p;
+        bmin = pp.cwiseMin(bmin);
+        bmax = pp.cwiseMax(bmax);
+    }
+
+    return {bmin.cast<double>(), bmax.cast<double>()};
+}
+
 }
 
 // Serialization through the Cereal library

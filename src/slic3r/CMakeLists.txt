@@ -317,12 +317,12 @@ set(SLIC3R_GUI_SOURCES
     GUI/Jobs/UpgradeNetworkJob.cpp
     GUI/Jobs/ArrangeJob.hpp
     GUI/Jobs/ArrangeJob.cpp
+    GUI/Jobs/ArrangeJob2.hpp
+    GUI/Jobs/ArrangeJob2.cpp
     GUI/Jobs/OrientJob.hpp
     GUI/Jobs/OrientJob.cpp
     GUI/Jobs/RotoptimizeJob.hpp
     GUI/Jobs/RotoptimizeJob.cpp
-    GUI/Jobs/FillBedJob.hpp
-    GUI/Jobs/FillBedJob.cpp
     GUI/Jobs/SLAImportJob.hpp
     GUI/Jobs/SLAImportJob.cpp
     GUI/Jobs/ProgressIndicator.hpp

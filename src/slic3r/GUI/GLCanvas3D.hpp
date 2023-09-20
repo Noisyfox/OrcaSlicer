@@ -18,6 +18,7 @@
 #include "Camera.hpp"
 #include "IMToolbar.hpp"
 
+#include "libslic3r/Arrange/ArrangeSettingsView.hpp"
 #include "libslic3r/Slicing.hpp"
 
 #include <float.h>
@@ -482,7 +483,13 @@ public:
         bool is_seq_print        = false;
         float bed_shrink_x       = 0.f;
         float bed_shrink_y       = 0.f;
-        bool  align_to_y_axis    = false;
+		bool  align_to_y_axis    = false;
+
+        // Orca: parameters from Prusa's arr2
+        float distance_bed = 0.f;
+        arr2::ArrangeSettingsView::XLPivots xl_align = arr2::ArrangeSettingsView::xlpFrontLeft;
+        arr2::ArrangeSettingsView::GeometryHandling geom_handling = arr2::ArrangeSettingsView::GeometryHandling::ghConvex;
+        arr2::ArrangeSettingsView::ArrangeStrategy  arr_strategy = arr2::ArrangeSettingsView::ArrangeStrategy::asAuto;
     };
 
     struct OrientSettings
@@ -972,8 +979,12 @@ public:
         inline const Vec2d& pos() const { return m_pos; }
         inline double rotation() const { return m_rotation; }
         inline const Vec2d bb_size() const { return m_bb.size(); }
+        inline const BoundingBoxf &bounding_box() const { return m_bb; }
+        inline const int plate_index() const { return m_plate_idx; }
 
         void apply_wipe_tower() const;
+
+        static void apply_wipe_tower(int plate_idx, Vec2d pos, double rot);
     };
 
     // BBS: add partplate logic

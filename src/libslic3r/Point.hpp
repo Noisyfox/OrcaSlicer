@@ -27,6 +27,9 @@ using Mat = Eigen::Matrix<T, N, M, Eigen::DontAlign, N, M>;
 
 template<int N, class T> using Vec = Mat<N, 1, T>;
 
+template<typename NumberType>
+using DynVec = Eigen::Matrix<NumberType, Eigen::Dynamic, 1>;
+
 // Eigen types, to replace the Slic3r's own types in the future.
 // Vector types with a fixed point coordinate base type.
 using Vec2crd = Eigen::Matrix<coord_t,  2, 1, Eigen::DontAlign>;
@@ -42,9 +45,9 @@ using Vec3i64 = Eigen::Matrix<int64_t,  3, 1, Eigen::DontAlign>;
 // Vector types with a double coordinate base type.
 using Vec2f   = Eigen::Matrix<float,    2, 1, Eigen::DontAlign>;
 using Vec3f   = Eigen::Matrix<float,    3, 1, Eigen::DontAlign>;
+using Vec4f   = Eigen::Matrix<float,    4, 1, Eigen::DontAlign>;
 using Vec2d   = Eigen::Matrix<double,   2, 1, Eigen::DontAlign>;
 using Vec3d   = Eigen::Matrix<double,   3, 1, Eigen::DontAlign>;
-// BBS
 using Vec4d   = Eigen::Matrix<double,   4, 1, Eigen::DontAlign>;
 
 using Points         = std::vector<Point>;
@@ -54,6 +57,8 @@ using Points3        = std::vector<Vec3crd>;
 using Pointfs        = std::vector<Vec2d>;
 using Vec2ds         = std::vector<Vec2d>;
 using Pointf3s       = std::vector<Vec3d>;
+
+using VecOfPoints    = std::vector<Points>;
 
 using Matrix2f       = Eigen::Matrix<float,  2, 2, Eigen::DontAlign>;
 using Matrix2d       = Eigen::Matrix<double, 2, 2, Eigen::DontAlign>;
@@ -265,22 +270,34 @@ inline Point lerp(const Point &a, const Point &b, double t)
     return ((1. - t) * a.cast<double>() + t * b.cast<double>()).cast<coord_t>();
 }
 
+// if IncludeBoundary, then a bounding box is defined even for a single point.
+// otherwise a bounding box is only defined if it has a positive area.
+template<bool IncludeBoundary = false>
 BoundingBox get_extents(const Points &pts);
-BoundingBox get_extents(const std::vector<Points> &pts);
+extern template BoundingBox get_extents<false>(const Points &pts);
+extern template BoundingBox get_extents<true>(const Points &pts);
+
+// if IncludeBoundary, then a bounding box is defined even for a single point.
+// otherwise a bounding box is only defined if it has a positive area.
+template<bool IncludeBoundary = false>
+BoundingBox get_extents(const VecOfPoints &pts);
+extern template BoundingBox get_extents<false>(const VecOfPoints &pts);
+extern template BoundingBox get_extents<true>(const VecOfPoints &pts);
+
 BoundingBoxf get_extents(const std::vector<Vec2d> &pts);
 
 // Test for duplicate points in a vector of points.
 // The points are copied, sorted and checked for duplicates globally.
-bool        has_duplicate_points(std::vector<Point> &&pts);
-inline bool has_duplicate_points(const std::vector<Point> &pts)
+bool        has_duplicate_points(Points &&pts);
+inline bool has_duplicate_points(const Points &pts)
 {
-    std::vector<Point> cpy = pts;
+    Points cpy = pts;
     return has_duplicate_points(std::move(cpy));
 }
 
 // Test for duplicate points in a vector of points.
 // Only successive points are checked for equality.
-inline bool has_duplicate_successive_points(const std::vector<Point> &pts)
+inline bool has_duplicate_successive_points(const Points &pts)
 {
     for (size_t i = 1; i < pts.size(); ++ i)
         if (pts[i - 1] == pts[i])
@@ -290,7 +307,7 @@ inline bool has_duplicate_successive_points(const std::vector<Point> &pts)
 
 // Test for duplicate points in a vector of points.
 // Only successive points are checked for equality. Additionally, first and last points are compared for equality.
-inline bool has_duplicate_successive_points_closed(const std::vector<Point> &pts)
+inline bool has_duplicate_successive_points_closed(const Points &pts)
 {
     return has_duplicate_successive_points(pts) || (pts.size() >= 2 && pts.front() == pts.back());
 }
@@ -315,7 +332,7 @@ namespace int128 {
 
 // To be used by std::unordered_map, std::unordered_multimap and friends.
 struct PointHash {
-    size_t operator()(const Vec2crd &pt) const {
+    size_t operator()(const Vec2crd &pt) const noexcept {
         return coord_t((89 * 31 + int64_t(pt.x())) * 31 + pt.y());
     }
 };

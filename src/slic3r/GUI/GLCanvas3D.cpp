@@ -1047,11 +1047,20 @@ void GLCanvas3D::load_arrange_settings()
     std::string dist_fff_str =
         wxGetApp().app_config->get("arrange", "min_object_distance_fff");
 
+    std::string dist_bed_fff_str =
+        wxGetApp().app_config->get("arrange", "min_bed_distance_fff");
+
     std::string dist_fff_seq_print_str =
         wxGetApp().app_config->get("arrange", "min_object_distance_seq_print_fff");
 
+    std::string dist_bed_fff_seq_print_str =
+        wxGetApp().app_config->get("arrange", "min_bed_distance_fff_seq_print");
+
     std::string dist_sla_str =
         wxGetApp().app_config->get("arrange", "min_object_distance_sla");
+
+    std::string dist_bed_sla_str =
+        wxGetApp().app_config->get("arrange", "min_bed_distance_sla");
 
     std::string en_rot_fff_str =
         wxGetApp().app_config->get("arrange", "enable_rotation_fff");
@@ -1067,17 +1076,35 @@ void GLCanvas3D::load_arrange_settings()
     
     std::string en_avoid_region_str =
         wxGetApp().app_config->get("arrange", "avoid_extrusion_cali_region");
-    
+
+    // Override default alignment and save save/load it to a temporary slot "alignment_xl"
+    std::string alignment_xl_str =
+        wxGetApp().app_config->get("arrange", "alignment_xl");
+
+    std::string geom_handling_str =
+        wxGetApp().app_config->get("arrange", "geometry_handling");
+
+    std::string strategy_str =
+        wxGetApp().app_config->get("arrange", "arrange_strategy");
     
 
     if (!dist_fff_str.empty())
         m_arrange_settings_fff.distance = std::stof(dist_fff_str);
 
+    if (!dist_bed_fff_str.empty())
+        m_arrange_settings_fff.distance_bed = string_to_float_decimal_point(dist_bed_fff_str);
+
     if (!dist_fff_seq_print_str.empty())
         m_arrange_settings_fff_seq_print.distance = std::stof(dist_fff_seq_print_str);
 
+    if (!dist_bed_fff_seq_print_str.empty())
+        m_arrange_settings_fff_seq_print.distance_bed = string_to_float_decimal_point(dist_bed_fff_seq_print_str);
+
     if (!dist_sla_str.empty())
         m_arrange_settings_sla.distance = std::stof(dist_sla_str);
+
+    if (!dist_bed_sla_str.empty())
+        m_arrange_settings_sla.distance_bed = string_to_float_decimal_point(dist_bed_sla_str);
 
     if (!en_rot_fff_str.empty())
         m_arrange_settings_fff.enable_rotation = (en_rot_fff_str == "1" || en_rot_fff_str == "true");
@@ -1097,6 +1124,42 @@ void GLCanvas3D::load_arrange_settings()
 
     //BBS: add specific arrange settings
     m_arrange_settings_fff_seq_print.is_seq_print = true;
+    
+    // Override default alignment and save save/load it to a temporary slot "alignment_xl"
+    arr2::ArrangeSettingsView::XLPivots arr_alignment = arr2::ArrangeSettingsView::xlpFrontLeft;
+    if (!alignment_xl_str.empty()) {
+        int align_val = std::stoi(alignment_xl_str);
+
+        if (align_val >= 0 && align_val < arr2::ArrangeSettingsView::xlpCount)
+            arr_alignment =
+                static_cast<arr2::ArrangeSettingsView::XLPivots>(align_val);
+    }
+
+    m_arrange_settings_sla.xl_align = arr_alignment;
+    m_arrange_settings_fff.xl_align = arr_alignment;
+    m_arrange_settings_fff_seq_print.xl_align = arr_alignment;
+
+    arr2::ArrangeSettingsView::GeometryHandling geom_handl = arr2::ArrangeSettingsView::ghConvex;
+    if (!geom_handling_str.empty()) {
+        int gh = std::stoi(geom_handling_str);
+        if (gh >= 0 && gh < arr2::ArrangeSettingsView::GeometryHandling::ghCount)
+            geom_handl = static_cast<arr2::ArrangeSettingsView::GeometryHandling>(gh);
+    }
+
+    m_arrange_settings_sla.geom_handling = geom_handl;
+    m_arrange_settings_fff.geom_handling = geom_handl;
+    m_arrange_settings_fff_seq_print.geom_handling = geom_handl;
+
+    arr2::ArrangeSettingsView::ArrangeStrategy arr_strategy = arr2::ArrangeSettingsView::asAuto;
+    if (!strategy_str.empty()) {
+        int strateg = std::stoi(strategy_str);
+        if (strateg >= 0 && strateg < arr2::ArrangeSettingsView::ArrangeStrategy::asCount)
+            arr_strategy = static_cast<arr2::ArrangeSettingsView::ArrangeStrategy>(strateg);
+    }
+
+    m_arrange_settings_sla.arr_strategy = arr_strategy;
+    m_arrange_settings_fff.arr_strategy = arr_strategy;
+    m_arrange_settings_fff_seq_print.arr_strategy = arr_strategy;
 }
 
 int GLCanvas3D::GetHoverId()
@@ -9227,20 +9290,25 @@ const SLAPrint* GLCanvas3D::sla_print() const
     return (m_process == nullptr) ? nullptr : m_process->sla_print();
 }
 
-void GLCanvas3D::WipeTowerInfo::apply_wipe_tower() const
+void GLCanvas3D::WipeTowerInfo::apply_wipe_tower(int plate_idx, Vec2d pos, double rot)
 {
     // BBS: add partplate logic
     DynamicConfig& proj_cfg = wxGetApp().preset_bundle->project_config;
-    Vec3d plate_origin = wxGetApp().plater()->get_partplate_list().get_plate(m_plate_idx)->get_origin();
-    ConfigOptionFloat wipe_tower_x(m_pos(X) - plate_origin(0));
-    ConfigOptionFloat wipe_tower_y(m_pos(Y) - plate_origin(1));
+    Vec3d plate_origin = wxGetApp().plater()->get_partplate_list().get_plate(plate_idx)->get_origin();
+    ConfigOptionFloat wipe_tower_x(pos(X) - plate_origin(0));
+    ConfigOptionFloat wipe_tower_y(pos(Y) - plate_origin(1));
 
     ConfigOptionFloats* wipe_tower_x_opt = proj_cfg.option<ConfigOptionFloats>("wipe_tower_x", true);
     ConfigOptionFloats* wipe_tower_y_opt = proj_cfg.option<ConfigOptionFloats>("wipe_tower_y", true);
-    wipe_tower_x_opt->set_at(&wipe_tower_x, m_plate_idx, 0);
-    wipe_tower_y_opt->set_at(&wipe_tower_y, m_plate_idx, 0);
+    wipe_tower_x_opt->set_at(&wipe_tower_x, plate_idx, 0);
+    wipe_tower_y_opt->set_at(&wipe_tower_y, plate_idx, 0);
 
     //q->update();
+}
+
+void GLCanvas3D::WipeTowerInfo::apply_wipe_tower() const
+{
+    apply_wipe_tower(m_plate_idx, m_pos, m_rotation);
 }
 
 void GLCanvas3D::RenderTimer::Notify()

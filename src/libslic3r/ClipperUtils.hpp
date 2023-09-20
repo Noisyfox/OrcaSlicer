@@ -14,6 +14,8 @@ using Slic3r::ClipperLib::jtSquare;
 
 namespace Slic3r {
 
+class BoundingBox;
+
 static constexpr const float                        ClipperSafetyOffset     = 10.f;
 
 static constexpr const Slic3r::ClipperLib::JoinType DefaultJoinType         = Slic3r::ClipperLib::jtMiter;
@@ -118,21 +120,21 @@ namespace ClipperUtils {
         const std::vector<PathType> &m_paths;
     };
 
-    template<typename MultiPointType>
+    template<typename MultiPointsType>
     class MultiPointsProvider {
     public:
-        MultiPointsProvider(const std::vector<MultiPointType> &multipoints) : m_multipoints(multipoints) {}
+        MultiPointsProvider(const MultiPointsType &multipoints) : m_multipoints(multipoints) {}
 
         struct iterator : public PathsProviderIteratorBase {
         public:
-            explicit iterator(typename std::vector<MultiPointType>::const_iterator it) : m_it(it) {}
+            explicit iterator(typename MultiPointsType::const_iterator it) : m_it(it) {}
             const Points& operator*() const { return m_it->points; }
             bool operator==(const iterator &rhs) const { return m_it == rhs.m_it; }
             bool operator!=(const iterator &rhs) const { return !(*this == rhs); }
             const Points& operator++(int) { return (m_it ++)->points; }
             iterator& operator++() { ++ m_it; return *this; }
         private:
-            typename std::vector<MultiPointType>::const_iterator m_it;
+            typename MultiPointsType::const_iterator m_it;
         };
 
         iterator cbegin() const { return iterator(m_multipoints.begin()); }
@@ -142,11 +144,11 @@ namespace ClipperUtils {
         size_t   size()   const { return m_multipoints.size(); }
 
     private:
-        const std::vector<MultiPointType> &m_multipoints;
+        const MultiPointsType &m_multipoints;
     };
 
-    using PolygonsProvider  = MultiPointsProvider<Polygon>;
-    using PolylinesProvider = MultiPointsProvider<Polyline>;
+    using PolygonsProvider  = MultiPointsProvider<Polygons>;
+    using PolylinesProvider = MultiPointsProvider<Polylines>;
 
     struct ExPolygonProvider {
         ExPolygonProvider(const ExPolygon &expoly) : m_expoly(expoly) {}
@@ -527,7 +529,10 @@ Slic3r::Polygons union_(const Slic3r::Polygons &subject, const ClipperLib::PolyF
 Slic3r::Polygons union_(const Slic3r::Polygons &subject, const Slic3r::Polygons &subject2);
 // May be used to "heal" unusual models (3DLabPrints etc.) by providing fill_type (pftEvenOdd, pftNonZero, pftPositive, pftNegative).
 Slic3r::ExPolygons union_ex(const Slic3r::Polygons &subject, ClipperLib::PolyFillType fill_type = ClipperLib::pftNonZero);
+Slic3r::ExPolygons union_ex(const Slic3r::Polygons &subject, const Slic3r::Polygons &subject2, ClipperLib::PolyFillType fill_type = ClipperLib::pftNonZero);
 Slic3r::ExPolygons union_ex(const Slic3r::ExPolygons &subject);
+Slic3r::ExPolygons union_ex(const Slic3r::ExPolygons &subject, const Slic3r::Polygons &subject2);
+Slic3r::ExPolygons union_ex(const Slic3r::Polygons &subject, const Slic3r::ExPolygons &subject2);
 Slic3r::ExPolygons union_ex(const Slic3r::Surfaces &subject);
 
 Slic3r::ExPolygons union_ex(const Slic3r::ExPolygons& poly1, const Slic3r::ExPolygons& poly2, bool safety_offset_ = false);

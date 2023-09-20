@@ -10,6 +10,11 @@
 #include <cassert>
 #include <optional>
 
+#ifdef WIN32
+#undef min
+#undef max
+#endif
+
 namespace Slic3r { namespace opt {
 
 // A type to hold the complete result of the optimization.

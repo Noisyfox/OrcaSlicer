@@ -723,6 +723,12 @@ arrangement::ArrangeParams get_arrange_params(Plater *p)
     params.is_seq_print = settings.is_seq_print;
     params.bed_shrink_x = settings.bed_shrink_x;
     params.bed_shrink_y = settings.bed_shrink_y;
+    
+    // Orca: parameters from Prusa's arr2
+    params.min_bed_distance  = scaled(settings.distance_bed);
+    params.xl_alignment      = settings.xl_align;
+    params.geometry_handling = settings.geom_handling;
+    params.arrange_strategy  = settings.arr_strategy;
 
     return params;
 }
@@ -759,6 +765,12 @@ arrangement::ArrangeParams init_arrange_params(Plater *p)
         params.is_seq_print       = plate->get_real_print_seq() == PrintSequence::ByObject;
     }
     */
+    
+    // Orca: parameters from Prusa's arr2
+    params.min_bed_distance  = scaled(settings.distance_bed);
+    params.xl_alignment      = settings.xl_align;
+    params.geometry_handling = settings.geom_handling;
+    params.arrange_strategy  = settings.arr_strategy;
 
     if (params.is_seq_print)
         params.min_obj_distance = std::max(params.min_obj_distance, scaled(params.cleareance_radius + 0.001)); // +0.001mm to avoid clearance check fail due to rounding error

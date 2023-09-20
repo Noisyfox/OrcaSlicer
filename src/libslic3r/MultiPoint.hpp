@@ -96,7 +96,7 @@ public:
     bool intersections(const Line &line, Points *intersections) const;
 
     static Points _douglas_peucker(const Points &points, const double tolerance);
-    static Points visivalingam(const Points& pts, const double tolerance);
+    static Points visivalingam(const Points& pts, const double& tolerance);
     static Points concave_hull_2d(const Points& pts, const double tolerence);
 
     inline auto begin()        { return points.begin(); }
@@ -105,6 +105,12 @@ public:
     inline auto end()    const { return points.end();   }
     inline auto cbegin() const { return points.begin(); }
     inline auto cend()   const { return points.end();   }
+    inline auto rbegin()       { return points.rbegin(); }
+    inline auto rbegin() const { return points.rbegin(); }
+    inline auto rend()         { return points.rend();   }
+    inline auto rend()   const { return points.rend();   }
+    inline auto crbegin()const { return points.crbegin(); }
+    inline auto crend()  const { return points.crend(); }
 };
 
 class MultiPoint3
@@ -127,7 +133,7 @@ public:
 };
 
 extern BoundingBox get_extents(const MultiPoint &mp);
-extern BoundingBox get_extents_rotated(const std::vector<Point> &points, double angle);
+extern BoundingBox get_extents_rotated(const Points &points, double angle);
 extern BoundingBox get_extents_rotated(const MultiPoint &mp, double angle);
 
 inline double length(const Points &pts) {

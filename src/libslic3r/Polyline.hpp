@@ -123,6 +123,9 @@ public:
 
     bool is_straight() const;
     bool is_closed() const { return this->points.front() == this->points.back(); }
+    
+    using iterator = Points::iterator;
+    using const_iterator = Points::const_iterator;
 
     //BBS: store arc fitting result
     std::vector<PathFittingData> fitting_result;

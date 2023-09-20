@@ -165,7 +165,7 @@ inline ExPolygons to_expolygons(Surfaces &&src)
 {
 	ExPolygons expolygons;
 	expolygons.reserve(src.size());
-	for (Surfaces::const_iterator it = src.begin(); it != src.end(); ++it)
+	for (auto it = src.begin(); it != src.end(); ++it)
 		expolygons.emplace_back(ExPolygon(std::move(it->expolygon)));
 	src.clear();
 	return expolygons;
@@ -268,8 +268,8 @@ inline void surfaces_append(Surfaces &dst, ExPolygons &&src, SurfaceType surface
 inline void surfaces_append(Surfaces &dst, ExPolygons &&src, const Surface &surfaceTempl)
 {
     dst.reserve(dst.size() + number_polygons(src));
-    for (ExPolygons::const_iterator it = src.begin(); it != src.end(); ++ it)
-        dst.emplace_back(Surface(surfaceTempl, std::move(*it)));
+    for (ExPolygon& explg : src)
+        dst.emplace_back(Surface(surfaceTempl, std::move(explg)));
     src.clear();
 }
 

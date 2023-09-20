@@ -878,23 +878,25 @@ CopyFileResult copy_file(const std::string &from, const std::string &to, std::st
         goto __finished;
     }
 
-    DWORD size=GetFileSize(handlesrc,NULL);
-    buff = new char[size+1];
-    DWORD dwRead=0,dwWrite;
-    result = ReadFile(handlesrc, buff, size, &dwRead, NULL);
-    if (!result) {
-        DWORD errCode = GetLastError();
-        error_message = "Error: " + errCode;
-        ret = FAIL_COPY_FILE;
-        goto __finished;
-    }
-    buff[size]=0;
-    result = WriteFile(handledst,buff,size,&dwWrite,NULL);
-    if (!result) {
-        DWORD errCode = GetLastError();
-        error_message = "Error: " + errCode;
-        ret = FAIL_COPY_FILE;
-        goto __finished;
+    {
+        DWORD size=GetFileSize(handlesrc,NULL);
+        buff = new char[size+1];
+        DWORD dwRead=0,dwWrite;
+        result = ReadFile(handlesrc, buff, size, &dwRead, NULL);
+        if (!result) {
+            DWORD errCode = GetLastError();
+            error_message = "Error: " + errCode;
+            ret = FAIL_COPY_FILE;
+            goto __finished;
+        }
+        buff[size]=0;
+        result = WriteFile(handledst,buff,size,&dwWrite,NULL);
+        if (!result) {
+            DWORD errCode = GetLastError();
+            error_message = "Error: " + errCode;
+            ret = FAIL_COPY_FILE;
+            goto __finished;
+        }
     }
 
 	FlushFileBuffers(handledst);

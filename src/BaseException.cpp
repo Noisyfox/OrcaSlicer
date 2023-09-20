@@ -64,7 +64,7 @@ void CBaseException::OutputString(LPCTSTR lpszFormat, ...)
 	//WriteConsole(GetStdHandle(STD_OUTPUT_HANDLE), szBuf, _tcslen(szBuf), NULL, NULL);
 
 	//output it to the current directory of binary
-	std::string output_str = textconv_helper::T2A_(szBuf);
+	std::string output_str{textconv_helper::T2A_(szBuf)};
 	*output_file << output_str;
 	output_file->flush();
 }
@@ -296,7 +296,7 @@ BOOL CBaseException::GetLogicalAddress(
 	for (unsigned i = 0; i < pNtHdr->FileHeader.NumberOfSections; i++, pSection++ )
 	{
 		DWORD sectionStart = pSection->VirtualAddress;
-		DWORD sectionEnd = sectionStart + max(pSection->SizeOfRawData, pSection->Misc.VirtualSize);
+		DWORD sectionEnd = sectionStart + std::max(pSection->SizeOfRawData, pSection->Misc.VirtualSize);
 
 		if ( (rva >= sectionStart) && (rva <= sectionEnd) )
 		{

@@ -2,6 +2,7 @@
 #define ARRANGE_HPP
 
 #include "ExPolygon.hpp"
+#include "libslic3r/Arrange/ArrangeSettingsView.hpp"
 #include "PrintConfig.hpp"
 namespace Slic3r {
 
@@ -130,6 +131,12 @@ struct ArrangeParams {
     float cleareance_radius = 0;
     float printable_height = 256.0;
     Vec2d align_center{ 0.5,0.5 };
+
+    // Orca: parameters from Prusa's arr2
+    coord_t                                     min_bed_distance  = 0;
+    arr2::ArrangeSettingsView::XLPivots         xl_alignment      = arr2::ArrangeSettingsView::xlpFrontLeft;
+    arr2::ArrangeSettingsView::GeometryHandling geometry_handling = arr2::ArrangeSettingsView::GeometryHandling::ghConvex;
+    arr2::ArrangeSettingsView::ArrangeStrategy  arrange_strategy  = arr2::ArrangeSettingsView::ArrangeStrategy::asAuto;
 
     ArrangePolygons excluded_regions;   // regions cant't be used
     ArrangePolygons nonprefered_regions; // regions can be used but not prefered

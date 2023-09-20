@@ -1404,6 +1404,9 @@ private:
     static PrintAndCLIConfigDef s_def;
 };
 
+inline bool is_XL_printer(const DynamicPrintConfig &cfg) { return false; }
+inline bool is_XL_printer(const PrintConfig &cfg) { return false; }
+
 Points get_bed_shape(const DynamicPrintConfig &cfg);
 Points get_bed_shape(const PrintConfig &cfg);
 Points get_bed_shape(const SLAPrinterConfig &cfg);

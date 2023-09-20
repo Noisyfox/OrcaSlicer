@@ -37,6 +37,7 @@ set(lisbslic3r_sources
     Brim.hpp
     BuildVolume.cpp
     BuildVolume.hpp
+    BoostAdapter.hpp
     Circle.cpp
     Circle.hpp
     clipper.cpp
@@ -199,6 +200,53 @@ set(lisbslic3r_sources
     CustomGCode.hpp
     Arrange.hpp
     Arrange.cpp
+    Arrange/Arrange.hpp
+    Arrange/ArrangeImpl.hpp
+    Arrange/Items/ArrangeItem.hpp
+    Arrange/Items/ArrangeItem.cpp
+    Arrange/Items/SimpleArrangeItem.hpp
+    Arrange/Items/SimpleArrangeItem.cpp
+    Arrange/Items/TrafoOnlyArrangeItem.hpp
+    Arrange/Items/MutableItemTraits.hpp
+    Arrange/Items/ArbitraryDataStore.hpp
+    Arrange/ArrangeSettingsView.hpp
+    Arrange/Scene.hpp
+    Arrange/Scene.cpp
+    Arrange/SceneBuilder.hpp
+    Arrange/SceneBuilder.cpp
+    Arrange/Tasks/ArrangeTask.hpp
+    Arrange/Tasks/ArrangeTaskImpl.hpp
+    Arrange/Tasks/FillBedTask.hpp
+    Arrange/Tasks/FillBedTaskImpl.hpp
+    Arrange/Tasks/MultiplySelectionTask.hpp
+    Arrange/Tasks/MultiplySelectionTaskImpl.hpp
+    Arrange/SegmentedRectangleBed.hpp
+    Arrange/Core/ArrangeItemTraits.hpp
+    Arrange/Core/DataStoreTraits.hpp
+    Arrange/Core/ArrangeBase.hpp
+    Arrange/Core/PackingContext.hpp
+    Arrange/Core/ArrangeFirstFit.hpp
+    Arrange/Core/Beds.hpp
+    Arrange/Core/Beds.cpp
+    Arrange/Core/NFP/NFP.hpp
+    Arrange/Core/NFP/NFP.cpp
+    Arrange/Core/NFP/NFPConcave_CGAL.hpp
+    Arrange/Core/NFP/NFPConcave_CGAL.cpp
+    Arrange/Core/NFP/NFPConcave_Tesselate.hpp
+    Arrange/Core/NFP/NFPConcave_Tesselate.cpp
+    Arrange/Core/NFP/EdgeCache.hpp
+    Arrange/Core/NFP/EdgeCache.cpp
+    Arrange/Core/NFP/CircularEdgeIterator.hpp
+    Arrange/Core/NFP/NFPArrangeItemTraits.hpp
+    Arrange/Core/NFP/PackStrategyNFP.hpp
+    Arrange/Core/NFP/RectangleOverfitPackingStrategy.hpp
+    Arrange/Core/NFP/Kernels/KernelTraits.hpp
+    Arrange/Core/NFP/Kernels/GravityKernel.hpp
+    Arrange/Core/NFP/Kernels/TMArrangeKernel.hpp
+    Arrange/Core/NFP/Kernels/CompactifyKernel.hpp
+    Arrange/Core/NFP/Kernels/RectangleOverfitKernelWrapper.hpp
+    Arrange/Core/NFP/Kernels/SVGDebugOutputKernelWrapper.hpp
+    Arrange/Core/NFP/Kernels/KernelUtils.hpp
     NormalUtils.cpp
     NormalUtils.hpp
     Orient.hpp
@@ -346,7 +394,6 @@ set(lisbslic3r_sources
 #    SLA/SupportTreeIGL.cpp
     SLA/Rotfinder.hpp
     SLA/Rotfinder.cpp
-    SLA/BoostAdapter.hpp
     SLA/SpatIndex.hpp
     SLA/SpatIndex.cpp
     SLA/RasterBase.hpp
@@ -424,6 +471,11 @@ endif ()
 add_library(libslic3r STATIC ${lisbslic3r_sources} 
     "${CMAKE_CURRENT_BINARY_DIR}/libslic3r_version.h"
     ${OpenVDBUtils_SOURCES})
+
+if (WIN32)
+    target_compile_definitions(libslic3r PUBLIC NOMINMAX)
+endif()
+
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${lisbslic3r_sources})
 
 if (SLIC3R_STATIC)

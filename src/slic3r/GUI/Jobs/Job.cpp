@@ -138,7 +138,38 @@ bool GUI::Job::join(int timeout_ms)
     return true;
 }
 
+struct NopJob : GUI::Job
+{
+    NopJob(std::shared_ptr<ProgressIndicator> pri) : Job(pri)
+    {
+        
+    }
+
+public:
+    void process() override
+    {
+        // Do nothing
+    }
+};
+
+GUI::ExclusiveJobGroup::ExclusiveJobGroup()
+{
+    size_t nop = add_job(std::make_unique<NopJob>(nullptr));
+    assert(nop == JOB_NONE);
+}
+
+void GUI::ExclusiveJobGroup::replace_job(size_t jid, std::unique_ptr<GUI::Job> &&job)
+{
+    assert(jid > JOB_NONE);
+    assert(jid < m_jobs.size());
+
+    m_jobs[jid]->cancel();
+    m_jobs[jid]->join(ABORT_WAIT_MAX_MS);
+    m_jobs[jid] = std::move(job);
+}
+
 void GUI::ExclusiveJobGroup::start(size_t jid) {
+    assert(jid > JOB_NONE);
     assert(jid < m_jobs.size());
     stop_all();
     m_jobs[jid]->start();

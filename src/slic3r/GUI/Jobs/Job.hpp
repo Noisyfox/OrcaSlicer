@@ -16,6 +16,8 @@
 
 namespace Slic3r { namespace GUI {
 
+struct ArrCtl;
+
 // A class to handle UI jobs like arranging and optimizing rotation.
 // These are not instant jobs, the user has to be informed about their
 // state in the status progress indicator. On the other hand they are
@@ -69,6 +71,8 @@ protected:
     }
    
 public:
+    friend struct ArrCtl;
+
     enum JobPrepareState {
         PREPARE_STATE_DEFAULT = 0,
         PREPARE_STATE_MENU = 1,
@@ -108,6 +112,10 @@ protected:
     virtual void before_start() {}
     
 public:
+    ExclusiveJobGroup();
+
+    constexpr static size_t JOB_NONE = 0;
+
     virtual ~ExclusiveJobGroup() = default;
     
     size_t add_job(std::unique_ptr<GUI::Job> &&job)
@@ -115,6 +123,8 @@ public:
         m_jobs.emplace_back(std::move(job));
         return m_jobs.size() - 1;
     }
+
+    void replace_job(size_t jid, std::unique_ptr<GUI::Job> &&job);
     
     void start(size_t jid);
     

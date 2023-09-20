@@ -13,7 +13,9 @@
 
 #include <utility>
 
-#include <libslic3r/Optimize/Optimizer.hpp>
+#include <libslic3r/libslic3r.h>
+
+#include "Optimizer.hpp"
 
 namespace Slic3r { namespace opt {
 
