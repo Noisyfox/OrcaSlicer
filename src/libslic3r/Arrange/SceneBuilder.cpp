@@ -449,6 +449,11 @@ SceneBuilder &&SceneBuilder::set_sla_print(AnyPtr<const SLAPrint> mdl_print)
     return std::move(*this);
 }
 
+static IrregularBed make_bed(const Points &contour, const Polygons &exclusions)
+{
+    return IrregularBed{diff_ex(Polygons{Polygon{contour}}, exclusions)};
+}
+
 SceneBuilder &&SceneBuilder::set_bed(const DynamicPrintConfig &cfg)
 {
     Points bedpts = get_bed_shape(cfg);
@@ -457,7 +462,13 @@ SceneBuilder &&SceneBuilder::set_bed(const DynamicPrintConfig &cfg)
         m_xl_printer = true;
     }
 
-    m_bed = arr2::to_arrange_bed(bedpts);
+    Polygons exclude_area = get_bed_excluded_area(cfg);
+    if (!exclude_area.empty() && bedpts.size() > 1) {
+        // Add excluded area
+        m_bed = make_bed(bedpts, exclude_area);
+    } else {
+        m_bed = arr2::to_arrange_bed(bedpts);
+    }
 
     return std::move(*this);
 }
@@ -466,10 +477,16 @@ SceneBuilder &&SceneBuilder::set_bed(const Print &print)
 {
     Points bedpts = get_bed_shape(print.config());
 
-    if (is_XL_printer(print.config())) {
-        m_bed = XLBed{get_extents(bedpts)};
+    Polygons exclude_area = get_bed_excluded_area(print.config());
+    if (!exclude_area.empty() && bedpts.size() > 1) {
+        // Add excluded area
+        m_bed = make_bed(bedpts, exclude_area);
     } else {
-        m_bed = arr2::to_arrange_bed(bedpts);
+        if (is_XL_printer(print.config())) {
+            m_bed = XLBed{get_extents(bedpts)};
+        } else {
+            m_bed = arr2::to_arrange_bed(bedpts);
+        }
     }
 
     set_brim_and_skirt();

@@ -1414,6 +1414,9 @@ Slic3r::Polygon get_bed_shape_with_excluded_area(const PrintConfig& cfg);
 bool has_skirt(const DynamicPrintConfig& cfg);
 float get_real_skirt_dist(const DynamicPrintConfig& cfg);
 
+Polygons get_bed_excluded_area(const DynamicPrintConfig &cfg);
+Polygons get_bed_excluded_area(const PrintConfig &cfg);
+
 // ModelConfig is a wrapper around DynamicPrintConfig with an addition of a timestamp.
 // Each change of ModelConfig is tracked by assigning a new timestamp from a global counter.
 // The counter is used for faster synchronization of the background slicing thread
