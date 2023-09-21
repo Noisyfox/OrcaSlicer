@@ -71,6 +71,63 @@ public:
     }
 };
 
+class ArrangeableBE : public arr2::Arrangeable
+{
+private:
+    Polygon poly;
+
+public:
+    explicit ArrangeableBE(Polygon shape) : poly{std::move(shape)} {}
+
+    // Exclusion area is not movable
+    bool is_selected() const override { return false; }
+
+    ObjectID   id() const override { return {}; }
+    ObjectID   geometry_id() const override { return {}; }
+
+    ExPolygons full_outline() const override
+    {
+        auto cpy = poly;
+        return {ExPolygon{std::move(cpy)}};
+    }
+    Polygon convex_outline() const override { return poly; }
+
+    void transform(const Vec2d &transl, double rot) override
+    {
+        // Should not reach here
+        assert(false);
+    }
+    int  get_bed_index() const override { return arr2::PhysicalBedId; }
+    bool assign_bed(int bed_idx) override { return false; }
+};
+
+class BEH : public arr2::BedExclusionHandler
+{
+private:
+    Polygons m_ex;
+
+public:
+    explicit BEH(const arrangement::ArrangePolygons &exclusions)
+    {
+        m_ex.reserve(exclusions.size());
+        for (const auto &ex : exclusions) {
+            m_ex.push_back(ex.poly.contour);
+        }
+    }
+
+    template<class Self, class Fn> static void visit_(Self &&self, Fn &&fn)
+    {
+        for (const auto &poly : self.m_ex) {
+            ArrangeableBE bea{poly};
+            fn(bea);
+        }
+    }
+
+    void visit(std::function<void(arr2::Arrangeable &)> fn) override { visit_(*this, fn); }
+
+    void visit(std::function<void(const arr2::Arrangeable &)> fn) const override { visit_(*this, fn); }
+};
+
 static Polygon get_wtpoly(const GLCanvas3D::WipeTowerInfo &wti)
 {
 
@@ -185,6 +242,13 @@ arr2::SceneBuilder build_scene(Plater &plater, ArrangeSelectionMode mode)
     PartPlateList &plate_list = plater.get_partplate_list();
     int current_plate_index   = plate_list.get_curr_plate_index();
 
+    // add the bed exclusion areas if has
+    AnyPtr<BEH> beh;
+    arrangement::ArrangePolygons exclusions;
+    if (plate_list.preprocess_exclude_areas(exclusions, 1)) {
+        beh = std::make_unique<BEH>(exclusions);
+    }
+
     auto wti = plater.canvas3D()->get_wipe_tower_info(current_plate_index);
 
     AnyPtr<WTH> wth;
@@ -200,6 +264,7 @@ arr2::SceneBuilder build_scene(Plater &plater, ArrangeSelectionMode mode)
         }
     }
 
+    builder.set_bed_exclusion_handler(std::move(beh));
     builder.set_wipe_tower_handler(std::move(wth));
     builder.set_model(plater.model());
 

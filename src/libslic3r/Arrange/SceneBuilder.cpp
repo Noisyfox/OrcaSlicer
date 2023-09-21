@@ -195,6 +195,10 @@ void SceneBuilder::build_arrangeable_slicer_model(ArrangeableSlicerModel &amodel
         m_vbed_handler = VirtualBedHandler::create(m_bed);
     }
 
+    if (!m_bedexclusion_handler) {
+        m_bedexclusion_handler = std::make_unique<MissingBedExclusionHandler>();
+    }
+
     if (!m_wipetower_handler) {
         m_wipetower_handler = std::make_unique<MissingWipeTowerHandler>();
     }
@@ -213,6 +217,7 @@ void SceneBuilder::build_arrangeable_slicer_model(ArrangeableSlicerModel &amodel
     amodel.m_vbed_handler = std::move(m_vbed_handler);
     amodel.m_model = std::move(m_model);
     amodel.m_selmask = std::move(m_selection);
+    amodel.m_beh = std::move(m_bedexclusion_handler);
     amodel.m_wth = std::move(m_wipetower_handler);
 
     amodel.m_wth->set_selection_predicate(
@@ -507,6 +512,8 @@ void ArrangeableSlicerModel::for_each_arrangeable(
 {
     for_each_arrangeable_(*this, fn);
 
+    m_beh->visit(fn);
+
     m_wth->visit(fn);
 }
 
@@ -514,6 +521,8 @@ void ArrangeableSlicerModel::for_each_arrangeable(
     std::function<void(const Arrangeable &)> fn) const
 {
     for_each_arrangeable_(*this, fn);
+
+    m_beh->visit(fn);
 
     m_wth->visit(fn);
 }
@@ -611,6 +620,8 @@ void ArrangeableSLAPrint::for_each_arrangeable(
 {
     for_each_arrangeable_(*this, fn);
 
+    m_beh->visit(fn);
+
     m_wth->visit(fn);
 }
 
@@ -618,6 +629,8 @@ void ArrangeableSLAPrint::for_each_arrangeable(
     std::function<void(const Arrangeable &)> fn) const
 {
     for_each_arrangeable_(*this, fn);
+
+    m_beh->visit(fn);
 
     m_wth->visit(fn);
 }

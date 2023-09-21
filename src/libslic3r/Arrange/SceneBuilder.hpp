@@ -24,6 +24,16 @@ namespace arr2 {
 
 using SelectionPredicate = std::function<bool()>;
 
+// Orca: Exclude certain area on the print bed to be unusable
+class BedExclusionHandler
+{
+public:
+    virtual ~BedExclusionHandler() = default;
+
+    virtual void visit(std::function<void(Arrangeable &)>)             = 0;
+    virtual void visit(std::function<void(const Arrangeable &)>) const = 0;
+};
+
 class WipeTowerHandler
 {
 public:
@@ -170,6 +180,7 @@ class ArrangeableSlicerModel: public ArrangeableModel
 {
 protected:
     AnyPtr<Model> m_model;
+    AnyPtr<BedExclusionHandler> m_beh;
     AnyPtr<WipeTowerHandler> m_wth;
     AnyPtr<VirtualBedHandler> m_vbed_handler;
     AnyPtr<const SelectionMask> m_selmask;
@@ -202,7 +213,8 @@ public:
 class SceneBuilder: public SceneBuilderBase<SceneBuilder>
 {
 protected:
-    AnyPtr<Model> m_model;
+    AnyPtr<Model>               m_model;
+    AnyPtr<BedExclusionHandler> m_bedexclusion_handler;
     AnyPtr<WipeTowerHandler> m_wipetower_handler;
     AnyPtr<VirtualBedHandler> m_vbed_handler;
     AnyPtr<const SelectionMask> m_selection;
@@ -230,6 +242,18 @@ public:
 
     SceneBuilder &&set_bed(const DynamicPrintConfig &cfg);
     SceneBuilder &&set_bed(const Print &print);
+
+    SceneBuilder &&set_bed_exclusion_handler(BedExclusionHandler &beh)
+    {
+        m_bedexclusion_handler = &beh;
+        return std::move(*this);
+    }
+
+    SceneBuilder &&set_bed_exclusion_handler(AnyPtr<BedExclusionHandler> beh)
+    {
+        m_bedexclusion_handler = std::move(beh);
+        return std::move(*this);
+    }
 
     SceneBuilder && set_wipe_tower_handler(WipeTowerHandler &wth)
     {
@@ -262,6 +286,12 @@ public:
     void build_scene(Scene &sc) && override;
 
     void build_arrangeable_slicer_model(ArrangeableSlicerModel &amodel);
+};
+
+struct MissingBedExclusionHandler : public BedExclusionHandler
+{
+    void visit(std::function<void(Arrangeable &)>) override {}
+    void visit(std::function<void(const Arrangeable &)>) const override {}
 };
 
 struct MissingWipeTowerHandler : public WipeTowerHandler
