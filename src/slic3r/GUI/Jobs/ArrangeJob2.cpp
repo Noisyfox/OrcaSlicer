@@ -105,13 +105,14 @@ class BEH : public arr2::BedExclusionHandler
 {
 private:
     Polygons m_ex;
+    static constexpr double scaled_exclusion_gap = scale_(1);
 
 public:
     explicit BEH(const arrangement::ArrangePolygons &exclusions)
     {
         m_ex.reserve(exclusions.size());
         for (const auto &ex : exclusions) {
-            m_ex.push_back(ex.poly.contour);
+            polygons_append(m_ex, offset(ex.poly.contour, scaled_exclusion_gap));
         }
     }
 
