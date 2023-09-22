@@ -1794,9 +1794,7 @@ void generate_support_toolpaths(
                     filler->link_max_length = coord_t(scale_(filler->spacing * link_max_length_factor / density));
                     sheath  = true;
                     no_sort = true;
-                } else if (config.support_style == SupportMaterialStyle::smsOrganic ||
-                    // Orca: use organic as default
-                    config.support_style == smsDefault) {
+                } else if (config.support_style == SupportMaterialStyle::smsOrganic) {
                     tree_supports_generate_paths(base_layer.extrusions, base_layer.polygons_to_extrude(), flow, support_params);
                     done = true;
                 }

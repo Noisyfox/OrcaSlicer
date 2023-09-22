@@ -404,12 +404,13 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
     if (config->opt_bool("enable_support")) {
         auto   support_type = config->opt_enum<SupportType>("support_type");
         auto   support_style = config->opt_enum<SupportMaterialStyle>("support_style");
-        std::set<int> enum_set_normal = {0, 1, 2};
-        std::set<int> enum_set_tree   = {0, 3, 4, 5, 6};
-        auto &           set             = is_tree(support_type) ? enum_set_tree : enum_set_normal;
+        auto   support_is_tree = is_tree(support_type);
+        std::set<int> enum_set_normal = {0, 1};
+        std::set<int> enum_set_tree   = {2, 3, 4, 5};
+        auto         &set             = support_is_tree ? enum_set_tree : enum_set_normal;
         if (set.find(support_style) == set.end()) {
             DynamicPrintConfig new_conf = *config;
-            new_conf.set_key_value("support_style", new ConfigOptionEnum<SupportMaterialStyle>(smsDefault));
+            new_conf.set_key_value("support_style", new ConfigOptionEnum<SupportMaterialStyle>(support_is_tree ? smsOrganic : smsGrid));
             apply(config, &new_conf);
         }
     }
@@ -596,9 +597,7 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig *config, co
     //toggle_field("support_closing_radius", have_support_material && support_style == smsSnug);
 
     bool support_is_tree = config->opt_bool("enable_support") && is_tree(support_type);
-    bool support_is_normal_tree = support_is_tree && support_style != smsOrganic &&
-        // Orca: use organic as default
-        support_style != smsDefault;
+    bool support_is_normal_tree = support_is_tree && support_style != smsOrganic;
     bool support_is_organic = support_is_tree && !support_is_normal_tree;
     // settings shared by normal and organic trees
     for (auto el : {"tree_support_branch_angle", "tree_support_branch_distance", "tree_support_branch_diameter" })

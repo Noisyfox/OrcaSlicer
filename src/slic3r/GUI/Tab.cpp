@@ -1424,7 +1424,7 @@ void Tab::on_value_change(const std::string& opt_key, const boost::any& value)
     // Orca: do this only in simple mode
     if (opt_key == "support_type" && m_mode == comSimple) {
         DynamicPrintConfig new_conf = *m_config;
-        new_conf.set_key_value("support_style", new ConfigOptionEnum<SupportMaterialStyle>(smsDefault));
+        new_conf.set_key_value("support_style", new ConfigOptionEnum<SupportMaterialStyle>(is_tree(m_config->opt_enum<SupportType>("support_type")) ? smsOrganic : smsGrid));
         m_config_manipulation.apply(m_config, &new_conf);
     }
 
@@ -2185,8 +2185,8 @@ void TabPrint::toggle_options()
     auto   support_type = m_config->opt_enum<SupportType>("support_type");
     if (auto choice = dynamic_cast<Choice*>(field)) {
         auto def = print_config_def.get("support_style");
-        std::vector<int> enum_set_normal = {0, 1, 2};
-        std::vector<int> enum_set_tree   = {0, 3, 4, 5, 6};
+        std::vector<int> enum_set_normal = {0, 1};
+        std::vector<int> enum_set_tree   = {2, 3, 4, 5};
         auto &           set             = is_tree(support_type) ? enum_set_tree : enum_set_normal;
         auto &           opt             = const_cast<ConfigOptionDef &>(field->m_opt);
         auto             cb              = dynamic_cast<ComboBox *>(choice->window);

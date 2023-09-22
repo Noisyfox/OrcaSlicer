@@ -183,7 +183,6 @@ static t_config_enum_values s_keys_map_SupportMaterialPattern {
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(SupportMaterialPattern)
 
 static t_config_enum_values s_keys_map_SupportMaterialStyle {
-    { "default",        smsDefault },
     { "grid",           smsGrid },
     { "snug",           smsSnug },
     { "tree_slim",      smsTreeSlim },
@@ -3533,22 +3532,20 @@ def = this->add("filament_loading_speed", coFloats);
                      "a lot of material (default organic), while hybrid style will create similar structure to normal support "
                      "under large flat overhangs.");
     def->enum_keys_map = &ConfigOptionEnum<SupportMaterialStyle>::get_enum_values();
-    def->enum_values.push_back("default");
     def->enum_values.push_back("grid");
     def->enum_values.push_back("snug");
+    def->enum_values.push_back("organic");
     def->enum_values.push_back("tree_slim");
     def->enum_values.push_back("tree_strong");
     def->enum_values.push_back("tree_hybrid");
-    def->enum_values.push_back("organic");
-    def->enum_labels.push_back(L("Default"));
     def->enum_labels.push_back(L("Grid"));
     def->enum_labels.push_back(L("Snug"));
+    def->enum_labels.push_back(L("Organic"));
     def->enum_labels.push_back(L("Tree Slim"));
     def->enum_labels.push_back(L("Tree Strong"));
     def->enum_labels.push_back(L("Tree Hybrid"));
-    def->enum_labels.push_back(L("Organic"));
     def->mode = comAdvanced;
-    def->set_default_value(new ConfigOptionEnum<SupportMaterialStyle>(smsDefault));
+    def->set_default_value(new ConfigOptionEnum<SupportMaterialStyle>(smsGrid));
 
     def = this->add("independent_support_layer_height", coBool);
     def->label = L("Independent support layer height");
