@@ -804,7 +804,7 @@ double configBrimWidthByVolumeGroups(double adhension, double maxSpeed, const st
 
 // Generate ears
 // Ported from SuperSlicer: https://github.com/supermerill/SuperSlicer/blob/45d0532845b63cd5cefe7de7dc4ef0e0ed7e030a/src/libslic3r/Brim.cpp#L1116
-//#define DEBUG_BRIM_EAR
+#define DEBUG_BRIM_EAR
 #define BRIM_EAR_ARC_RESOLUTION (SCALED_RESOLUTION * 5)
 static ExPolygons make_brim_ears(ExPolygons& obj_expoly, coord_t size_ear, coord_t ear_detection_length,
                                  coordf_t brim_ears_max_angle, bool is_outer_brim) {
@@ -1064,6 +1064,13 @@ static ExPolygons outer_inner_brim_area(const Print& print,
                 }
                 auto objectIsland = offset_ex(object->layers().front()->lslices, brim_offset, jtRound, SCALED_RESOLUTION);
                 append(no_brim_area_object, objectIsland);
+
+#if 0
+                // don't generate brim at places that are right below the second layer, so they won't fuse together
+                if (object->layers().size() > 1) {
+                    append(no_brim_area_object, offset_ex(object->layers()[1]->lslices, -brim_offset, jtRound, SCALED_RESOLUTION));
+                }
+#endif
 
                 brimToWrite.at(object->id()).obj = false;
                 for (const PrintInstance& instance : object->instances()) {
