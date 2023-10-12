@@ -861,16 +861,20 @@ static ExPolygons make_brim_ears(ExPolygons& obj_expoly, coord_t size_ear, coord
                         break;
                     case EMovePathType::Arc_move_cw:
                     case EMovePathType::Arc_move_ccw: {
-                        // Use the middle point of the arc as the approximation of the corner tip
-                        Point mid;
-                        if (r.arc_data.point_at(0.5, mid)) {
-                            ps.push_back(points[start_index]);
-                            ps.push_back(mid);
-                        } else {
-                            // Failed, fallback to original points
-                            for (size_t j = start_index; j < end_index; j++) {
-                                ps.push_back(points[j]);
-                            }
+                        ps.push_back(points[start_index]);
+                        // Evenly select points on the arc for the approximation of the corner tip
+                        int segments = r.arc_data.angle_radians * 4 / PI; // Each segment is not greater than 45deg
+                        if (segments < 2) {
+                            segments = 2;
+                        }
+                        // Force even segments so the result will be symmetrical
+                        if (segments % 2 == 1) {
+                            segments++;
+                        }
+                        for (int i = 1; i < segments; i++) {
+                            Point seg;
+                            r.arc_data.point_at(static_cast<double>(i) / segments, seg);
+                            ps.push_back(seg);
                         }
                         break;
                     }
