@@ -814,7 +814,7 @@ static ExPolygons make_brim_ears(ExPolygons& obj_expoly, coord_t size_ear, coord
     }
     // Detect places to put ears
     const coordf_t angle_threshold = (180 - brim_ears_max_angle) * PI / 180.0;
-    Points pt_ears;
+    std::vector<std::pair<ExPolygon, Points>> pt_ears;
     for (ExPolygon &poly : obj_expoly) {
         Polygon decimated_polygon = poly.contour;
         {
@@ -896,8 +896,7 @@ static ExPolygons make_brim_ears(ExPolygons& obj_expoly, coord_t size_ear, coord
 #endif
         }
 
-        append(pt_ears, is_outer_brim ? decimated_polygon.convex_points(angle_threshold)
-                                      : decimated_polygon.concave_points(angle_threshold));
+        pt_ears.emplace_back(poly, is_outer_brim ? decimated_polygon.convex_points(angle_threshold) : decimated_polygon.concave_points(angle_threshold));
     }
 
     // Then add ears
@@ -909,10 +908,20 @@ static ExPolygons make_brim_ears(ExPolygons& obj_expoly, coord_t size_ear, coord
     }
 
     // create ears
-    for (Point &pt : pt_ears) {
-        mouse_ears_ex.emplace_back();
-        mouse_ears_ex.back().contour = point_round;
-        mouse_ears_ex.back().contour.translate(pt);
+    for (auto &pt : pt_ears) {
+        for (auto &p : pt.second) {
+            ExPolygon ear(point_round);
+            ear.translate(p);
+
+            // Clip poly
+            if (is_outer_brim) {
+                // For outer brim, keep the part that is outside the contour
+                append(mouse_ears_ex, diff_ex(ear, pt.first));
+            } else {
+                // For inner brim, keep the part that is inside the hole
+                append(mouse_ears_ex, intersection_ex(ear, pt.first));
+            }
+        }
     }
 
     return mouse_ears_ex;
