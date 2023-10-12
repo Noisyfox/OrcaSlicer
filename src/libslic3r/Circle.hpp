@@ -98,6 +98,7 @@ public:
     bool clip_end(const Point& point);
     bool reverse();
     bool split_at(const Point& point, ArcSegment& p1, ArcSegment& p2);
+    bool point_at(double percent, Point &out) const;
     bool is_point_inside(const Point& point) const;
 
 private:

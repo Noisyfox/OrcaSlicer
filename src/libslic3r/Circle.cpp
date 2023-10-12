@@ -239,6 +239,32 @@ bool ArcSegment::split_at(const Point &point, ArcSegment& p1, ArcSegment& p2)
     return true;
 }
 
+bool ArcSegment::point_at(double percent, Point &out) const
+{
+    if (!is_valid() || percent < 0 || percent > 1.)
+        return false;
+
+    double segment_theta;
+    if (direction == ArcDirection::Arc_Dir_CCW) {
+        double end = polar_end_theta;
+        while (end < polar_start_theta) {
+            end += 2 * M_PI;
+        }
+
+        segment_theta = (end - polar_start_theta) * percent + polar_start_theta;
+    } else {
+        double start = polar_start_theta;
+        while (start < polar_end_theta) {
+            start += 2 * M_PI;
+        }
+
+        segment_theta = (start - polar_end_theta) * percent + polar_end_theta;
+    }
+    const Vec2d  v{cos(segment_theta), sin(segment_theta)};
+    out = center + (v * radius).cast<coord_t>();
+    return true;
+}
+
 bool ArcSegment::is_point_inside(const Point& point) const
 {
     double polar_theta = get_polar_radians(point);

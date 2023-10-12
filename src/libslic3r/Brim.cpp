@@ -804,6 +804,8 @@ double configBrimWidthByVolumeGroups(double adhension, double maxSpeed, const st
 
 // Generate ears
 // Ported from SuperSlicer: https://github.com/supermerill/SuperSlicer/blob/45d0532845b63cd5cefe7de7dc4ef0e0ed7e030a/src/libslic3r/Brim.cpp#L1116
+//#define DEBUG_BRIM_EAR
+#define BRIM_EAR_ARC_RESOLUTION (SCALED_RESOLUTION * 5)
 static ExPolygons make_brim_ears(ExPolygons& obj_expoly, coord_t size_ear, coord_t ear_detection_length,
                                  coordf_t brim_ears_max_angle, bool is_outer_brim) {
     ExPolygons mouse_ears_ex;
@@ -815,15 +817,79 @@ static ExPolygons make_brim_ears(ExPolygons& obj_expoly, coord_t size_ear, coord
     Points pt_ears;
     for (ExPolygon &poly : obj_expoly) {
         Polygon decimated_polygon = poly.contour;
-        if (ear_detection_length > 0) {
+        {
             // decimate polygon
             Points points = poly.contour.points;
-            points.push_back(points.front());
-            points = MultiPoint::_douglas_peucker(points, ear_detection_length);
-            if (points.size() > 4) { // don't decimate if it's going to be below 4 points, as it's surely enough to fill everything anyway
-                points.erase(points.end() - 1);
-                decimated_polygon.points = points;
+            {
+                // Find the points of the longest edge to use as the start and end point
+                double max_len = 0;
+                int max_len_idx = 0;
+                for (int i = 0; i < points.size(); i++) {
+                    Point &p1 = i == 0 ? points.back() : points[i - 1];
+                    Point &p2 = points[i];
+                    const double l = (p2 - p1).cast<double>().norm();
+                    if (l > max_len) {
+                        max_len = l;
+                        max_len_idx = i;
+                    }
+                }
+
+                std::rotate(points.begin(), points.begin() + max_len_idx, points.end());
             }
+
+            // Use arc-fitting to find out the round corners
+            {
+                std::vector<PathFittingData> fitting_result;
+                if (ear_detection_length > 0) {
+                    ArcFitter::do_arc_fitting_and_simplify(points, fitting_result, BRIM_EAR_ARC_RESOLUTION, ear_detection_length);
+                } else {
+                    ArcFitter::do_arc_fitting(points, fitting_result, BRIM_EAR_ARC_RESOLUTION);
+                }
+                assert(fitting_result.size() > 0);
+
+                Points ps;
+                ps.reserve(points.size());
+                for (const auto &r : fitting_result) {
+                    const size_t start_index = r.start_point_index;
+                    const size_t end_index   = r.end_point_index;
+
+                    switch (r.path_type) {
+                    case EMovePathType::Linear_move:
+                        for (size_t j = start_index; j < end_index; j++) {
+                            ps.push_back(points[j]);
+                        }
+                        break;
+                    case EMovePathType::Arc_move_cw:
+                    case EMovePathType::Arc_move_ccw: {
+                        // Use the middle point of the arc as the approximation of the corner tip
+                        Point mid;
+                        if (r.arc_data.point_at(0.5, mid)) {
+                            ps.push_back(points[start_index]);
+                            ps.push_back(mid);
+                        } else {
+                            // Failed, fallback to original points
+                            for (size_t j = start_index; j < end_index; j++) {
+                                ps.push_back(points[j]);
+                            }
+                        }
+                        break;
+                    }
+                    }
+                }
+                ps.push_back(points.back());
+                points = std::move(ps);
+            }
+
+            decimated_polygon.points = points;
+#ifdef DEBUG_BRIM_EAR
+            {
+                static int irun = 0;
+                SVG svg(debug_out_path("brim-ear-decimate-%d.svg", irun).c_str(), get_extents(poly));
+                svg.draw_outline(poly, "black", "black", scale_(0.05));
+                svg.draw(Polyline(decimated_polygon.points), "red", scale_(0.1));
+                irun++;
+            }
+#endif
         }
 
         append(pt_ears, is_outer_brim ? decimated_polygon.convex_points(angle_threshold)
