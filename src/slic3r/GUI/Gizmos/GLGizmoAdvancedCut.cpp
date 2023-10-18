@@ -28,7 +28,7 @@ const float UndefFloat = -999.f;
 
 // connector colors
 
-using ColorRGBA = std::array<float, 4>;
+//using ColorRGBA = std::array<float, 4>;
 
 static const ColorRGBA BLACK() { return {0.0f, 0.0f, 0.0f, 1.0f}; }
 static const ColorRGBA BLUE() { return {0.0f, 0.0f, 1.0f, 1.0f}; }
@@ -954,7 +954,7 @@ void GLGizmoAdvancedCut::render_connectors()
 
         const Transform3d view_model_matrix = translate_tf * m_rotate_matrix * scale_tf;
 
-        render_connector_model(m_shapes[connector.attribs], render_color, view_model_matrix);
+        render_connector_model(m_shapes[connector.attribs], render_color.data_array(), view_model_matrix);
     }
 }
 
