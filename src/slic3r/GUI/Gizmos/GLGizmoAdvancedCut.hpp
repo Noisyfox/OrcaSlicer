@@ -126,6 +126,8 @@ public:
     void finish_rotation();
     std::string get_tooltip() const override;
 
+    void data_changed(bool is_serializing) override;
+
     BoundingBoxf3 bounding_box() const;
     //BoundingBoxf3 transformed_bounding_box(const Vec3d &plane_center, bool revert_move = false) const;
 
@@ -150,22 +152,6 @@ protected:
     virtual void on_render_input_window(float x, float y, float bottom_limit);
 
     void show_tooltip_information(float x, float y);
-
-    virtual void on_enable_grabber(unsigned int id)
-    {
-        if (id < 3)
-            m_gizmos[id].enable_grabber(0);
-        else if (id == 3)
-            this->enable_grabber(0);
-    }
-
-    virtual void on_disable_grabber(unsigned int id)
-    {
-        if (id < 3)
-            m_gizmos[id].disable_grabber(0);
-        else if (id == 3)
-            this->disable_grabber(0);
-    }
 
     virtual void on_set_hover_id()
     {

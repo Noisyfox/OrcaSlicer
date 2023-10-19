@@ -162,9 +162,9 @@ void GLGizmoMmuSegmentation::render_painter_gizmo()
     glsafe(::glDisable(GL_BLEND));
 }
 
-void GLGizmoMmuSegmentation::set_painter_gizmo_data(const Selection &selection)
+void GLGizmoMmuSegmentation::data_changed(bool is_serializing)
 {
-    GLGizmoPainterBase::set_painter_gizmo_data(selection);
+    GLGizmoPainterBase::data_changed(is_serializing);
 
     if (m_state != On || wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology() != ptFFF || wxGetApp().filaments_cnt() <= 1)
         return;

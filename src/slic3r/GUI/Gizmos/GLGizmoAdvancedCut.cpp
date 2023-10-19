@@ -124,7 +124,6 @@ GLGizmoAdvancedCut::GLGizmoAdvancedCut(GLCanvas3D& parent, const std::string& ic
     for (int i = 0; i < 4; i++)
         m_cut_plane_points[i] = { 0., 0., 0. };
 
-    set_group_id(m_gizmos.size());
     m_rotation.setZero();
     //m_current_base_rotation.setZero();
     m_rotate_cmds.clear();
@@ -146,7 +145,7 @@ bool GLGizmoAdvancedCut::gizmo_event(SLAGizmoEventType action, const Vec2d &mous
             return false;
 
         if (m_hover_id != -1) {
-            start_dragging();
+            //start_dragging();
             return true;
         }
 
@@ -204,6 +203,20 @@ bool GLGizmoAdvancedCut::on_key(wxKeyEvent &evt)
 std::string GLGizmoAdvancedCut::get_tooltip() const
 {
     return "";
+}
+
+void GLGizmoAdvancedCut::data_changed(bool is_serializing)
+{
+    GLGizmoRotate3D::data_changed(is_serializing);
+
+    const Selection &selection = m_parent.get_selection();
+    if (selection.is_single_full_instance()) {
+        // BBS
+        finish_rotation();
+    } else if (selection.is_single_volume() || selection.is_single_modifier()) {
+        // BBS
+        finish_rotation();
+    }
 }
 
 BoundingBoxf3 GLGizmoAdvancedCut::bounding_box() const
@@ -431,15 +444,15 @@ CommonGizmosDataID GLGizmoAdvancedCut::on_get_requirements() const
 
 void GLGizmoAdvancedCut::on_start_dragging()
 {
-    for (auto gizmo : m_gizmos) {
-        if (m_hover_id == gizmo.get_group_id()) {
-            gizmo.start_dragging();
-            return;
-        }
-    }
-
-    if (m_hover_id != get_group_id())
-        return;
+    // for (auto gizmo : m_gizmos) {
+    //     if (m_hover_id == gizmo.get_group_id()) {
+    //         gizmo.start_dragging();
+    //         return;
+    //     }
+    // }
+    //
+    // if (m_hover_id != get_group_id())
+    //     return;
 
     const Selection& selection = m_parent.get_selection();
     const BoundingBoxf3& box = selection.get_bounding_box();
@@ -475,12 +488,12 @@ void GLGizmoAdvancedCut::on_dragging(const UpdateData &data)
     m_rotation = rotation;
     //m_move_grabber.angles = m_current_base_rotation + m_rotation;
 
-    if (m_hover_id == get_group_id()) {
-        double move = calc_projection(data.mouse_ray);
-        set_movement(m_start_movement + move);
-        Vec3d plane_normal = get_plane_normal();
-        m_height = m_start_height + plane_normal(2) * move;
-    }
+    // if (m_hover_id == get_group_id()) {
+    //     double move = calc_projection(data.mouse_ray);
+    //     set_movement(m_start_movement + move);
+    //     Vec3d plane_normal = get_plane_normal();
+    //     m_height = m_start_height + plane_normal(2) * move;
+    // }
 
     // dragging connectors
     if (m_connectors_editing && m_hover_id >= c_connectors_group_id) {
@@ -862,7 +875,7 @@ void GLGizmoAdvancedCut::render_cut_plane_and_grabbers()
     // m_move_grabber.color = GrabberColor;
     // m_move_grabber.hover_color = GrabberHoverColor;
     // m_move_grabber.render(m_hover_id == get_group_id(), (float)((box.size()(0) + box.size()(1) + box.size()(2)) / 3.0));
-    bool hover = (m_hover_id == get_group_id());
+    bool hover = true;//(m_hover_id == get_group_id());
     std::array<float, 4> render_color;
     if (hover) {
         render_color = GrabberHoverColor;

@@ -37,6 +37,10 @@ class GLGizmoScale3D : public GLGizmoBase
     double m_snap_step;
     StartingData m_starting;
 
+    std::array<float, 4> m_base_color;
+    std::array<float, 4> m_drag_color;
+    std::array<float, 4> m_highlight_color;
+
     //BBS: add size adjust related
     GizmoObjectManipulation* m_object_manipulation;
 
@@ -59,6 +63,8 @@ public:
     /// <param name="mouse_event">Keep information about mouse click</param>
     /// <returns>Return True when use the information otherwise False.</returns>
     bool on_mouse(const wxMouseEvent &mouse_event) override;
+
+    void data_changed(bool is_serializing) override;
 
     void enable_ununiversal_scale(bool enable);
 protected:

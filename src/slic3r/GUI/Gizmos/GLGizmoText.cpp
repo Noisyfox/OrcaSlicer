@@ -253,7 +253,7 @@ bool GLGizmoText::gizmo_event(SLAGizmoEventType action, const Vec2d &mouse_posit
     }
     else if (action == SLAGizmoEventType::LeftDown) {
         if (!selection.is_empty() && get_hover_id() != -1) {
-            start_dragging();
+            //start_dragging();
             return true;
         }
 

@@ -7,6 +7,7 @@
 namespace Slic3r {
 
 namespace GUI {
+class Selection;
 
 class GLGizmoFaceDetector : public GLGizmoBase
 {

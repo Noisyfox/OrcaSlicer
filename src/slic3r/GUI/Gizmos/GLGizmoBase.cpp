@@ -208,9 +208,6 @@ GLGizmoBase::GLGizmoBase(GLCanvas3D& parent, const std::string& icon_filename, u
     , m_first_input_window_render(true)
     , m_dirty(false)
 {
-    m_base_color = DEFAULT_BASE_COLOR;
-    m_drag_color = DEFAULT_DRAG_COLOR;
-    m_highlight_color = DEFAULT_HIGHLIGHT_COLOR;
     m_cone.init_from(its_make_cone(1., 1., 2 * PI / 24));
     m_sphere.init_from(its_make_sphere(1., (2 * M_PI) / 24.));
     m_cylinder.init_from(its_make_cylinder(1., 1., 2 * PI / 24.));
@@ -231,53 +228,6 @@ void GLGizmoBase::set_hover_id(int id)
 
     m_hover_id = id;
     on_set_hover_id();  
-}
-
-void GLGizmoBase::set_highlight_color(const std::array<float, 4>& color)
-{
-    m_highlight_color = color;
-}
-
-void GLGizmoBase::enable_grabber(unsigned int id)
-{
-    if (id < m_grabbers.size())
-        m_grabbers[id].enabled = true;
-
-    on_enable_grabber(id);
-}
-
-void GLGizmoBase::disable_grabber(unsigned int id)
-{
-    if (id < m_grabbers.size())
-        m_grabbers[id].enabled = false;
-
-    on_disable_grabber(id);
-}
-
-void GLGizmoBase::start_dragging()
-{
-    m_dragging = true;
-
-    for (int i = 0; i < (int)m_grabbers.size(); ++i)
-    {
-        m_grabbers[i].dragging = (m_hover_id == i);
-    }
-
-    on_start_dragging();
-    //BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << boost::format("this %1%, m_hover_id=%2%\n")%this %m_hover_id;
-}
-
-void GLGizmoBase::stop_dragging()
-{
-    m_dragging = false;
-
-    for (int i = 0; i < (int)m_grabbers.size(); ++i)
-    {
-        m_grabbers[i].dragging = false;
-    }
-
-    on_stop_dragging();
-    //BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << boost::format("this %1%, m_hover_id=%2%\n")%this %m_hover_id;
 }
 
 bool GLGizmoBase::update_items_state()
