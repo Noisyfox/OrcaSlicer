@@ -3967,21 +3967,18 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
         // It should be detection of volume change
         // Not only detection of some modifiers !!!
         if (evt.Dragging()) {
+            GLGizmosManager::EType c = m_gizmos.get_current_type();
             if (current_printer_technology() == ptFFF &&
                 (fff_print()->config().print_sequence == PrintSequence::ByObject)) {
-                switch (m_gizmos.get_current_type()) {
-                case GLGizmosManager::EType::Move:
-                case GLGizmosManager::EType::Scale:
-                case GLGizmosManager::EType::Rotate:
+                if (c == GLGizmosManager::EType::Move ||
+                    c == GLGizmosManager::EType::Scale ||
+                    c == GLGizmosManager::EType::Rotate )
                     update_sequential_clearance();
-                }
             } else {
-                switch (m_gizmos.get_current_type()) {
-                case GLGizmosManager::EType::Move:
-                case GLGizmosManager::EType::Scale:
-                case GLGizmosManager::EType::Rotate: 
+                if (c == GLGizmosManager::EType::Move ||
+                    c == GLGizmosManager::EType::Scale ||
+                    c == GLGizmosManager::EType::Rotate)
                     show_sinking_contours();
-                }
             }
         }
         else if (evt.LeftUp() &&

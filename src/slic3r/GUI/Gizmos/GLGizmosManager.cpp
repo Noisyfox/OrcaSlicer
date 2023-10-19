@@ -400,11 +400,11 @@ void GLGizmosManager::update_assemble_view_data()
 void GLGizmosManager::update_data()
 {
     if (!m_enabled) return;
-    if (m_current != Undefined) m_gizmos[m_current]->data_changed(m_serializing);
     if (m_common_gizmos_data)
         m_common_gizmos_data->update(get_current()
                                    ? get_current()->get_requirements()
                                    : CommonGizmosDataID(0));
+    if (m_current != Undefined) m_gizmos[m_current]->data_changed(m_serializing);
 
     //BBS: GUI refactor: add object manipulation in gizmo
     m_object_manipulation.update_ui_from_settings();
