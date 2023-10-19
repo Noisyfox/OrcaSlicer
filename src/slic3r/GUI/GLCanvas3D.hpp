@@ -1,3 +1,8 @@
+///|/ Copyright (c) Prusa Research 2018 - 2023 Enrico Turri @enricoturri1966, Tomáš Mészáros @tamasmeszaros, Lukáš Matěna @lukasmatena, Oleksandra Iushchenko @YuSanka, Filip Sykala @Jony01, Vojtěch Bubník @bubnikv, Lukáš Hejl @hejllukas, David Kocík @kocikdav, Vojtěch Král @vojtechkral
+///|/ Copyright (c) BambuStudio 2023 manch1n @manch1n
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef slic3r_GLCanvas3D_hpp_
 #define slic3r_GLCanvas3D_hpp_
 
@@ -16,10 +21,10 @@
 #include "libslic3r/GCode/GCodeProcessor.hpp"
 #include "GCodeViewer.hpp"
 #include "Camera.hpp"
+#include "SceneRaycaster.hpp"
 #include "IMToolbar.hpp"
 
 #include "libslic3r/Slicing.hpp"
-#include "slic3r/GUI/SceneRaycaster.hpp"
 
 #include <float.h>
 
@@ -508,7 +513,6 @@ private:
     wxGLCanvas* m_canvas;
     wxGLContext* m_context;
     SceneRaycaster m_scene_raycaster;
-
     Bed3D &m_bed;
 #if ENABLE_RETINA_GL
     std::unique_ptr<RetinaHelper> m_retina_helper;

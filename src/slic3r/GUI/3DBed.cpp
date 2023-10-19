@@ -13,6 +13,7 @@
 #include "GUI_Colors.hpp"
 #include "GLCanvas3D.hpp"
 #include "Plater.hpp"
+#include "Camera.hpp"
 
 #include <GL/glew.h>
 
@@ -27,9 +28,9 @@
 #endif
 
 static const float GROUND_Z = -0.04f;
-static const std::array<float, 4> DEFAULT_MODEL_COLOR = { 0.3255f, 0.337f, 0.337f, 1.0f };
-static const std::array<float, 4> DEFAULT_MODEL_COLOR_DARK = { 0.255f, 0.255f, 0.283f, 1.0f };
-static const std::array<float, 4> PICKING_MODEL_COLOR = { 0.0f, 0.0f, 0.0f, 1.0f };
+static const Slic3r::ColorRGBA DEFAULT_MODEL_COLOR = { 0.3255f, 0.337f, 0.337f, 1.0f };
+static const Slic3r::ColorRGBA DEFAULT_MODEL_COLOR_DARK = { 0.255f, 0.255f, 0.283f, 1.0f };
+static const Slic3r::ColorRGBA PICKING_MODEL_COLOR             = Slic3r::ColorRGBA::BLACK();
 
 namespace Slic3r {
 namespace GUI {
@@ -760,5 +761,6 @@ void Bed3D::register_raycasters_for_picking(const GLModel::Geometry& geometry, c
     m_model.mesh_raycaster = std::make_unique<MeshRaycaster>(std::make_shared<const TriangleMesh>(std::move(its)));
     wxGetApp().plater()->canvas3D()->add_raycaster_for_picking(SceneRaycaster::EType::Bed, 0, *m_model.mesh_raycaster, trafo);
 }
+
 } // GUI
 } // Slic3r

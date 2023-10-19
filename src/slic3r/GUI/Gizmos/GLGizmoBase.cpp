@@ -199,7 +199,7 @@ GLGizmoBase::GLGizmoBase(GLCanvas3D& parent, const std::string& icon_filename, u
     : m_parent(parent)
     , m_group_id(-1)
     , m_state(Off)
-    , m_shortcut_key(0)
+    , m_shortcut_key(NO_SHORTCUT_KEY_VALUE)
     , m_icon_filename(icon_filename)
     , m_sprite_id(sprite_id)
     , m_hover_id(-1)

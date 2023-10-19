@@ -1,3 +1,9 @@
+///|/ Copyright (c) Prusa Research 2020 - 2023 Enrico Turri @enricoturri1966, Oleksandra Iushchenko @YuSanka, Lukáš Matěna @lukasmatena, Vojtěch Bubník @bubnikv, Filip Sykala @Jony01, Lukáš Hejl @hejllukas
+///|/ Copyright (c) BambuStudio 2023 manch1n @manch1n
+///|/ Copyright (c) SuperSlicer 2023 Remi Durand @supermerill
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "libslic3r/Color.hpp"
 #include "libslic3r/libslic3r.h"
 #include "GCodeViewer.hpp"
@@ -890,11 +896,6 @@ void GCodeViewer::init(ConfigOptionMode mode, PresetBundle* preset_bundle)
     }
 
     m_sequential_view.marker.init(filename);
-
-    // initializes point sizes
-    std::array<int, 2> point_sizes;
-    ::glGetIntegerv(GL_ALIASED_POINT_SIZE_RANGE, point_sizes.data());
-    m_detected_point_sizes = { static_cast<float>(point_sizes[0]), static_cast<float>(point_sizes[1]) };
 
     // BBS initialzed view_type items
     m_user_mode = mode;
@@ -2849,13 +2850,13 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result, const
                 ++m_statistics.vbuffers_count;
 #endif // ENABLE_GCODE_VIEWER_STATISTICS
 
-                GLuint id = 0;
-                glsafe(::glGenBuffers(1, &id));
-                glsafe(::glBindBuffer(GL_ARRAY_BUFFER, id));
+                GLuint vbo_id = 0;
+                glsafe(::glGenBuffers(1, &vbo_id));
+                glsafe(::glBindBuffer(GL_ARRAY_BUFFER, vbo_id));
                 glsafe(::glBufferData(GL_ARRAY_BUFFER, size_bytes, v_buffer.data(), GL_STATIC_DRAW));
                 glsafe(::glBindBuffer(GL_ARRAY_BUFFER, 0));
 
-                t_buffer.vertices.vbos.push_back(static_cast<unsigned int>(id));
+                t_buffer.vertices.vbos.push_back(static_cast<unsigned int>(vbo_id));
                 t_buffer.vertices.sizes.push_back(size_bytes);
             }
         }

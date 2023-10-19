@@ -1,3 +1,14 @@
+///|/ Copyright (c) Prusa Research 2017 - 2023 Lukáš Matěna @lukasmatena, Enrico Turri @enricoturri1966, Oleksandra Iushchenko @YuSanka, Tomáš Mészáros @tamasmeszaros, Filip Sykala @Jony01, Vojtěch Bubník @bubnikv, David Kocík @kocikdav, Vojtěch Král @vojtechkral
+///|/ Copyright (c) 2017 Eyal Soha @eyal0
+///|/ Copyright (c) Slic3r 2015 Alessandro Ranellucci @alranel
+///|/
+///|/ ported from lib/Slic3r/GUI/3DScene.pm:
+///|/ Copyright (c) Prusa Research 2016 - 2019 Vojtěch Bubník @bubnikv, Enrico Turri @enricoturri1966, Oleksandra Iushchenko @YuSanka
+///|/ Copyright (c) Slic3r 2013 - 2016 Alessandro Ranellucci @alranel
+///|/ Copyright (c) 2013 Guillaume Seguin @iXce
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef slic3r_3DScene_hpp_
 #define slic3r_3DScene_hpp_
 
@@ -30,10 +41,10 @@
     #define glsafe(cmd) cmd
     #define glcheck()
 #endif // HAS_GLSAFE
-extern std::vector<std::array<float, 4>> get_extruders_colors();
+extern std::vector<Slic3r::ColorRGBA> get_extruders_colors();
 extern float FullyTransparentMaterialThreshold;
 extern float FullTransparentModdifiedToFixAlpha;
-extern std::array<float, 4>    adjust_color_for_rendering(const std::array<float, 4> &colors);
+extern Slic3r::ColorRGBA adjust_color_for_rendering(const Slic3r::ColorRGBA &colors);
 
 namespace Slic3r {
 namespace GUI {
@@ -57,7 +68,7 @@ enum ModelInstanceEPrintVolumeState : unsigned char;
 using ModelObjectPtrs = std::vector<ModelObject*>;
 
 // Return appropriate color based on the ModelVolume.
-std::array<float, 4> color_from_model_volume(const ModelVolume& model_volume);
+ColorRGBA color_from_model_volume(const ModelVolume &model_volume);
 
 // A container for interleaved arrays of 3D vertices and normals,
 // possibly indexed by triangles and / or quads.
@@ -264,17 +275,17 @@ class GLVolume {
 public:
     std::string name;
 
-    static std::array<float, 4> DISABLED_COLOR;
-    static std::array<float, 4> SLA_SUPPORT_COLOR;
-    static std::array<float, 4> SLA_PAD_COLOR;
-    static std::array<float, 4> NEUTRAL_COLOR;
-    static std::array<float, 4> UNPRINTABLE_COLOR;
-    static std::array<std::array<float, 4>, 5> MODEL_COLOR;
-    static std::array<float, 4> MODEL_MIDIFIER_COL;
-    static std::array<float, 4> MODEL_NEGTIVE_COL;
-    static std::array<float, 4> SUPPORT_ENFORCER_COL;
-    static std::array<float, 4> SUPPORT_BLOCKER_COL;
-    static std::array<float, 4> MODEL_HIDDEN_COL;
+    static ColorRGBA DISABLED_COLOR;
+    static ColorRGBA SLA_SUPPORT_COLOR;
+    static ColorRGBA SLA_PAD_COLOR;
+    static ColorRGBA NEUTRAL_COLOR;
+    static ColorRGBA UNPRINTABLE_COLOR;
+    static std::array<ColorRGBA, 5> MODEL_COLOR;
+    static ColorRGBA MODEL_MIDIFIER_COL;
+    static ColorRGBA MODEL_NEGTIVE_COL;
+    static ColorRGBA SUPPORT_ENFORCER_COL;
+    static ColorRGBA SUPPORT_BLOCKER_COL;
+    static ColorRGBA MODEL_HIDDEN_COL;
 
     static void update_render_colors();
     static void load_render_colors();
@@ -290,9 +301,8 @@ public:
         HS_Deselect
     };
 
-    GLVolume(float r = 1.f, float g = 1.f, float b = 1.f, float a = 1.f);
-    GLVolume(const std::array<float, 4>& rgba) : GLVolume(rgba[0], rgba[1], rgba[2], rgba[3]) {}
-    virtual ~GLVolume();
+    GLVolume(float r = 1.0f, float g = 1.0f, float b = 1.0f, float a = 1.0f);
+    GLVolume(const ColorRGBA& color) : GLVolume(color.r(), color.g(), color.b(), color.a()) {}
 
     // BBS
 protected:
@@ -332,9 +342,9 @@ protected:
 
 public:
     // Color of the triangles / quads held by this volume.
-    std::array<float, 4> color;
+    ColorRGBA color;
     // Color used to render this volume.
-    std::array<float, 4> render_color;
+    ColorRGBA render_color;
 
     struct CompositeID {
         CompositeID(int object_id, int volume_id, int instance_id) : object_id(object_id), volume_id(volume_id), instance_id(instance_id) {}
@@ -389,9 +399,7 @@ public:
         bool                is_wipe_tower : 1;
 	    // Wheter or not this volume has been generated from an extrusion path
 	    bool                is_extrusion_path : 1;
-	    // Wheter or not to always render this volume using its own alpha
-	    bool                force_transparent : 1;
-	    // Whether or not always use the volume's own color (not using SELECTED/HOVER/DISABLED/OUTSIDE)
+        // Whether or not always use the volume's own color (not using SELECTED/HOVER/DISABLED/OUTSIDE)
 	    bool                force_native_color : 1;
         // Whether or not render this volume in neutral
         bool                force_neutral_color : 1;
@@ -402,7 +410,7 @@ public:
     // Is mouse or rectangle selection over this object to select/deselect it ?
     EHoverState         	hover;
     // raycaster used for picking
-    GUI::MeshRaycaster* mesh_raycaster;
+    std::unique_ptr<GUI::MeshRaycaster> mesh_raycaster;
 
     // Interleaved triangles & normals with indexed triangles & quads.
     GLIndexedVertexArray        indexed_vertex_array;
@@ -431,11 +439,10 @@ public:
         return out;
     }
 
-    void set_color(const std::array<float, 4>& rgba);
-    void set_render_color(float r, float g, float b, float a);
-    void set_render_color(const std::array<float, 4>& rgba);
+    void set_color(const ColorRGBA& rgba)        { color = rgba; }
+    void set_render_color(const ColorRGBA& rgba) { render_color = rgba; }
     // Sets render color in dependence of current state
-    void set_render_color();
+    void set_render_color(bool force_transparent);
     // set color according to model volume
     void set_color_from_model_volume(const ModelVolume& model_volume);
 
@@ -530,7 +537,7 @@ public:
     virtual void        render(bool with_outline = false) const;
 
     //BBS: add simple render function for thumbnail
-    void simple_render(GLShaderProgram* shader, ModelObjectPtrs& model_objects, std::vector<std::array<float, 4>>& extruder_colors) const;
+    void simple_render(GLShaderProgram *shader, ModelObjectPtrs &model_objects, std::vector<ColorRGBA> &extruder_colors) const;
 
     void                finalize_geometry(bool opengl_initialized) { this->indexed_vertex_array.finalize_geometry(opengl_initialized); }
     void                release_geometry() { this->indexed_vertex_array.release_geometry(); }
@@ -561,14 +568,14 @@ public:
 // BBS
 class GLWipeTowerVolume : public GLVolume {
 public:
-    GLWipeTowerVolume(const std::vector<std::array<float, 4>>& colors);
+    GLWipeTowerVolume(const std::vector<ColorRGBA>& colors);
     virtual void render(bool with_outline = false) const;
 
     std::vector<GLIndexedVertexArray> iva_per_colors;
     bool                              IsTransparent();
 
 private:
-    std::vector<std::array<float, 4>> m_colors;
+    std::vector<ColorRGBA> m_colors;
 };
 
 typedef std::vector<GLVolume*> GLVolumePtrs;
@@ -663,8 +670,8 @@ public:
     int load_wipe_tower_preview(
         int obj_idx, float pos_x, float pos_y, float width, float depth, float height, float rotation_angle, bool size_unknown, float brim_width, bool opengl_initialized);
 
-    GLVolume* new_toolpath_volume(const std::array<float, 4>& rgba, size_t reserve_vbo_floats = 0);
-    GLVolume* new_nontoolpath_volume(const std::array<float, 4>& rgba, size_t reserve_vbo_floats = 0);
+    GLVolume* new_toolpath_volume(const ColorRGBA& rgba, size_t reserve_vbo_floats = 0);
+    GLVolume* new_nontoolpath_volume(const ColorRGBA& rgba, size_t reserve_vbo_floats = 0);
 
     int get_selection_support_threshold_angle(bool&) const;
     // Render the volumes by OpenGL.

@@ -369,6 +369,8 @@ bool GLGizmoSlaSupports::gizmo_event(SLAGizmoEventType action, const Vec2d& mous
                     m_editing_cache.emplace_back(sla::SupportPoint(pos_and_normal.first, m_new_point_head_diameter/2.f, false), false, pos_and_normal.second);
                     m_parent.set_as_dirty();
                     m_wait_for_up_event = true;
+                    on_unregister_raycasters_for_picking();
+                    on_register_raycasters_for_picking();
                 }
                 else
                     return false;
@@ -393,7 +395,8 @@ bool GLGizmoSlaSupports::gizmo_event(SLAGizmoEventType action, const Vec2d& mous
 
             // Now ask the rectangle which of the points are inside.
             std::vector<Vec3f> points_inside;
-            std::vector<unsigned int> points_idxs = m_selection_rectangle.stop_dragging(m_parent, points);
+            std::vector<unsigned int> points_idxs = m_selection_rectangle.contains(points);
+            m_selection_rectangle.stop_dragging();
             for (size_t idx : points_idxs)
                 points_inside.push_back(points[idx].cast<float>());
 
