@@ -269,6 +269,18 @@ protected:
 
     // Mark gizmo as dirty to Re-Render when idle()
     void set_dirty();
+
+    /// <summary>
+    /// function which 
+    /// Set up m_dragging and call functions
+    /// on_start_dragging / on_dragging / on_stop_dragging
+    /// </summary>
+    /// <param name="mouse_event">Keep information about mouse click</param>
+    /// <returns>same as on_mouse</returns>
+    bool use_grabbers(const wxMouseEvent &mouse_event);
+
+    void do_stop_dragging(bool perform_mouse_cleanup);
+
 private:
     // Flag for dirty visible state of Gizmo
     // When True then need new rendering

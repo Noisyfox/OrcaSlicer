@@ -50,11 +50,23 @@ std::string GLGizmoMove3D::get_tooltip() const
         return "";
 }
 
+bool GLGizmoMove3D::on_mouse(const wxMouseEvent &mouse_event) {
+    return use_grabbers(mouse_event);
+}
+
+void GLGizmoMove3D::data_changed(bool is_serializing) {
+    m_grabbers[2].enabled = !m_parent.get_selection().is_wipe_tower();
+}
+
 bool GLGizmoMove3D::on_init()
 {
     for (int i = 0; i < 3; ++i) {
         m_grabbers.push_back(Grabber());
+        m_grabbers.back().extensions = GLGizmoBase::EGrabberExtension::PosZ;
     }
+
+    m_grabbers[0].angles = { 0.0, 0.5 * double(PI), 0.0 };
+    m_grabbers[1].angles = { -0.5 * double(PI), 0.0, 0.0 };
 
     m_shortcut_key = WXK_CONTROL_M;
 
@@ -224,7 +236,16 @@ void GLGizmoMove3D::on_render()
         }
     }
 }
+void GLGizmoMove3D::on_register_raycasters_for_picking()
+{
+    // the gizmo grabbers are rendered on top of the scene, so the raytraced picker should take it into account
+    m_parent.set_raycaster_gizmos_on_top(true);
+}
 
+void GLGizmoMove3D::on_unregister_raycasters_for_picking()
+{
+    m_parent.set_raycaster_gizmos_on_top(false);
+}
 
 //BBS: add input window for move
 void GLGizmoMove3D::on_render_input_window(float x, float y, float bottom_limit)

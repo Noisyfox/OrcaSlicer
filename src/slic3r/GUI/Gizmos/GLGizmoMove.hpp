@@ -48,6 +48,17 @@ public:
 
     std::string get_tooltip() const override;
 
+    /// <summary>
+    /// Postpone to Grabber for move
+    /// </summary>
+    /// <param name="mouse_event">Keep information about mouse click</param>
+    /// <returns>Return True when use the information otherwise False.</returns>
+    bool on_mouse(const wxMouseEvent &mouse_event) override;
+
+    /// <summary>
+    /// Detect reduction of move for wipetover on selection change
+    /// </summary>
+    void data_changed(bool is_serializing) override;
 protected:
     virtual bool on_init() override;
     virtual std::string on_get_name() const override;
@@ -56,6 +67,8 @@ protected:
     virtual void on_stop_dragging() override;
     virtual void on_update(const UpdateData& data) override;
     virtual void on_render() override;
+    virtual void on_register_raycasters_for_picking() override;
+    virtual void on_unregister_raycasters_for_picking() override;
     //BBS: GUI refactor: add object manipulation
     virtual void on_render_input_window(float x, float y, float bottom_limit);
 
