@@ -460,7 +460,7 @@ void GLGizmoText::on_render()
     plater->update();
 }
 
-void GLGizmoText::on_update(const UpdateData &data)
+void GLGizmoText::on_dragging(const UpdateData &data)
 {
     Vec2d              mouse_pos = Vec2d(data.mouse_pos.x(), data.mouse_pos.y());
     const ModelObject *mo = m_c->selection_info()->model_object();

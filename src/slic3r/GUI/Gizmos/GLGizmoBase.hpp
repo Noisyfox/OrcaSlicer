@@ -152,7 +152,7 @@ public:
     GLGizmoBase(GLCanvas3D& parent,
                 const std::string& icon_filename,
                 unsigned int sprite_id);
-    virtual ~GLGizmoBase() {}
+    virtual ~GLGizmoBase() = default;
 
     bool init() { return on_init(); }
 
@@ -199,8 +199,6 @@ public:
 
     bool is_dragging() const { return m_dragging; }
 
-    void update(const UpdateData& data);
-
     // returns True when Gizmo changed its state
     bool update_items_state();
 
@@ -245,9 +243,12 @@ protected:
     virtual CommonGizmosDataID on_get_requirements() const { return CommonGizmosDataID(0); }
     virtual void on_enable_grabber(unsigned int id) {}
     virtual void on_disable_grabber(unsigned int id) {}
+       
+    // called inside use_grabbers
     virtual void on_start_dragging() {}
     virtual void on_stop_dragging() {}
-    virtual void on_update(const UpdateData& data) {}
+    virtual void on_dragging(const UpdateData& data) {}
+
     virtual void on_render() = 0;
     virtual void on_render_input_window(float x, float y, float bottom_limit) {}
     void register_grabbers_for_picking();

@@ -44,8 +44,6 @@ public:
     double get_snap_step(double step) const { return m_snap_step; }
     void set_snap_step(double step) { m_snap_step = step; }
 
-    const Vec3d& get_displacement() const { return m_displacement; }
-
     std::string get_tooltip() const override;
 
     /// <summary>
@@ -60,13 +58,13 @@ public:
     /// </summary>
     void data_changed(bool is_serializing) override;
 protected:
-    virtual bool on_init() override;
-    virtual std::string on_get_name() const override;
-    virtual bool on_is_activable() const override;
-    virtual void on_start_dragging() override;
-    virtual void on_stop_dragging() override;
-    virtual void on_update(const UpdateData& data) override;
-    virtual void on_render() override;
+    bool on_init() override;
+    std::string on_get_name() const override;
+    bool on_is_activable() const override;
+    void on_start_dragging() override;
+    void on_stop_dragging() override;
+    void on_dragging(const UpdateData& data) override;
+    void on_render() override;
     virtual void on_register_raycasters_for_picking() override;
     virtual void on_unregister_raycasters_for_picking() override;
     //BBS: GUI refactor: add object manipulation

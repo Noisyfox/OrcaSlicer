@@ -85,20 +85,21 @@ bool GLGizmoMove3D::on_is_activable() const
 
 void GLGizmoMove3D::on_start_dragging()
 {
-    if (m_hover_id != -1) {
-        m_displacement               = Vec3d::Zero();
-        m_starting_drag_position     = m_grabbers[m_hover_id].matrix * m_grabbers[m_hover_id].center;
-        m_starting_box_center        = m_center;
-        m_starting_box_bottom_center = Vec3d(m_center.x(), m_center.y(), m_bounding_box.min.z());
-    }
+    assert(m_hover_id != -1);
+
+    m_displacement               = Vec3d::Zero();
+    m_starting_drag_position     = m_grabbers[m_hover_id].matrix * m_grabbers[m_hover_id].center;
+    m_starting_box_center        = m_center;
+    m_starting_box_bottom_center = Vec3d(m_center.x(), m_center.y(), m_bounding_box.min.z());
 }
 
 void GLGizmoMove3D::on_stop_dragging()
 {
+    m_parent.do_move(L("Gizmo-Move"));
     m_displacement = Vec3d::Zero();
 }
 
-void GLGizmoMove3D::on_update(const UpdateData& data)
+void GLGizmoMove3D::on_dragging(const UpdateData& data)
 {
     if (m_hover_id == 0)
         m_displacement.x() = calc_projection(data);
@@ -106,6 +107,9 @@ void GLGizmoMove3D::on_update(const UpdateData& data)
         m_displacement.y() = calc_projection(data);
     else if (m_hover_id == 2)
         m_displacement.z() = calc_projection(data);
+        
+    Selection &selection = m_parent.get_selection();
+    selection.translate(m_displacement);
 }
 
 void GLGizmoMove3D::on_render()

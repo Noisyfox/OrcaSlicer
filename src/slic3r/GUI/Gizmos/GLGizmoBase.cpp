@@ -222,11 +222,15 @@ void GLGizmoBase::set_icon_filename(const std::string &filename) {
 
 void GLGizmoBase::set_hover_id(int id)
 {
-    if (m_grabbers.empty() || (id < (int)m_grabbers.size()))
-    {
-        m_hover_id = id;
-        on_set_hover_id();
-    }
+    // do not change hover id during dragging
+    if (m_dragging) return;
+
+    // allow empty grabbers when not using grabbers but use hover_id - flatten, rotate
+    if (!m_grabbers.empty() && id >= (int) m_grabbers.size())
+        return;
+
+    m_hover_id = id;
+    on_set_hover_id();  
 }
 
 void GLGizmoBase::set_highlight_color(const std::array<float, 4>& color)
@@ -276,18 +280,13 @@ void GLGizmoBase::stop_dragging()
     //BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << boost::format("this %1%, m_hover_id=%2%\n")%this %m_hover_id;
 }
 
-void GLGizmoBase::update(const UpdateData& data)
-{
-    if (m_hover_id != -1)
-        on_update(data);
-}
-
 bool GLGizmoBase::update_items_state()
 {
     bool res = m_dirty;
     m_dirty  = false;
     return res;
-};
+}
+
 void GLGizmoBase::register_grabbers_for_picking()
 {
     for (size_t i = 0; i < m_grabbers.size(); ++i) {
@@ -391,7 +390,7 @@ bool GLGizmoBase::use_grabbers(const wxMouseEvent &mouse_event) {
             auto       ray = m_parent.mouse_ray(mouse_coord);
             UpdateData data(ray, mouse_coord);
 
-            on_update(data);
+            on_dragging(data);
 
             wxGetApp().obj_manipul()->set_dirty();
             m_parent.set_as_dirty();
