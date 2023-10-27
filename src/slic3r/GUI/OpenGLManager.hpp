@@ -6,6 +6,7 @@
 class wxWindow;
 class wxGLCanvas;
 class wxGLContext;
+class wxGLAttributes;
 
 namespace Slic3r {
 namespace GUI {
@@ -106,7 +107,7 @@ public:
     static bool use_manually_generated_mipmaps() { return m_use_manually_generated_mipmaps; }
 
 private:
-    static void detect_multisample(int* attribList);
+    static void detect_multisample(const wxGLAttributes& attribList);
 };
 
 } // namespace GUI

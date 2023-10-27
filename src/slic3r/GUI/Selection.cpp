@@ -2220,7 +2220,7 @@ void Selection::render_bounding_box(const BoundingBoxf3& box, const ColorRGB& co
         init_data.add_vertex(Vec3f(b_min.x(), b_max.y(), b_max.z() - size.z()));
 
         // indices
-        for (unsigned short i = 0; i < 48; ++i) {
+        for (unsigned int i = 0; i < 48; ++i) {
             init_data.add_index(i);
         }
 
@@ -2229,9 +2229,7 @@ void Selection::render_bounding_box(const BoundingBoxf3& box, const ColorRGB& co
 
     glsafe(::glEnable(GL_DEPTH_TEST));
 
-    glsafe(::glLineWidth(2.0f * m_scale_factor));
-
-    GLShaderProgram* shader = wxGetApp().get_shader("flat");
+    GLShaderProgram* shader = wxGetApp().get_shader("dashed_thick_lines");
     if (shader == nullptr)
         return;
 
@@ -2239,6 +2237,10 @@ void Selection::render_bounding_box(const BoundingBoxf3& box, const ColorRGB& co
     const Camera& camera = wxGetApp().plater()->get_camera();
     shader->set_uniform("view_model_matrix", camera.get_view_matrix());
     shader->set_uniform("projection_matrix", camera.get_projection_matrix());
+    const std::array<int, 4>& viewport = camera.get_viewport();
+    shader->set_uniform("viewport_size", Vec2d(double(viewport[2]), double(viewport[3])));
+    shader->set_uniform("width", 1.5f);
+    shader->set_uniform("gap_size", 0.0f);
     m_box.set_color(to_rgba(color));
     m_box.render();
     shader->stop_using();

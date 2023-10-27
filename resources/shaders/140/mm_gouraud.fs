@@ -40,6 +40,8 @@ struct SlopeDetection
 };
 uniform SlopeDetection slope;
 
+out vec4 out_color;
+
 void main()
 {
     if (any(lessThan(clipping_planes_dots, ZERO)))
@@ -86,5 +88,5 @@ void main()
     NdotL = max(dot(eye_normal, LIGHT_FRONT_DIR), 0.0);
     intensity.x += NdotL * LIGHT_FRONT_DIFFUSE;
 
-    gl_FragColor = vec4(vec3(intensity.y) + color * intensity.x, alpha);
+    out_color = vec4(vec3(intensity.y) + color * intensity.x, alpha);
 }

@@ -128,8 +128,7 @@ void GLGizmoRotate::on_render()
 
     m_grabbers.front().matrix = local_transform(selection);
 
-    glsafe(::glLineWidth((m_hover_id != -1) ? 2.0f : 1.5f));
-    GLShaderProgram* shader = wxGetApp().get_shader("flat");
+    GLShaderProgram* shader = wxGetApp().get_shader("dashed_thick_lines");
     if (shader != nullptr) {
         shader->start_using();
 
@@ -138,11 +137,15 @@ void GLGizmoRotate::on_render()
 
         shader->set_uniform("view_model_matrix", view_model_matrix);
         shader->set_uniform("projection_matrix", camera.get_projection_matrix());
+        const std::array<int, 4>& viewport = camera.get_viewport();
+        shader->set_uniform("viewport_size", Vec2d(double(viewport[2]), double(viewport[3])));
+        shader->set_uniform("width", 0.25f);
+        shader->set_uniform("gap_size", 0.0f);
 
         const bool radius_changed = std::abs(m_old_radius - m_radius) > EPSILON;
         m_old_radius = m_radius;
 
-        ColorRGBA color((m_hover_id != -1) ? m_drag_color : m_highlight_color);
+        const ColorRGBA color = (m_hover_id != -1) ? m_drag_color : m_highlight_color;
         render_circle(color, radius_changed);
         if (m_hover_id != -1) {
             const bool hover_radius_changed = std::abs(m_old_hover_radius - m_radius) > EPSILON;
