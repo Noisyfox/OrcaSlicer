@@ -224,7 +224,7 @@ public:
      */
     void generate();
 
-    void detect_overhangs(bool detect_first_sharp_tail_only=false);
+    void detect_overhangs(bool detect_first_sharp_tail_only=false, std::vector<ExPolygons>* overhangs=nullptr);
 
     enum NodeType {
         eCircle,
@@ -398,6 +398,7 @@ public:
     double max_cantilever_dist = 0;
     SupportType support_type;
     SupportMaterialStyle support_style;
+    size_t m_raft_layers = 0;
 
     std::unique_ptr<FillLightning::Generator> generator;
     std::unordered_map<double, size_t> printZ_to_lightninglayer;
@@ -414,7 +415,6 @@ private:
     SlicingParameters        m_slicing_params;
     // Various precomputed support parameters to be shared with external functions.
     SupportParams   m_support_params;
-    size_t          m_raft_layers = 0;
     size_t          m_highest_overhang_layer = 0;
     std::vector<std::vector<MinimumSpanningTree>> m_spanning_trees;
     std::vector< std::unordered_map<Line, bool, LineHash>> m_mst_line_x_layer_contour_caches;

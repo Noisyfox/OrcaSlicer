@@ -712,7 +712,7 @@ TreeSupport::TreeSupport(PrintObject& object, const SlicingParameters &slicing_p
 
 
 #define SUPPORT_SURFACES_OFFSET_PARAMETERS ClipperLib::jtSquare, 0.
-void TreeSupport::detect_overhangs(bool detect_first_sharp_tail_only)
+void TreeSupport::detect_overhangs(bool detect_first_sharp_tail_only, std::vector<ExPolygons> *overhangs)
 {
     // overhangs are already detected
     if (m_object->support_layer_count() >= m_object->layer_count())
@@ -1150,6 +1150,15 @@ void TreeSupport::detect_overhangs(bool detect_first_sharp_tail_only)
 
         if (!ts_layer->overhang_areas.empty()) has_overhangs = true;
         if (!layer->cantilevers.empty()) has_cantilever = true;
+    }
+
+    // Output detect result
+    if (overhangs) {
+        overhangs->clear();
+        overhangs->reserve(m_object->support_layer_count());
+        for (const auto & support_layer : m_object->support_layers()) {
+            overhangs->emplace_back(support_layer->overhang_areas);
+        }
     }
 
 #ifdef SUPPORT_TREE_DEBUG_TO_SVG

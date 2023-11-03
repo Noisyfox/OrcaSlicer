@@ -40,6 +40,11 @@
 #include <tbb/parallel_for.h>
 
 // #define TREESUPPORT_DEBUG_SVG
+#define USE_BBS_OVERHANG_DETECTION
+
+#ifdef USE_BBS_OVERHANG_DETECTION
+#include "../TreeSupport.hpp"
+#endif
 
 using namespace Slic3r::FFFSupport;
 
@@ -193,6 +198,7 @@ static std::vector<std::pair<TreeSupportSettings, std::vector<size_t>>> group_me
 }
 #endif
 
+#ifndef USE_BBS_OVERHANG_DETECTION
 [[nodiscard]] static const std::vector<Polygons> generate_overhangs(const TreeSupportSettings &settings, const PrintObject &print_object, std::function<void()> throw_on_cancel)
 {
     const size_t num_raft_layers   = settings.raft_layers.size();
@@ -287,7 +293,19 @@ static std::vector<std::pair<TreeSupportSettings, std::vector<size_t>>> group_me
                     overhangs = overhangs.empty() ? std::move(enforced_overhangs) : union_(overhangs, enforced_overhangs);
                     //check_self_intersections(overhangs, "generate_overhangs - enforcers");
                 }
-            }   
+            }
+#ifdef TREESUPPORT_BLOCKER_DEBUG_SVG
+            {
+                std::vector<std::pair<Slic3r::ExPolygons, SVG::ExPolygonAttributes>> p = {
+                    {{current_layer.lslices}, {"current_layer.lslices", "yellow", 0.5f}},
+                };
+                if (!(blockers_layers.empty() || blockers_layers[layer_id].empty())) {
+                    p.push_back({union_ex(blockers_layers[layer_id]), {"blockers_layers", "red", 0.5f}});
+                }
+                p.push_back({union_ex(overhangs), {"overhangs", "black", 1.0f}});
+                SVG::export_expolygons(debug_out_path("treesupport-layers-%d.svg", layer_id), p);
+            }
+#endif // TREESUPPORT_BLOCKER_DEBUG_SVG
             out[layer_id + num_raft_layers] = std::move(overhangs);
             throw_on_cancel();
         }
@@ -320,6 +338,38 @@ static std::vector<std::pair<TreeSupportSettings, std::vector<size_t>>> group_me
 
     return out;
 }
+#else
+static std::vector<Polygons> generate_overhangs(const TreeSupportSettings &settings, PrintObject &print_object, std::function<void()> throw_on_cancel)
+{
+    print_object.clear_support_layers();
+    print_object.clear_tree_support_preview_cache();
+
+    const size_t num_raft_layers   = settings.raft_layers.size();
+    const size_t num_object_layers = print_object.layer_count();
+    const size_t num_layers        = num_object_layers + num_raft_layers;
+    std::vector<ExPolygons> overhangs;
+
+    // Use BBS' tree support overhang detection algorithm
+    Slic3r::TreeSupport tree_support(print_object, print_object.slicing_parameters());
+    tree_support.detect_overhangs(false, &overhangs);
+
+    throw_on_cancel();
+
+    // Clear intermediate data
+    print_object.clear_support_layers();
+    print_object.clear_tree_support_preview_cache();
+
+    // Convert output
+    std::vector<Polygons> out(num_raft_layers, Polygons{});
+    out.reserve(num_layers);
+
+    for (auto it = overhangs.begin() + tree_support.m_raft_layers; it != overhangs.end(); it++) {
+        out.emplace_back(union_(*it));
+    }
+
+    return out;
+}
+#endif
 
 /*!
  * \brief Precalculates all avoidances, that could be required.
