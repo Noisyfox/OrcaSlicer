@@ -449,7 +449,8 @@ static ExtrusionEntityCollection traverse_loops(const PerimeterGenerator &perime
             assert(thin_walls.empty());
             ExtrusionEntityCollection children = traverse_loops(perimeter_generator, loop.children, thin_walls, steep_overhang_contour, steep_overhang_hole);
             out.entities.reserve(out.entities.size() + children.entities.size() + 1);
-            ExtrusionLoop *eloop = static_cast<ExtrusionLoop*>(coll.entities[idx.first]);
+            ExtrusionLoop *eloop = nullptr;
+            //static_cast<ExtrusionLoop *>(coll.entities[idx.first]);
             coll.entities[idx.first] = nullptr;
 
             eloop->make_counter_clockwise();
