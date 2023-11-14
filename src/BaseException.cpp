@@ -1,3 +1,5 @@
+
+#include <backward.hpp>
 #include "BaseException.h"
 #include <iomanip>
 #include <string>
@@ -8,13 +10,14 @@
 #include <boost/log/trivial.hpp>
 #include <boost/format.hpp>
 #include <mutex>
+#include <tchar.h>
+
 
 static std::string g_log_folder;
 static std::atomic<int> g_crash_log_count = 0;
 static std::mutex g_dump_mutex;
 
-CBaseException::CBaseException(HANDLE hProcess, WORD wPID, LPCTSTR lpSymbolPath, PEXCEPTION_POINTERS pEp):
-	CStackWalker(hProcess, wPID, lpSymbolPath)
+CBaseException::CBaseException(HANDLE hProcess, WORD wPID, LPCTSTR lpSymbolPath, PEXCEPTION_POINTERS pEp)
 {
 	if (NULL != pEp)
 	{
@@ -53,6 +56,16 @@ void CBaseException::set_log_folder(std::string log_folder)
 	g_log_folder = log_folder;
 }
 
+// Convert a wide Unicode string to an UTF8 string
+std::string utf8_encode(const std::wstring &wstr, UINT codePage = CP_ACP)
+{
+    if( wstr.empty() ) return std::string();
+    int size_needed = WideCharToMultiByte(codePage, 0, &wstr[0], (int)wstr.size(), NULL, 0, NULL, NULL);
+    std::string strTo( size_needed, 0 );
+    WideCharToMultiByte(codePage, 0, &wstr[0], (int) wstr.size(), &strTo[0], size_needed, NULL, NULL);
+    return strTo;
+}
+
 void CBaseException::OutputString(LPCTSTR lpszFormat, ...)
 {
 	TCHAR szBuf[2048] = _T("");
@@ -64,36 +77,25 @@ void CBaseException::OutputString(LPCTSTR lpszFormat, ...)
 	//WriteConsole(GetStdHandle(STD_OUTPUT_HANDLE), szBuf, _tcslen(szBuf), NULL, NULL);
 
 	//output it to the current directory of binary
-	std::string output_str = textconv_helper::T2A_(szBuf);
+	std::string output_str = utf8_encode(szBuf);
 	*output_file << output_str;
 	output_file->flush();
 }
 
-void CBaseException::ShowLoadModules()
-{
-	LoadSymbol();
-	LPMODULE_INFO pHead = GetLoadModules();
-	LPMODULE_INFO pmi = pHead;
-
-	TCHAR szBuf[MAX_COMPUTERNAME_LENGTH] = _T("");
-	DWORD dwSize = MAX_COMPUTERNAME_LENGTH;
-	GetUserName(szBuf, &dwSize);
-	OutputString(_T("Current User:%s\r\n"), szBuf);
-	OutputString(_T("BaseAddress:\tSize:\tName\tPath\tSymbolPath\tVersion\r\n"));
-	while (NULL != pmi)
-	{
-		OutputString(_T("%08x\t%d\t%s\t%s\t%s\t%s\r\n"), (unsigned long)(pmi->ModuleAddress), pmi->dwModSize, pmi->szModuleName, pmi->szModulePath, pmi->szSymbolPath, pmi->szVersion);
-		pmi = pmi->pNext;
-	}
-
-	FreeModuleInformations(pHead);
-}
-
-void CBaseException::ShowCallstack(HANDLE hThread, const CONTEXT* context)
+void CBaseException::ShowCallstack(HANDLE hThread, CONTEXT* context)
 {
 	OutputString(_T("Show CallStack:\r\n"));
-	LPSTACKINFO phead = StackWalker(hThread, context);
-	FreeStackInformations(phead);
+
+    backward::Printer printer;
+
+    backward::StackTrace st;
+    st.set_machine_type(printer.resolver().machine_type());
+    st.set_thread_handle(hThread);
+    st.load_here(32, context);
+    st.skip_n_firsts(0);
+
+    printer.address = true;
+    printer.print(st, *output_file);
 }
 
 void CBaseException::ShowExceptionResoult(DWORD dwExceptionCode)
@@ -296,7 +298,7 @@ BOOL CBaseException::GetLogicalAddress(
 	for (unsigned i = 0; i < pNtHdr->FileHeader.NumberOfSections; i++, pSection++ )
 	{
 		DWORD sectionStart = pSection->VirtualAddress;
-		DWORD sectionEnd = sectionStart + max(pSection->SizeOfRawData, pSection->Misc.VirtualSize);
+		DWORD sectionEnd = sectionStart + std::max(pSection->SizeOfRawData, pSection->Misc.VirtualSize);
 
 		if ( (rva >= sectionStart) && (rva <= sectionEnd) )
 		{
@@ -307,24 +309,6 @@ BOOL CBaseException::GetLogicalAddress(
 	}
 
 	return FALSE;   // Should never get here!
-}
-
-void CBaseException::ShowRegistorInformation(PCONTEXT pCtx)
-{
-#ifdef _M_IX86  // Intel Only!
-	OutputString( _T("\nRegisters:\r\n") );
-
-	OutputString(_T("EAX:%08X\r\nEBX:%08X\r\nECX:%08X\r\nEDX:%08X\r\nESI:%08X\r\nEDI:%08X\r\n"),
-		pCtx->Eax, pCtx->Ebx, pCtx->Ecx, pCtx->Edx, pCtx->Esi, pCtx->Edi );
-
-	OutputString( _T("CS:EIP:%04X:%08X\r\n"), pCtx->SegCs, pCtx->Eip );
-	OutputString( _T("SS:ESP:%04X:%08X  EBP:%08X\r\n"),pCtx->SegSs, pCtx->Esp, pCtx->Ebp );
-	OutputString( _T("DS:%04X  ES:%04X  FS:%04X  GS:%04X\r\n"), pCtx->SegDs, pCtx->SegEs, pCtx->SegFs, pCtx->SegGs );
-	OutputString( _T("Flags:%08X\r\n"), pCtx->EFlags );
-
-#endif
-
-	OutputString( _T("\r\n") );
 }
 
 void CBaseException::STF(unsigned int ui,  PEXCEPTION_POINTERS pEp)
@@ -351,8 +335,6 @@ void CBaseException::ShowExceptionInformation()
 	DWORD section, offset;
 	GetLogicalAddress(m_pEp->ExceptionRecord->ExceptionAddress, szFaultingModule, sizeof(szFaultingModule), section, offset );
 	OutputString( _T("Fault address:  0x%X 0x%X:0x%X %s\r\n"), m_pEp->ExceptionRecord->ExceptionAddress, section, offset, szFaultingModule );
-
-	ShowRegistorInformation(m_pEp->ContextRecord);
 
 	ShowCallstack(GetCurrentThread(), m_pEp->ContextRecord);
 }
