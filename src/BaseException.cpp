@@ -95,6 +95,8 @@ void CBaseException::ShowCallstack(HANDLE hThread, CONTEXT* context)
     st.skip_n_firsts(0);
 
     printer.address = true;
+    printer.object = true;
+    printer.reverse = false;
     printer.print(st, *output_file);
 }
 
