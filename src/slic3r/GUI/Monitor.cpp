@@ -102,9 +102,13 @@ AddMachinePanel::~AddMachinePanel() {
     SetDoubleBuffered(true);
 #endif //__WINDOWS__
 
+    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " start init_bitmap";
     init_bitmap();
+    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " end init_bitmap";
 
+    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " start init_tabpanel";
     init_tabpanel();
+    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " end init_tabpanel";
 
     m_main_sizer = new wxBoxSizer(wxHORIZONTAL);
     m_main_sizer->Add(m_tabpanel, 1, wxEXPAND | wxLEFT, 0);
@@ -158,10 +162,14 @@ MonitorPanel::~MonitorPanel()
 
  void MonitorPanel::init_tabpanel()
 {
+    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " start new SideTools";
     m_side_tools = new SideTools(this, wxID_ANY);
+    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " end new SideTools";
     wxBoxSizer* sizer_side_tools = new wxBoxSizer(wxVERTICAL);
     sizer_side_tools->Add(m_side_tools, 1, wxEXPAND, 0);
+    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " start new Tabbook";
     m_tabpanel             = new Tabbook(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, sizer_side_tools, wxNB_LEFT | wxTAB_TRAVERSAL | wxNB_NOPAGETHEME);
+    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " end new Tabbook";
     m_side_tools->set_table_panel(m_tabpanel);
     m_tabpanel->SetBackgroundColour(wxColour("#FEFFFF"));
     m_tabpanel->Bind(wxEVT_BOOKCTRL_PAGE_CHANGED, [this](wxBookCtrlEvent& e) {
@@ -174,21 +182,27 @@ MonitorPanel::~MonitorPanel()
     }, m_tabpanel->GetId());
 
     //m_status_add_machine_panel = new AddMachinePanel(m_tabpanel);
+    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " start new StatusPanel";
     m_status_info_panel        = new StatusPanel(m_tabpanel);
     m_tabpanel->AddPage(m_status_info_panel, _L("Status"), "", true);
 
+    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " start new MediaFilePanel";
     m_media_file_panel = new MediaFilePanel(m_tabpanel);
     m_tabpanel->AddPage(m_media_file_panel, _L("SD Card"), "", false);
     //m_tabpanel->AddPage(m_media_file_panel, _L("Internal Storage"), "", false);
 
+    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " start new UpgradePanel";
     m_upgrade_panel = new UpgradePanel(m_tabpanel);
     m_tabpanel->AddPage(m_upgrade_panel, _L("Update"), "", false);
 
+    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " start new HMSPanel";
     m_hms_panel = new HMSPanel(m_tabpanel);
     m_tabpanel->AddPage(m_hms_panel, _L("HMS"),"", false);
 
     m_initialized = true;
+    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " start show_status";
     show_status((int)MonitorStatus::MONITOR_NO_PRINTER);
+    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " end show_status";
 }
 
 void MonitorPanel::set_default()

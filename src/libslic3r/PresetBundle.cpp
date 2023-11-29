@@ -240,6 +240,7 @@ PresetsConfigSubstitutions PresetBundle::load_presets(AppConfig &config, Forward
     BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << boost::format(" enter, substitution_rule %1%, preferred printer_model_id %2%")%substitution_rule%preferred_selection.printer_model_id;
     //BBS: change system config to json
     std::tie(substitutions, errors_cummulative) = this->load_system_presets_from_json(substitution_rule);
+    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " end load_system_presets_from_json";
 
     // BBS load preset from user's folder, load system default if
     // BBS: change directories by design
@@ -2828,9 +2829,11 @@ void PresetBundle::load_config_file_config(const std::string &name_or_path, bool
 std::pair<PresetsConfigSubstitutions, size_t> PresetBundle::load_vendor_configs_from_json(
     const std::string &path, const std::string &vendor_name, LoadConfigBundleAttributes flags, ForwardCompatibilitySubstitutionRule compatibility_rule)
 {
+    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " 1";
     // Enable substitutions for user config bundle, throw an exception when loading a system profile.
     ConfigSubstitutionContext  substitution_context { compatibility_rule };
     PresetsConfigSubstitutions substitutions;
+    substitutions.reserve(100);
     std::string vendor_system_path = data_dir() + "/" + PRESET_SYSTEM_DIR;
 
     //BBS: add config related logs
@@ -2926,6 +2929,7 @@ std::pair<PresetsConfigSubstitutions, size_t> PresetBundle::load_vendor_configs_
                 %root_file %err.what() %vendor_system_path).str());
         //goto __error_process;
     }
+    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " 2";
 
     //2) paste the machine model
     for (auto& machine_model : machine_model_subfiles)
@@ -3021,6 +3025,7 @@ std::pair<PresetsConfigSubstitutions, size_t> PresetBundle::load_vendor_configs_
     if (flags.has(LoadConfigBundleAttribute::LoadVendorOnly))
         return std::make_pair(PresetsConfigSubstitutions{}, 0);
 
+    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " 3";
     // 3) paste the process/filament/print configs
     PresetCollection         *presets = nullptr;
     size_t                   presets_loaded = 0;
@@ -3049,6 +3054,7 @@ std::pair<PresetsConfigSubstitutions, size_t> PresetBundle::load_vendor_configs_
 
             //parse the json elements
             DynamicPrintConfig config_src;
+            BOOST_LOG_TRIVIAL(info) << " parse_subfile " << subfile;
             config_src.load_from_json(subfile, substitution_context, false, key_values, reason);
             if (!reason.empty()) {
                 BOOST_LOG_TRIVIAL(error) << __FUNCTION__<< ": load config file "<<subfile<<" Failed!";
@@ -3225,6 +3231,7 @@ std::pair<PresetsConfigSubstitutions, size_t> PresetBundle::load_vendor_configs_
         }
     }
 
+    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " 3.2";
     //3.2) paste the filaments
     presets = &this->filaments;
     configs.clear();
@@ -3240,6 +3247,7 @@ std::pair<PresetsConfigSubstitutions, size_t> PresetBundle::load_vendor_configs_
         }
     }
 
+    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " 3.3";
     //3.3) paste the printers
     presets = &this->printers;
     configs.clear();
@@ -3255,6 +3263,7 @@ std::pair<PresetsConfigSubstitutions, size_t> PresetBundle::load_vendor_configs_
         }
     }
 
+    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " end";
     //BBS: add config related logs
     BOOST_LOG_TRIVIAL(debug) << __FUNCTION__ << boost::format(", finished, presets_loaded %1%")%presets_loaded;
     return std::make_pair(std::move(substitutions), presets_loaded);

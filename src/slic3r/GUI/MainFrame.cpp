@@ -1047,11 +1047,15 @@ void MainFrame::init_tabpanel() {
     create_preset_tabs();
 
         //BBS add pages
+    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " start new MonitorPanel";
     m_monitor = new MonitorPanel(m_tabpanel, wxID_ANY, wxDefaultPosition, wxDefaultSize);
+    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " end new MonitorPanel";
     m_monitor->SetBackgroundColour(*wxWHITE);
     m_tabpanel->AddPage(m_monitor, _L("Device"), std::string("tab_monitor_active"), std::string("tab_monitor_active"));
 
+    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " start new PrinterWebView";
     m_printer_view = new PrinterWebView(m_tabpanel);
+    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " end new PrinterWebView";
     Bind(EVT_LOAD_PRINTER_URL, [this](LoadPrinterViewEvent &evt) {
         wxString url = evt.GetString();
         wxString key = evt.GetAPIkey();
@@ -1059,12 +1063,16 @@ void MainFrame::init_tabpanel() {
         m_printer_view->load_url(url, key);
     });
     m_printer_view->Hide();
-    
+
+    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " start new ProjectPanel";
     m_project = new ProjectPanel(m_tabpanel, wxID_ANY, wxDefaultPosition, wxDefaultSize);
+    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " end new ProjectPanel";
     m_project->SetBackgroundColour(*wxWHITE);
     m_tabpanel->AddPage(m_project, _L("Project"), std::string("tab_auxiliary_avtice"), std::string("tab_auxiliary_avtice"));
 
+    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " start new CalibrationPanel";
     m_calibration = new CalibrationPanel(m_tabpanel, wxID_ANY, wxDefaultPosition, wxDefaultSize);
+    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " end new CalibrationPanel";
     m_calibration->SetBackgroundColour(*wxWHITE);
     m_tabpanel->AddPage(m_calibration, _L("Calibration"), std::string("tab_monitor_active"), std::string("tab_monitor_active"));
 

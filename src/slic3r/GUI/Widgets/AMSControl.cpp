@@ -2385,7 +2385,9 @@ AMSControl::AMSControl(wxWindow *parent, wxWindowID id, const wxPoint &pos, cons
     extruder_pane->SetSizer(sizer_sextruder);
     extruder_pane->Layout();
 
+    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " 1";
     m_extruder = new AMSextruder(extruder_pane, wxID_ANY, wxDefaultPosition, AMS_EXTRUDER_SIZE);
+    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " 2";
     sizer_sextruder->Add(m_extruder, 0, wxALIGN_CENTER, 0);
 
     m_sizer_left_bottom->Add(extruder_pane, 0, wxALL,0);
@@ -2474,8 +2476,11 @@ AMSControl::AMSControl(wxWindow *parent, wxWindowID id, const wxPoint &pos, cons
     auto vams_panel = new wxWindow(m_panel_virtual, wxID_ANY);
     vams_panel->SetBackgroundColour(AMS_CONTROL_DEF_BLOCK_BK_COLOUR);
 
+    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " 3";
     m_vams_lib = new AMSLib(vams_panel, m_vams_info);
+    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " 4";
     m_vams_road = new AMSRoad(vams_panel, wxID_ANY, m_vams_info, -1, -1, wxDefaultPosition, AMS_CAN_ROAD_SIZE);
+    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " 5";
 
     m_vams_lib->Bind(wxEVT_LEFT_DOWN, [this](auto& e) {
         //clear all selected
@@ -2549,6 +2554,7 @@ AMSControl::AMSControl(wxWindow *parent, wxWindowID id, const wxPoint &pos, cons
     m_sizer_vams_tips->Add(m_vams_tip, 0, wxTOP, FromDIP(5));
     m_sizer_vams_tips->Add(m_img_vams_tip, 0, wxALL, FromDIP(3));
 
+    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " 6";
     m_vams_extra_road = new AMSVirtualRoad(m_amswin, wxID_ANY);
     m_vams_extra_road->SetMinSize(wxSize(m_panel_virtual->GetSize().x + FromDIP(16), -1));
 
@@ -2586,6 +2592,7 @@ AMSControl::AMSControl(wxWindow *parent, wxWindowID id, const wxPoint &pos, cons
     tip_right->SetSizer(m_sizer_right_tip);
     tip_right->Layout();
 
+    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " 7";
     m_filament_load_step = new ::StepIndicator(m_simplebook_right, wxID_ANY);
     m_filament_load_step->SetMinSize(AMS_STEP_SIZE);
     m_filament_load_step->SetMaxSize(AMS_STEP_SIZE);
@@ -2606,7 +2613,8 @@ AMSControl::AMSControl(wxWindow *parent, wxWindowID id, const wxPoint &pos, cons
     m_simplebook_right->AddPage(m_filament_unload_step, wxEmptyString, false);
     m_simplebook_right->AddPage(m_filament_vt_load_step, wxEmptyString, false);
 
-
+    
+    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " 8";
     m_button_ams_setting_normal = ScalableBitmap(this, "ams_setting_normal", 24);
     m_button_ams_setting_hover = ScalableBitmap(this, "ams_setting_hover", 24);
     m_button_ams_setting_press = ScalableBitmap(this, "ams_setting_press", 24);
@@ -2650,6 +2658,7 @@ AMSControl::AMSControl(wxWindow *parent, wxWindowID id, const wxPoint &pos, cons
     m_sizer_body->Add(0, 0, 1, wxEXPAND | wxTOP, FromDIP(18));
     m_sizer_body->Add(m_sizer_bottom, 0, wxEXPAND | wxLEFT, FromDIP(6));
 
+    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " 9";
     init_scaled_buttons();
     m_amswin->SetSizer(m_sizer_body);
     m_amswin->Layout();
@@ -2682,6 +2691,7 @@ AMSControl::AMSControl(wxWindow *parent, wxWindowID id, const wxPoint &pos, cons
     m_in_calibration_panel->SetSizer(sizer_calibration_h);
     m_in_calibration_panel->Layout();
 
+    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " 10";
     auto m_calibration_err_panel = new wxWindow(m_simplebook_calibration, wxID_ANY, wxDefaultPosition, m_amswin->GetSize(), wxTAB_TRAVERSAL);
     m_calibration_err_panel->SetBackgroundColour(AMS_CONTROL_WHITE_COLOUR);
     wxBoxSizer *sizer_err_calibration_h = new wxBoxSizer(wxHORIZONTAL);
@@ -2729,6 +2739,7 @@ AMSControl::AMSControl(wxWindow *parent, wxWindowID id, const wxPoint &pos, cons
     AddPage(m_amswin, wxEmptyString, false);
     AddPage(m_simplebook_calibration, wxEmptyString, false);
 
+    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " 11";
     UpdateStepCtrl(false);
 
     //m_button_extrusion_cali->Connect(wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler(AMSControl::on_extrusion_cali), NULL, this);
@@ -2765,9 +2776,12 @@ AMSControl::AMSControl(wxWindow *parent, wxWindowID id, const wxPoint &pos, cons
         post_event(wxCommandEvent(EVT_AMS_RETRY));
         });
 
+    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " 12";
     CreateAms();
+    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " 13";
     SetSelection(0);
     EnterNoneAMSMode();
+    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " 14";
 }
 
 void AMSControl::on_retry()
@@ -3066,10 +3080,14 @@ void AMSControl::CreateAms()
     std::vector<AMSinfo>           ams_info{ams1, ams2, ams3, ams4};
     std::vector<AMSinfo>::iterator it;
     Freeze();
-    for (it = ams_info.begin(); it != ams_info.end(); it++) { 
-        AddAmsItems(*it); 
+    for (it = ams_info.begin(); it != ams_info.end(); it++) {
+        BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " 1";
+        AddAmsItems(*it);
+        BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " 2";
         AddAms(*it);
+        BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " 3";
         AddExtraAms(*it);
+        BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " 4";
         m_ams_info.push_back(*it);
     }
 

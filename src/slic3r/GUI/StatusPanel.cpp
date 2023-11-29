@@ -777,14 +777,18 @@ void PrintingTaskPanel::set_star_count(int star_count)
 StatusBasePanel::StatusBasePanel(wxWindow *parent, wxWindowID id, const wxPoint &pos, const wxSize &size, long style, const wxString &name)
     : wxScrolledWindow(parent, id, pos, size, wxHSCROLL | wxVSCROLL)
 {
+    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " start StatusBasePanel";
     this->SetScrollRate(5, 5);
 
+    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " 1";
     init_bitmaps();
 
+    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " 2";
     this->SetBackgroundColour(wxColour(0xEE, 0xEE, 0xEE));
 
     wxBoxSizer *bSizer_status = new wxBoxSizer(wxVERTICAL);
 
+    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " 3";
     auto m_panel_separotor_top = new wxPanel(this, wxID_ANY, wxDefaultPosition, wxSize(-1, PAGE_SPACING), wxTAB_TRAVERSAL);
     m_panel_separotor_top->SetBackgroundColour(STATUS_PANEL_BG);
 
@@ -792,23 +796,28 @@ StatusBasePanel::StatusBasePanel(wxWindow *parent, wxWindowID id, const wxPoint 
 
     wxBoxSizer *bSizer_status_below = new wxBoxSizer(wxHORIZONTAL);
 
+    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " 4";
     auto m_panel_separotor_left = new wxPanel(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTAB_TRAVERSAL);
     m_panel_separotor_left->SetBackgroundColour(STATUS_PANEL_BG);
     m_panel_separotor_left->SetMinSize(wxSize(PAGE_SPACING, -1));
 
+    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " 5";
     bSizer_status_below->Add(m_panel_separotor_left, 0, wxEXPAND | wxALL, 0);
 
     wxBoxSizer *bSizer_left = new wxBoxSizer(wxVERTICAL);
 
+    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " 6";
     auto m_monitoring_sizer = create_monitoring_page();
     bSizer_left->Add(m_monitoring_sizer, 1, wxEXPAND | wxALL, 0);
 
+    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " 7";
     auto m_panel_separotor1 = new wxPanel(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTAB_TRAVERSAL);
     m_panel_separotor1->SetBackgroundColour(STATUS_PANEL_BG);
     m_panel_separotor1->SetMinSize(wxSize(-1, PAGE_SPACING));
     m_panel_separotor1->SetMaxSize(wxSize(-1, PAGE_SPACING));
     m_monitoring_sizer->Add(m_panel_separotor1, 0, wxEXPAND, 0);
 
+    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " 8";
     m_project_task_panel = new PrintingTaskPanel(this, PrintingTaskType::PRINGINT);
     m_project_task_panel->init_bitmaps();
     m_monitoring_sizer->Add(m_project_task_panel, 0, wxALL | wxEXPAND , 0);
@@ -820,15 +829,18 @@ StatusBasePanel::StatusBasePanel(wxWindow *parent, wxWindowID id, const wxPoint 
 
     bSizer_status_below->Add(bSizer_left, 1, wxALL | wxEXPAND, 0);
 
+    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " 9";
     auto m_panel_separator_middle = new wxPanel(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxBORDER_NONE | wxTAB_TRAVERSAL);
     m_panel_separator_middle->SetBackgroundColour(STATUS_PANEL_BG);
     m_panel_separator_middle->SetMinSize(wxSize(PAGE_SPACING, -1));
 
     bSizer_status_below->Add(m_panel_separator_middle, 0, wxEXPAND | wxALL, 0);
 
+    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " 10";
     m_machine_ctrl_panel = new wxPanel(this);
     m_machine_ctrl_panel->SetBackgroundColour(*wxWHITE);
     m_machine_ctrl_panel->SetDoubleBuffered(true);
+    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " 11";
     auto m_machine_control = create_machine_control_page(m_machine_ctrl_panel);
     m_machine_ctrl_panel->SetSizer(m_machine_control);
     m_machine_ctrl_panel->Layout();
@@ -836,6 +848,7 @@ StatusBasePanel::StatusBasePanel(wxWindow *parent, wxWindowID id, const wxPoint 
 
     bSizer_status_below->Add(m_machine_ctrl_panel, 0, wxALL, 0);
 
+    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " 12";
     m_panel_separator_right = new wxPanel(this, wxID_ANY, wxDefaultPosition, wxSize(PAGE_SPACING, -1), wxTAB_TRAVERSAL);
     m_panel_separator_right->SetBackgroundColour(STATUS_PANEL_BG);
 
@@ -843,12 +856,14 @@ StatusBasePanel::StatusBasePanel(wxWindow *parent, wxWindowID id, const wxPoint 
 
     bSizer_status->Add(bSizer_status_below, 1, wxALL | wxEXPAND, 0);
 
+    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " 13";
     m_panel_separotor_bottom = new wxPanel(this, wxID_ANY, wxDefaultPosition, wxSize(-1, PAGE_SPACING), wxTAB_TRAVERSAL);
     m_panel_separotor_bottom->SetBackgroundColour(STATUS_PANEL_BG);
 
     bSizer_status->Add(m_panel_separotor_bottom, 0, wxEXPAND | wxALL, 0);
     this->SetSizerAndFit(bSizer_status);
     this->Layout();
+    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " end StatusBasePanel";
 }
 
 StatusBasePanel::~StatusBasePanel()
@@ -992,21 +1007,25 @@ wxBoxSizer *StatusBasePanel::create_monitoring_page()
 
 wxBoxSizer *StatusBasePanel::create_machine_control_page(wxWindow *parent)
 {
+    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " 1";
     wxBoxSizer *bSizer_right = new wxBoxSizer(wxVERTICAL);
 
     m_panel_control_title = new wxPanel(parent, wxID_ANY, wxDefaultPosition, wxSize(-1, PAGE_TITLE_HEIGHT), wxTAB_TRAVERSAL);
     m_panel_control_title->SetBackgroundColour(STATUS_TITLE_BG);
 
+    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " 2";
     wxBoxSizer *bSizer_control_title = new wxBoxSizer(wxHORIZONTAL);
     m_staticText_control             = new Label(m_panel_control_title,_L("Control"));
     m_staticText_control->Wrap(-1);
     m_staticText_control->SetFont(PAGE_TITLE_FONT);
     m_staticText_control->SetForegroundColour(PAGE_TITLE_FONT_COL);
 
+    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " 3";
     StateColor btn_bg_green(std::pair<wxColour, int>(AMS_CONTROL_DISABLE_COLOUR, StateColor::Disabled), std::pair<wxColour, int>(wxColour(0, 137, 123), StateColor::Pressed),
         std::pair<wxColour, int>(wxColour(38, 166, 154), StateColor::Hovered), std::pair<wxColour, int>(AMS_CONTROL_BRAND_COLOUR, StateColor::Normal));
     StateColor btn_bd_green(std::pair<wxColour, int>(AMS_CONTROL_WHITE_COLOUR, StateColor::Disabled), std::pair<wxColour, int>(AMS_CONTROL_BRAND_COLOUR, StateColor::Enabled));
 
+    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " 4";
     m_options_btn = new Button(m_panel_control_title, _L("Print Options"));
     m_options_btn->SetBackgroundColor(btn_bg_green);
     m_options_btn->SetBorderColor(btn_bd_green);
@@ -1034,14 +1053,17 @@ wxBoxSizer *StatusBasePanel::create_machine_control_page(wxWindow *parent)
 
     wxBoxSizer *bSizer_control = new wxBoxSizer(wxVERTICAL);
 
+    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " 5";
     auto temp_axis_ctrl_sizer = create_temp_axis_group(parent);
     bSizer_control->Add(temp_axis_ctrl_sizer, 0, wxEXPAND, 0);
 
+    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " 6";
     auto m_ams_ctrl_sizer = create_ams_group(parent);
     bSizer_control->Add(m_ams_ctrl_sizer, 0, wxEXPAND|wxBOTTOM, FromDIP(10));
 
     bSizer_right->Add(bSizer_control, 1, wxEXPAND | wxALL, 0);
 
+    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " 7";
     return bSizer_right;
 }
 
@@ -1603,7 +1625,9 @@ StatusPanel::StatusPanel(wxWindow *parent, wxWindowID id, const wxPoint &pos, co
     : StatusBasePanel(parent, id, pos, size, style)
     , m_fan_control_popup(new FanControlPopup(this))
 {
+    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " start init_scaled_buttons";
     init_scaled_buttons();
+    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " end init_scaled_buttons";
     m_buttons.push_back(m_button_unload);
     m_buttons.push_back(m_bpButton_z_10);
     m_buttons.push_back(m_bpButton_z_1);

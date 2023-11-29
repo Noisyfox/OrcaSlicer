@@ -1097,7 +1097,7 @@ void GUI_App::post_init()
 
             if (!slow_bootup) {
                 BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << ", start to render a first frame for test";
-                plater_->canvas3D()->render(false);
+                //plater_->canvas3D()->render(false);
                 BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << ", finished rendering a first frame for test";
             }
 //#ifdef __linux__
