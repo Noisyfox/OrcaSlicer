@@ -9,8 +9,8 @@
 
 SwitchButton::SwitchButton(wxWindow* parent, wxWindowID id)
 	: wxBitmapToggleButton(parent, id, wxNullBitmap, wxDefaultPosition, wxDefaultSize, wxBORDER_NONE | wxBU_EXACTFIT)
-	, m_on(this, "toggle_on", 16, false, false, true)
-	, m_off(this, "toggle_off", 16, false, false, true)
+	, m_on(this, "toggle_on", 16, false, false)
+	, m_off(this, "toggle_off", 16, false, false)
     , text_color(std::pair{0xfffffe, (int) StateColor::Checked}, std::pair{0x6B6B6B, (int) StateColor::Normal})
 	, track_color(0xD9D9D9)
     , thumb_color(std::pair{0x009688, (int) StateColor::Checked}, std::pair{0xD9D9D9, (int) StateColor::Normal})
@@ -138,11 +138,15 @@ void SwitchButton::Rescale()
 			(i == 0 ? m_off : m_on).bmp() = bmp;
 		}
 	}
-	SetSize(m_on.GetSize());
+
 	update();
 }
 
 void SwitchButton::update()
 {
 	SetBitmap((GetValue() ? m_on : m_off).bmp());
+
+    wxSize best_sz = GetBestSize();
+    SetSize(best_sz);
+
 }

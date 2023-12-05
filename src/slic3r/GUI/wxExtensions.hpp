@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2018 - 2023 Oleksandra Iushchenko @YuSanka, Lukáš Hejl @hejllukas, Enrico Turri @enricoturri1966, David Kocík @kocikdav, Vojtěch Bubník @bubnikv, Tomáš Mészáros @tamasmeszaros, Lukáš Matěna @lukasmatena, Vojtěch Král @vojtechkral
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef slic3r_GUI_wxExtensions_hpp_
 #define slic3r_GUI_wxExtensions_hpp_
 
@@ -169,8 +173,7 @@ public:
                     const std::string& icon_name = "",
                     const int px_cnt = 16,
                     const bool grayscale = false,
-                    const bool resize = false, // BBS: support resize by fill border
-                    const bool use_legacy_bmp = false);
+                    const bool resize = false); // BBS: support resize by fill border
 
     ~ScalableBitmap() {}
 
@@ -178,20 +181,16 @@ public:
     inline void msw_rescale() { sys_color_changed(); }
     void sys_color_changed();
 
-    const wxBitmapBundle&     bmp() const { return m_bmp; }
+    const wxBitmapBundle& bmp() const { return m_bmp; }
+    [[deprecated("Use SetBitmap instead")]]
     wxBitmapBundle&           bmp()       { return m_bmp; }
     wxBitmap                  get_bitmap() const { return m_bmp.GetBitmapFor(m_parent); }
     wxWindow*                 parent() const { return m_parent;}
     const std::string&        name() const{ return m_icon_name; }
     int                       px_cnt() const { return m_px_cnt; }
 
-    wxSize              GetSize()   const {
-#ifdef __WIN32__
-        return m_bmp.GetPreferredBitmapSizeFor(m_parent);
-#else
-        return m_bmp.GetDefaultSize();
-#endif
-    }
+    void                SetBitmap(const wxBitmapBundle& bmp) { m_bmp = bmp; }
+    wxSize              GetSize()   const { return get_preferred_size(m_bmp, m_parent); }
     int                 GetWidth()  const { return GetSize().GetWidth(); }
     int                 GetHeight() const { return GetSize().GetHeight(); }
 
@@ -202,7 +201,6 @@ private:
     int             m_px_cnt {16};
     bool            m_grayscale{ false };
     bool            m_resize{ false };
-    bool            m_legacy_bmp{ false };
 };
 
 
