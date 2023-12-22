@@ -5428,6 +5428,8 @@ void DeviceManager::load_last_machine()
     }
 }
 
+std::map<std::string, std::string> DeviceManager::all_supported_printers;
+
 json DeviceManager::filaments_blacklist = json::object();
 
 
@@ -5618,6 +5620,31 @@ std::string DeviceManager::load_gcode(std::string type_str, std::string gcode_fi
 
 
     return "";
+}
+
+std::map<std::string, std::string> DeviceManager::get_all_supported_printers()
+{
+    if (all_supported_printers.empty()) {
+        // Read information of all supported printers from "resource/printers/*.json"
+        boost::filesystem::path               printers_dir(Slic3r::resources_dir() + "/printers/");
+        boost::filesystem::directory_iterator end_iter;
+        for (boost::filesystem::directory_iterator iter(printers_dir); iter != end_iter; iter++) {
+            if (boost::filesystem::is_directory(*iter)) {
+                continue;
+            }
+            const std::string file_name = iter->path().filename().string();
+            if (!boost::algorithm::ends_with(file_name, ".json")) {
+                continue;
+            }
+            const std::string type_str = file_name.substr(0, file_name.length() - 5);
+            const std::string printer_display_name = get_printer_display_name(type_str);
+            if (!printer_display_name.empty()) {
+                all_supported_printers[type_str] = printer_display_name;
+            }
+        }
+    }
+
+    return all_supported_printers;
 }
 
 } // namespace Slic3r

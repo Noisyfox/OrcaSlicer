@@ -944,6 +944,7 @@ class DeviceManager
 {
 private:
     NetworkAgent* m_agent { nullptr };
+    static std::map<std::string, std::string> all_supported_printers;
 
 public:
     DeviceManager(NetworkAgent* agent = nullptr);
@@ -1027,6 +1028,7 @@ public:
     static bool load_filaments_blacklist_config(std::string config_file);
     static void check_filaments_in_blacklist(std::string tag_vendor, std::string tag_type, bool& in_blacklist, std::string& ac, std::string& info);
     static std::string load_gcode(std::string type_str, std::string gcode_file);
+    static std::map<std::string, std::string> get_all_supported_printers();
 };
 
 } // namespace Slic3r
