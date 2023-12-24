@@ -631,18 +631,35 @@ void SelectMachinePopup::update_other_devices()
         m_placeholder_panel = nullptr;
     }
 
-    m_placeholder_panel = new wxWindow(m_scrolledWindow, wxID_ANY, wxDefaultPosition, wxSize(-1,FromDIP(26)));
+    m_placeholder_panel = new wxWindow(m_scrolledWindow, wxID_ANY, wxDefaultPosition, wxSize(-1,FromDIP(70)));
+    m_placeholder_panel->SetBackgroundColour(StateColor::darkModeColorFor(*wxWHITE));
     wxBoxSizer* placeholder_sizer = new wxBoxSizer(wxVERTICAL);
 
     m_hyperlink = new wxHyperlinkCtrl(m_placeholder_panel, wxID_ANY, _L("Can't find my devices?"), wxT("https://wiki.bambulab.com/en/software/bambu-studio/failed-to-connect-printer"), wxDefaultPosition, wxDefaultSize, wxHL_DEFAULT_STYLE);
     placeholder_sizer->Add(m_hyperlink, 0, wxALIGN_CENTER | wxALL, 5);
 
+    m_add_printer_btn = new Button(m_placeholder_panel, _L("Add Printer Manually"));
+
+    StateColor btn_bd_white(std::pair<wxColour, int>(wxColour(255,255,254), StateColor::Disabled), 
+                            std::pair<wxColour, int>(wxColour(38, 46, 48), StateColor::Enabled));
+    StateColor btn_text_white(std::pair<wxColour, int>(wxColour(255, 255, 254), StateColor::Disabled),
+                              std::pair<wxColour, int>(wxColour(38, 46, 48), StateColor::Enabled));
+    StateColor btn_bg_white(std::pair<wxColour, int>(AMS_CONTROL_DISABLE_COLOUR, StateColor::Disabled), 
+                            std::pair<wxColour, int>(AMS_CONTROL_DISABLE_COLOUR, StateColor::Pressed),
+                            std::pair<wxColour, int>(AMS_CONTROL_DEF_BLOCK_BK_COLOUR, StateColor::Hovered),
+                            std::pair<wxColour, int>(AMS_CONTROL_WHITE_COLOUR, StateColor::Normal));
+    m_add_printer_btn->SetCornerRadius(FromDIP(12));
+    m_add_printer_btn->SetBorderColor(btn_bd_white);
+    m_add_printer_btn->SetTextColor(btn_text_white);
+    m_add_printer_btn->SetMinSize(wxSize(-1, FromDIP(24)));
+    m_add_printer_btn->SetBackgroundColor(btn_bg_white);
+    m_add_printer_btn->Bind(wxEVT_BUTTON, [this](wxCommandEvent& e) { on_add_printer_btn_clicked(); });
+    placeholder_sizer->Add(m_add_printer_btn, 0, wxALIGN_CENTER | wxALL, FromDIP(10));
 
     m_placeholder_panel->SetSizer(placeholder_sizer);
     m_placeholder_panel->Layout();
     placeholder_sizer->Fit(m_placeholder_panel);
 
-    m_placeholder_panel->SetBackgroundColour(StateColor::darkModeColorFor(*wxWHITE));
     m_sizer_other_devices->Add(m_placeholder_panel, 0, wxEXPAND, 0);
 
     //m_sizer_other_devices->Layout();
@@ -876,7 +893,18 @@ void SelectMachinePopup::OnLeftUp(wxMouseEvent &event)
         if (mouse_pos.x > h_rect.x && mouse_pos.y > h_rect.y && mouse_pos.x < (h_rect.x + m_hyperlink->GetSize().x) && mouse_pos.y < (h_rect.y + m_hyperlink->GetSize().y)) {
           wxLaunchDefaultBrowser(wxT("https://wiki.bambulab.com/en/software/bambu-studio/failed-to-connect-printer"));
         }
+
+        // Add printer
+        h_rect = m_add_printer_btn->ClientToScreen(wxPoint(0, 0));
+        if (mouse_pos.x > h_rect.x && mouse_pos.y > h_rect.y && mouse_pos.x < (h_rect.x + m_add_printer_btn->GetSize().x) && mouse_pos.y < (h_rect.y + m_add_printer_btn->GetSize().y)) {
+            on_add_printer_btn_clicked(); 
+        }
     }
+}
+
+void SelectMachinePopup::on_add_printer_btn_clicked() {
+    // TODO: show printer add page
+    BOOST_LOG_TRIVIAL(info) << "SelectMachinePopup on_timer";
 }
 
 static wxString MACHINE_BED_TYPE_STRING[BED_TYPE_COUNT] = {

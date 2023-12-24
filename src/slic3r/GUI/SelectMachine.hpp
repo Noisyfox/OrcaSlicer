@@ -206,6 +206,7 @@ private:
     int                               m_other_devices_count{0};
     wxWindow*                         m_placeholder_panel{nullptr};
     wxHyperlinkCtrl*                  m_hyperlink{nullptr};
+    Button*                           m_add_printer_btn{nullptr};
     wxBoxSizer *                      m_sizer_body{nullptr};
     wxBoxSizer *                      m_sizer_my_devices{nullptr};
     wxBoxSizer *                      m_sizer_other_devices{nullptr};
@@ -233,6 +234,7 @@ private:
     bool      search_for_printer(MachineObject* obj);
     void      on_dissmiss_win(wxCommandEvent &event);
     wxWindow *create_title_panel(wxString text);
+    void      on_add_printer_btn_clicked();
 };
 
 #define SELECT_MACHINE_DIALOG_BUTTON_SIZE wxSize(FromDIP(68), FromDIP(23))
