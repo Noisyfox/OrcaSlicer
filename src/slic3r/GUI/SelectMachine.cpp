@@ -902,6 +902,24 @@ void SelectMachinePopup::OnLeftUp(wxMouseEvent &event)
     }
 }
 
+class AddPrinterDialog : public DPIDialog
+{
+public:
+    AddPrinterDialog(wxWindow*       parent,
+                     wxWindowID      id    = wxID_ANY,
+                     const wxString& title = wxEmptyString,
+                     const wxPoint&  pos   = wxDefaultPosition,
+                     const wxSize&   size  = wxDefaultSize,
+                     long            style = wxCLOSE_BOX | wxCAPTION)
+        : DPIDialog(parent, id, _L("ConnectPrinter(LAN)"), pos, size, style)
+    {
+        SetBackgroundColour(*wxWHITE);
+        this->SetSizeHints(wxDefaultSize, wxDefaultSize);
+    }
+
+    ~AddPrinterDialog() override = default;
+};
+
 void SelectMachinePopup::on_add_printer_btn_clicked() {
     // TODO: show printer add page
     BOOST_LOG_TRIVIAL(info) << "SelectMachinePopup on_timer";
