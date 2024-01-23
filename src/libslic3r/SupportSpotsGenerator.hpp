@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2022 - 2023 Pavel Mikuš @Godrak
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef SRC_LIBSLIC3R_SUPPORTABLEISSUESSEARCH_HPP_
 #define SRC_LIBSLIC3R_SUPPORTABLEISSUESSEARCH_HPP_
 
@@ -8,7 +12,6 @@
 #include <boost/log/trivial.hpp>
 #include <cstddef>
 #include <vector>
-
 
 namespace Slic3r {
 
@@ -80,9 +83,6 @@ struct Params
     }
 };
 
-void estimate_malformations(std::vector<Layer *> &layers, const Params &params);
-
-
 enum class SupportPointCause { 
     LongBridge, // point generated on bridge and straight perimeter extrusion longer than the allowed length 
     FloatingBridgeAnchor, // point generated on unsupported bridge endpoint
@@ -103,10 +103,10 @@ enum class SupportPointCause {
 //    between forces that destabilize the object (extruder conflicts with curled filament, weight if instable center of mass, bed movements etc)
 //    and forces that stabilize the object (bed adhesion, other support spots adhesion, weight if stable center of mass).
 //    Note that the force is only the difference - the amount needed to stabilize the object again.
-/*struct SupportPoint
+struct SupportPoint
 {
-    SupportPoint(SupportPointCause cause, const Vec3f &position, float force, float spot_radius, const Vec2f &direction)
-        : cause(cause), position(position), force(force), spot_radius(spot_radius), direction(direction)
+    SupportPoint(SupportPointCause cause, const Vec3f &position, float spot_radius)
+        : cause(cause), position(position), spot_radius(spot_radius)
     {}
 
     bool is_local_extrusion_support() const
@@ -118,17 +118,9 @@ enum class SupportPointCause {
     SupportPointCause cause; // reason why this support point was generated. Used for the user alerts
     // position is in unscaled coords. The z coordinate is aligned with the layers bottom_z coordiantes
     Vec3f position;
-    // force that destabilizes the object to the point of falling/breaking. g*mm/s^2 units
-    // It is valid only for global_object_support. For local extrusion support points, the force is -EPSILON
-    // values gathered from large XL model: Min : 0 | Max : 18713800 | Average : 1361186 | Median : 329103
-    // For reference 18713800 is weight of 1.8 Kg object, 329103 is weight of 0.03 Kg
-    // The final sliced object weight was approx 0.5 Kg
-    float force;
     // Expected spot size. The support point strength is calculated from the area defined by this value.
     // Currently equal to the support_points_interface_radius parameter above
     float spot_radius;
-    // direction of the fall of the object (z part is neglected)
-    Vec2f direction;
 };
 
 using SupportPoints = std::vector<SupportPoint>;
@@ -150,15 +142,17 @@ struct PartialObject
 
 using PartialObjects = std::vector<PartialObject>;
 
+// Both support points and partial objects are sorted from the lowest z to the highest
 std::tuple<SupportPoints, PartialObjects> full_search(const PrintObject *po, const PrintTryCancel& cancel_func, const Params &params);
 
 void estimate_supports_malformations(std::vector<SupportLayer *> &layers, float supports_flow_width, const Params &params);
+void estimate_malformations(std::vector<Layer *> &layers, const Params &params);
 
 
 // NOTE: the boolean marks if the issue is critical or not for now.
 std::vector<std::pair<SupportPointCause, bool>> gather_issues(const SupportPoints &support_points,
                                                              PartialObjects      &partial_objects);
-*/
+
 }} // namespace Slic3r::SupportSpotsGenerator
 
 #endif /* SRC_LIBSLIC3R_SUPPORTABLEISSUESSEARCH_HPP_ */

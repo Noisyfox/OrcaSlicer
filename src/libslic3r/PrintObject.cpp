@@ -29,6 +29,9 @@
 #include "Fill/FillLightning.hpp"
 #include "Format/STL.hpp"
 #include "TreeSupport.hpp"
+#include "SupportSpotsGenerator.hpp"
+#include "TriangleSelectorWrapper.hpp"
+#include "format.hpp"
 
 #include <float.h>
 #include <oneapi/tbb/blocked_range.h>
@@ -588,6 +591,30 @@ void PrintObject::ironing()
     }
 }
 
+void PrintObject::generate_support_spots()
+{
+    if (this->set_started(posSupportSpotsSearch)) {
+        BOOST_LOG_TRIVIAL(debug) << "Searching support spots - start";
+        m_print->set_status(65, _u8L("Searching support spots"));
+        if (!this->shared_regions()->generated_support_points.has_value()) {
+            PrintTryCancel                cancel_func = m_print->make_try_cancel();
+            SupportSpotsGenerator::Params params{this->print()->m_config.filament_type.values,
+                                                 float(this->print()->default_object_config().inner_wall_acceleration.getFloat()),
+                                                 this->config().raft_layers.getInt(), this->config().brim_type.value,
+                                                 float(this->config().brim_width.getFloat())};
+            auto [supp_points, partial_objects] = SupportSpotsGenerator::full_search(this, cancel_func, params);
+            Transform3d po_transform            = this->trafo_centered();
+            if (this->layer_count() > 0) {
+                po_transform = Geometry::translation_transform(Vec3d{0, 0, this->layers().front()->bottom_z()}) * po_transform;
+            }
+            this->m_shared_regions->generated_support_points = {po_transform, supp_points, partial_objects};
+            m_print->throw_if_canceled();
+        }
+        BOOST_LOG_TRIVIAL(debug) << "Searching support spots - end";
+        this->set_done(posSupportSpotsSearch);
+    }
+}
+
 // BBS
 void PrintObject::clear_overhangs_for_lift()
 {
@@ -902,6 +929,7 @@ bool PrintObject::invalidate_state_by_config_options(
             || opt_key == "support_speed"
             || opt_key == "internal_solid_infill_speed"
             || opt_key == "top_surface_speed") {
+            steps.emplace_back(posSupportSpotsSearch);
             // Brim is printed below supports, support invalidates brim and skirt.
             steps.emplace_back(posSupportMaterial);
             if (opt_key == "brim_type") {
@@ -1180,15 +1208,16 @@ bool PrintObject::invalidate_step(PrintObjectStep step)
 
     // propagate to dependent steps
     if (step == posPerimeters) {
-		invalidated |= this->invalidate_steps({ posPrepareInfill, posInfill, posIroning, posSimplifyPath, posSimplifyInfill });
+		invalidated |= this->invalidate_steps({ posPrepareInfill, posInfill, posIroning, posSupportSpotsSearch, posSimplifyPath, posSimplifyInfill });
         invalidated |= m_print->invalidate_steps({ psSkirtBrim });
     } else if (step == posPrepareInfill) {
-        invalidated |= this->invalidate_steps({ posInfill, posIroning, posSimplifyPath, posSimplifyInfill });
+        invalidated |= this->invalidate_steps({ posInfill, posIroning, posSupportSpotsSearch, posSimplifyPath, posSimplifyInfill });
     } else if (step == posInfill) {
-        invalidated |= this->invalidate_steps({ posIroning, posSimplifyInfill });
+        invalidated |= this->invalidate_steps({ posIroning, posSupportSpotsSearch, posSimplifyInfill });
         invalidated |= m_print->invalidate_steps({ psSkirtBrim });
     } else if (step == posSlice) {
-		invalidated |= this->invalidate_steps({ posPerimeters, posPrepareInfill, posInfill, posIroning, posSupportMaterial, posSimplifyPath, posSimplifyInfill });
+		invalidated |= this->invalidate_steps({ posPerimeters, posPrepareInfill, posInfill, posIroning, posSupportSpotsSearch,
+                                               posSupportMaterial, posSimplifyPath, posSimplifyInfill });
         invalidated |= m_print->invalidate_steps({ psSkirtBrim });
         m_slicing_params.valid = false;
     } else if (step == posSupportMaterial) {

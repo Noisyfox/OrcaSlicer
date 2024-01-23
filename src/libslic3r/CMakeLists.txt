@@ -346,6 +346,8 @@ set(lisbslic3r_sources
     TriangleSelector.hpp
     TriangleSetSampling.cpp
     TriangleSetSampling.hpp
+    TriangleSelectorWrapper.cpp
+    TriangleSelectorWrapper.hpp
     MTUtils.hpp
     VariableWidth.cpp
     VariableWidth.hpp

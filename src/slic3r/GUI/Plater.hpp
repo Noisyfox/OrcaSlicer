@@ -63,6 +63,7 @@ class ModelObject;
 class ModelInstance;
 class Print;
 class SLAPrint;
+enum PrintObjectStep;
 //BBS: add partplatelist and SlicingStatusEvent
 class PartPlateList;
 class SlicingStatusEvent;
@@ -419,6 +420,7 @@ public:
     void export_toolpaths_to_obj() const;
     void reslice();
     void record_slice_preset(std::string action);
+    void reslice_FFF_until_step(PrintObjectStep step, const ModelObject &object, bool postpone_error_messages = false);
     void reslice_SLA_supports(const ModelObject &object, bool postpone_error_messages = false);
     void reslice_SLA_hollowing(const ModelObject &object, bool postpone_error_messages = false);
     void reslice_SLA_until_step(SLAPrintObjectStep step, const ModelObject &object, bool postpone_error_messages = false);
@@ -778,6 +780,8 @@ public:
     std::atomic<bool> m_arrange_running{false};
 
 private:
+    void reslice_until_step_inner(int step, const ModelObject &object, bool postpone_error_messages);
+
     struct priv;
     std::unique_ptr<priv> p;
 
