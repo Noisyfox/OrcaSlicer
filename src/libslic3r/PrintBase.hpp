@@ -362,7 +362,7 @@ class PrintTryCancel
 {
 public:
     // calls print.throw_if_canceled().
-    void operator()();
+    void operator()() const;
 private:
     friend PrintBase;
     PrintTryCancel() = delete;

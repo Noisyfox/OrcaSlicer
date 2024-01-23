@@ -220,7 +220,6 @@ void estimate_malformations(LayerPtrs &layers, const Params &params)
 #endif
 }
 
-/*
 
 
 struct SupportGridFilter
@@ -1143,6 +1142,7 @@ std::tuple<SupportPoints, PartialObjects> full_search(const PrintObject *po, con
     return results;
 }
 
+/*
 void estimate_supports_malformations(SupportLayerPtrs &layers, float flow_width, const Params &params)
 {
 #ifdef DEBUG_FILES
