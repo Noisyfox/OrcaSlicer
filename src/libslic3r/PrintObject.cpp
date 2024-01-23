@@ -3719,7 +3719,7 @@ SupportNecessaryType PrintObject::is_support_necessary()
     return NoNeedSupp;
 }
 
-static void project_triangles_to_slabs(ConstLayerPtrsAdaptor layers, const indexed_triangle_set &custom_facets, const Transform3f &tr, bool seam, std::vector<Polygons> &out)
+static void project_triangles_to_slabs(SpanOfConstPtrs<Layer> layers, const indexed_triangle_set &custom_facets, const Transform3f &tr, bool seam, std::vector<Polygons> &out)
 {
     if (custom_facets.indices.empty())
         return;

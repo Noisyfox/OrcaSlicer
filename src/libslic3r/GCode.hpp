@@ -37,7 +37,6 @@ class GCode;
 
 namespace { struct Item; }
 struct PrintInstance;
-class ConstPrintObjectPtrsAdaptor;
 
 class OozePrevention {
 public:
