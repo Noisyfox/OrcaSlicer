@@ -1005,9 +1005,9 @@ float WipingExtrusions::mark_wiping_extrusions(const Print& print, unsigned int 
         return std::max(0.f, volume_to_wipe); // Support filament cannot be used to print support, infill, wipe_tower, etc.
 
     // we will sort objects so that dedicated for wiping are at the beginning:
-    ConstPrintObjectPtrs object_list = print.objects().vector();
+    ConstPrintObjectPtrs object_list(print.objects().begin(), print.objects().end());
     // BBS: fix the exception caused by not fixed order between different objects
-    std::sort(object_list.begin(), object_list.end(), [object_list](const PrintObject* a, const PrintObject* b) {
+    std::sort(object_list.begin(), object_list.end(), [](const PrintObject* a, const PrintObject* b) {
         if (a->config().flush_into_objects != b->config().flush_into_objects) {
             return a->config().flush_into_objects.getBool();
         }

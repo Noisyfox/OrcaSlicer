@@ -1,3 +1,25 @@
+///|/ Copyright (c) Prusa Research 2016 - 2023 Lukáš Matěna @lukasmatena, Vojtěch Bubník @bubnikv, Enrico Turri @enricoturri1966, Pavel Mikuš @Godrak, Oleksandra Iushchenko @YuSanka, Lukáš Hejl @hejllukas, Filip Sykala @Jony01, David Kocík @kocikdav
+///|/ Copyright (c) SuperSlicer 2023 Remi Durand @supermerill
+///|/ Copyright (c) 2021 Justin Schuh @jschuh
+///|/ Copyright (c) 2020 Paul Arden @ardenpm
+///|/ Copyright (c) 2020 sckunkle
+///|/ Copyright (c) 2020 Kyle Maas @KyleMaas
+///|/ Copyright (c) 2019 Thomas Moore
+///|/ Copyright (c) 2019 Bryan Smith
+///|/ Copyright (c) Slic3r 2015 - 2016 Alessandro Ranellucci @alranel
+///|/ Copyright (c) 2016 Chow Loong Jin @hyperair
+///|/ Copyright (c) 2015 Maksim Derbasov @ntfshard
+///|/ Copyright (c) 2015 Vicious-one @Vicious-one
+///|/ Copyright (c) 2015 Luís Andrade
+///|/
+///|/ ported from lib/Slic3r/GCode.pm:
+///|/ Copyright (c) Slic3r 2011 - 2015 Alessandro Ranellucci @alranel
+///|/ Copyright (c) 2013 Robert Giseburt
+///|/ Copyright (c) 2012 Mark Hindess
+///|/ Copyright (c) 2012 Henrik Brix Andersen @henrikbrixandersen
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "BoundingBox.hpp"
 #include "Polygon.hpp"
 #include "PrintConfig.hpp"
@@ -125,7 +147,7 @@ static std::vector<Vec2d> get_path_of_change_filament(const Print& print)
 
     // step 1: get the x-range intervals of all objects
     std::vector<std::pair<double, double>> object_intervals;
-    for (PrintObject *print_object : print.objects()) {
+    for (const PrintObject *print_object : print.objects()) {
         const PrintInstances &print_instances = print_object->instances();
         BoundingBoxf3 bounding_box = print_instances[0].model_instance->get_object()->bounding_box();
 

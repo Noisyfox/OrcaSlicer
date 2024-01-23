@@ -421,7 +421,7 @@ public:
     void project_and_append_custom_facets(bool seam, EnforcerBlockerType type, std::vector<Polygons>& expolys) const;
 
     //BBS
-    BoundingBox get_first_layer_bbox(float& area, float& layer_height, std::string& name);
+    BoundingBox get_first_layer_bbox(float& area, float& layer_height, std::string& name) const;
     void         get_certain_layers(float start, float end, std::vector<LayerPtrs> &out, std::vector<BoundingBox> &boundingbox_objects);
     std::vector<Point> get_instances_shift_without_plate_offset();
     PrintObject* get_shared_object() const { return m_shared_object; }

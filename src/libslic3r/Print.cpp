@@ -1596,7 +1596,7 @@ void  PrintObject::copy_layers_overhang_from_shared_object()
 
 
 // BBS
-BoundingBox PrintObject::get_first_layer_bbox(float& a, float& layer_height, std::string& name)
+BoundingBox PrintObject::get_first_layer_bbox(float& a, float& layer_height, std::string& name) const
 {
     BoundingBox bbox;
     a = 0;
