@@ -10,6 +10,7 @@
 #include "Flow.hpp"
 #include "Point.hpp"
 #include "Slicing.hpp"
+#include "SupportSpotsGenerator.hpp"
 #include "TriangleMeshSlicer.hpp"
 #include "GCode/ToolOrdering.hpp"
 #include "GCode/WipeTower.hpp"
@@ -90,7 +91,7 @@ enum PrintStep {
 
 enum PrintObjectStep {
     posSlice, posPerimeters,posEstimateCurledExtrusions, posPrepareInfill,
-    posInfill, posIroning, posSupportMaterial, posSimplifyPath, posSimplifySupportPath,
+    posInfill, posIroning, posSupportSpotsSearch, posSupportMaterial, posSimplifyPath, posSimplifySupportPath,
     // BBS
     posDetectOverhangsForLift,
     posSimplifyWall, posSimplifyInfill,
@@ -271,12 +272,19 @@ public:
         }
     };
 
+    struct GeneratedSupportPoints{
+        Transform3d object_transform; // for frontend object mapping
+        SupportSpotsGenerator::SupportPoints support_points;
+    };
+
     std::vector<std::unique_ptr<PrintRegion>>   all_regions;
     std::vector<LayerRangeRegions>              layer_ranges;
     // Transformation of this ModelObject into one of the associated PrintObjects (all PrintObjects derived from a single modelObject differ by a Z rotation only).
     // This transformation is used to calculate VolumeExtents.
     Transform3d                                 trafo_bboxes;
     std::vector<ObjectID>                       cached_volume_ids;
+
+    std::optional<GeneratedSupportPoints> generated_support_points;
 
     void ref_cnt_inc() { ++ m_ref_cnt; }
     void ref_cnt_dec() { if (-- m_ref_cnt == 0) delete this; }
@@ -474,6 +482,7 @@ private:
     void prepare_infill();
     void infill();
     void ironing();
+    void generate_support_spots();
     void generate_support_material();
     void estimate_curled_extrusions();
     void simplify_extrusion_path();
@@ -816,6 +825,7 @@ public:
     std::vector<ObjectID> print_object_ids() const override;
 
     ApplyStatus         apply(const Model &model, DynamicPrintConfig config) override;
+    void                cleanup() override;
 
     void                process(long long *time_cost_with_cache = nullptr, bool use_cache = false) override;
     // Exports G-code into a file name based on the path_template, returns the file path of the generated G-code file.
@@ -970,6 +980,12 @@ private:
 
     // Islands of objects and their supports extruded at the 1st layer.
     Polygons            first_layer_islands() const;
+
+    // Returns true if any of the print_objects has print_object_step valid.
+    // That means data shared by all print objects of the print_objects span may still use the shared data.
+    // Otherwise the shared data shall be released.
+    // Unguarded variant, thus it shall only be called from main thread with background processing stopped.
+    static bool         is_shared_print_object_step_valid_unguarded(ConstPrintObjectPtrsAdaptor print_objects, PrintObjectStep print_object_step);
 
     PrintConfig                             m_config;
     PrintObjectConfig                       m_default_object_config;

@@ -1796,6 +1796,14 @@ void Print::process(long long *time_cost_with_cache, bool use_cache)
                     obj->set_done(posIroning);
             }
         }
+        for (PrintObject* obj : m_objects) {
+            if (need_slicing_objects.count(obj) != 0) {
+                obj->generate_support_spots();
+            } else {
+                if (obj->set_started(posSupportSpotsSearch))
+                    obj->set_done(posSupportSpotsSearch);
+            }
+        }
 
         tbb::parallel_for(tbb::blocked_range<int>(0, int(m_objects.size())),
             [this, need_slicing_objects](const tbb::blocked_range<int>& range) {

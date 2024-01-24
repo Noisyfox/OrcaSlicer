@@ -454,6 +454,7 @@ public:
     void                set_task(const TaskParams &params) override;
     void                process(long long *time_cost_with_cache = nullptr, bool use_cache = false) override;
     void                finalize() override;
+    void                cleanup() override {}
     // Returns true if an object step is done on all objects and there's at least one object.
     bool                is_step_done(SLAPrintObjectStep step) const;
     // Returns true if the last step was finished with success.

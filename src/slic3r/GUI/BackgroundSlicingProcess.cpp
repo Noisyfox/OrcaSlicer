@@ -341,6 +341,9 @@ void BackgroundSlicingProcess::thread_proc()
 				exception ? SlicingProcessCompletedEvent::Error : SlicingProcessCompletedEvent::Finished, exception);
 			BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << boost::format(": send SlicingProcessCompletedEvent to main, status %1%")%evt.status();
 			wxQueueEvent(GUI::wxGetApp().mainframe->m_plater, evt.Clone());
+        	// Cancelled by the user, not internally, thus cleanup() was not called yet.
+        	// Otherwise cleanup() is called from Print::apply()
+        	m_print->cleanup();
 		}
 		else {
 			//BBS: internal cancel
