@@ -50,6 +50,7 @@
 #include <boost/format.hpp>
 #include <boost/log/trivial.hpp>
 #include <boost/regex.hpp>
+#include <map>
 #include <boost/nowide/fstream.hpp>
 
 #include <tbb/blocked_range.h>
@@ -2176,6 +2177,417 @@ void Print::process(long long *time_cost_with_cache, bool use_cache)
     BOOST_LOG_TRIVIAL(info) << "Slicing process finished." << log_memory_info();
 }
 
+// --------------------------------------------------------------------
+
+
+
+double ATC_check_region_intersection(LayerRegion& upper, LayerRegion& lower)
+{
+    ExPolygons A_polygons = to_expolygons(upper.slices.surfaces); // upper
+    ExPolygons B_polygons = to_expolygons(lower.slices.surfaces); // lower
+    ExPolygons region_intersection = intersection_ex(A_polygons, B_polygons);
+
+    double A_expolygon_area = area(A_polygons);
+    double B_expolygon_area = area(B_polygons);
+    double intersection_area = area(region_intersection);
+    return intersection_area;
+}
+
+
+// --------------------------------------------------------------------
+
+void Print::layer_batch_labeling() 
+{
+    std::cout << "-- layer_batch_labeling() --" << std::endl;
+    bool need_wipe = 0;
+
+    ATC_linked_list printing_map_initial, printing_map_batched;
+
+    std::cout << "///////////////// Generate list of printing pieces ////////////////" << std::endl;
+    for (size_t L = 0; L < this->get_object(0)->layers().size(); L++) {
+        for (size_t R = 0; R < this->m_print_regions.size(); R++)
+        {
+            if (this->get_object(0)->layers()[L]->regions()[R]->slices.surfaces.size() != 0)
+            {
+                printing_map_initial.append_node(L, R, need_wipe, 0, 0); // layer, region, need_wipe, state, batch
+            }
+        }
+    }
+
+    std::cout << "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" << std::endl;
+    std::cout << "printing_map_initial.get_count() = " << printing_map_initial.get_count() << std::endl;
+    std::cout << "printing_map_batched.get_count() = " << printing_map_batched.get_count() << std::endl;
+    std::cout << "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" << std::endl;
+
+    std::cout << "PRINTING MAP INITIAL:" << std::endl;
+    ATC_linked_list::display(printing_map_initial.gethead());
+    std::cout << "PRINTING MAP BATCHED:" << std::endl;
+    ATC_linked_list::display(printing_map_batched.gethead());
+
+    std::cout << "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" << std::endl;
+    std::cout << "printing_map_initial.get_count() = " << printing_map_initial.get_count() << std::endl;
+    std::cout << "printing_map_batched.get_count() = " << printing_map_batched.get_count() << std::endl;
+    std::cout << "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" << std::endl;
+
+    // we should iterate over all the positions in the printing_map list
+    // get the initial count of all the existing pinting pieces
+
+    int printing_pieces_count = printing_map_initial.get_count();
+    double cum_layer_height = 0;
+    ;
+
+    double atc_safe_height = this->m_objects[0]->m_config.atc_safe_batch_height.value; // 0.4 default value in mm
+    double atc_running_height = 0;
+    int batch_new = 0;
+    double region_intersection = 0;
+    double critical_intersection = this->m_objects[0]->m_config.atc_critical_intersection_area; // 0.5
+
+    //this->config().bed_temperature;
+
+    int number_of_colors = this->get_object(0)->all_regions().size();
+
+    int max_layers_in_object = this->get_object(0)->layers().size();
+    int atc_iterator = 0;
+    int atc_step = 0;
+    int intersected_node_state;
+    int intersected_region;
+    struct ATC_printing_piece* node;
+    struct ATC_printing_piece* last_node;
+    int overall_intersections_below = 0;
+    node = NULL;
+    last_node = NULL;
+    int current_layer_idx, current_region_idx, candidate_layer_idx, candidate_region_idx;
+
+    std::cout << "*********************************************" << std::endl;
+    while (printing_map_batched.get_count() <= printing_map_initial.get_count() - 1)
+    {
+        atc_step += 1;
+        // get the first node in the list with zero-state (which is not done)
+        if (last_node != NULL)
+            node = last_node;
+        if (last_node == NULL)
+            node = printing_map_initial.node_search(printing_map_initial.gethead(), 0); // get first node with zero-state
+
+        current_layer_idx = node->layer;
+        current_region_idx = node->region;
+        candidate_layer_idx = node->layer + 1;
+        candidate_region_idx = node->region; // the same region
+
+        std::cout << "--STEP-- " << atc_step << ", PROCESSED NODES=" << atc_iterator << std::endl;
+        std::cout << "got node {L" << current_layer_idx << ", R" << current_region_idx << "}" << " -- candidate {Lc" << candidate_layer_idx << ", Rc" << candidate_region_idx << "}" << std::endl;
+
+
+
+        if (node->state == 0)
+        {
+            printing_map_batched.append_node(current_layer_idx, current_region_idx, need_wipe, 1, batch_new); // state = 1
+            last_node = printing_map_initial.node_search(printing_map_initial.gethead(), current_layer_idx, current_region_idx);
+            printing_map_initial.node_search(printing_map_initial.gethead(), current_layer_idx, current_region_idx)->state = 1;
+            std::cout << "appended node {L" << current_layer_idx << ", R" << current_region_idx << "}" << std::endl;
+            atc_iterator += 1;
+            atc_running_height += this->get_object(0)->layers()[current_layer_idx]->height; //in mm
+            std::cout << "===atc_running_height===" << atc_running_height << "mm" << std::endl;
+        }
+
+        if (printing_map_initial.node_search(printing_map_initial.gethead(), candidate_layer_idx, candidate_region_idx) && candidate_layer_idx < max_layers_in_object)
+        {
+            Layer* layer_candidate = this->get_object(0)->layers()[candidate_layer_idx];
+            Layer* layer_current = this->get_object(0)->layers()[current_layer_idx];
+            LayerRegion& region_candidate = *layer_candidate->regions()[current_region_idx];
+
+            overall_intersections_below = 0;
+            for (int color = 0; color < number_of_colors; color++)
+            {
+                LayerRegion& region_below = *layer_current->regions()[color];
+                region_intersection = ATC_check_region_intersection(region_candidate, region_below) / 1e+10;
+                std::cout << "checking intersections for {L" << current_layer_idx << ", R" << color << "}: region_intersection=" << region_intersection << std::endl;
+                if (printing_map_initial.node_search(printing_map_initial.gethead(), current_layer_idx, color))
+                {
+                    intersected_node_state = printing_map_initial.node_search(printing_map_initial.gethead(), current_layer_idx, color)->state;
+                    if (color != current_region_idx && region_intersection > critical_intersection && intersected_node_state == 0)
+                    {
+                        overall_intersections_below += 1;
+                        std::cout << "overall_intersections_below=" << overall_intersections_below << std::endl;
+                    }
+                }
+            }
+
+            for (int color = 0; color < number_of_colors; color++)
+            {
+                LayerRegion& region_below = *layer_current->regions()[color];
+                region_intersection = ATC_check_region_intersection(region_candidate, region_below) / 1e+10;
+                std::cout << "checking intersections for {L" << current_layer_idx << ", R" << color << "}: region_intersection=" << region_intersection << std::endl;
+                if (printing_map_initial.node_search(printing_map_initial.gethead(), current_layer_idx, color))
+                {
+                    intersected_node_state = printing_map_initial.node_search(printing_map_initial.gethead(), current_layer_idx, color)->state;
+                    if (color != current_region_idx && (region_intersection > critical_intersection && intersected_node_state == 0))
+                    {
+                        // stop, remap
+                        std::cout << "detected intersection with {L" << current_layer_idx << ", R" << color << "}" << std::endl;
+                        std::cout << "breaking" << std::endl;
+                        last_node = NULL;
+                        break;
+                    }
+                    if (color != current_region_idx && region_intersection <= critical_intersection && overall_intersections_below == 0)
+                    {
+                        if (printing_map_initial.node_search(printing_map_initial.gethead(), candidate_layer_idx, candidate_region_idx))
+                        {
+                            // append new node to the batched map
+                            printing_map_batched.append_node(candidate_layer_idx, candidate_region_idx, need_wipe, 1, batch_new); // state = 1
+                            last_node = printing_map_initial.node_search(printing_map_initial.gethead(), candidate_layer_idx, candidate_region_idx);
+
+                            printing_map_initial.node_search(printing_map_initial.gethead(), candidate_layer_idx, candidate_region_idx)->state = 1;
+                            atc_iterator += 1;
+                            std::cout << "no intersections --> appending node {L" << candidate_layer_idx << ", R" << candidate_region_idx << "}" << std::endl;
+                            atc_running_height += this->get_object(0)->layers()[current_layer_idx]->height; //in mm
+                            std::cout << "===atc_running_height===" << atc_running_height << "mm" << std::endl;
+                            break;
+                        }
+                        else
+                        {
+                            std::cout << "no intersections, BUT the candidate node is not found: breaking" << std::endl;
+                            last_node = NULL;
+                            break;
+                        }
+                    }
+                }
+                else
+                {
+                    std::cout << "before intersection check the candidate node is not found: continuing" << std::endl;
+                    last_node = NULL;
+                    continue;
+                }
+            }
+        }
+
+        if (candidate_layer_idx >= max_layers_in_object || printing_map_initial.node_search(printing_map_initial.gethead(), candidate_layer_idx, candidate_region_idx) == NULL)
+        {
+            std::cout << "candidate_layer_idx >= max_layers_in_object OR printing node==NULL: continuing" << std::endl;
+            last_node = NULL;
+            continue;
+        }
+
+        if (atc_running_height >= atc_safe_height)
+        {
+            atc_running_height = 0;
+            std::cout << "detected critical height: continuing" << std::endl;
+            last_node = NULL;
+            continue;
+        }
+
+        std::cout << "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" << std::endl;
+        std::cout << "printing_map_initial.get_count() = " << printing_map_initial.get_count() << std::endl;
+        std::cout << "printing_map_batched.get_count() = " << printing_map_batched.get_count() << std::endl;
+        std::cout << "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" << std::endl;
+
+        std::cout << "PRINTING MAP INITIAL:" << std::endl;
+        ATC_linked_list::display(printing_map_initial.gethead());
+        std::cout << "PRINTING MAP BATCHED:" << std::endl;
+        ATC_linked_list::display(printing_map_batched.gethead());
+
+        std::cout << "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" << std::endl;
+        std::cout << "printing_map_initial.get_count() = " << printing_map_initial.get_count() << std::endl;
+        std::cout << "printing_map_batched.get_count() = " << printing_map_batched.get_count() << std::endl;
+        std::cout << "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" << std::endl;
+
+        this->m_ATC_printing_map = printing_map_batched;
+        
+
+    }
+
+
+
+    /*
+    struct PrintOrder
+    {
+        size_t iteration_idx;
+        size_t batch_idx;
+        size_t layer_idx;
+        size_t region_idx;
+    };
+
+    std::map<size_t, PrintOrder> printMap;
+
+    size_t iteration_idx = 0;
+    size_t batch_idx = 0;
+
+    size_t cumulative_layer_height = 0;
+    size_t current_processing_region = 0;
+    size_t current_processing_layer = 0;
+    size_t last_processing_layer;
+    size_t last_processing_region;
+
+
+
+    LayerRegion *DOWN_layer_region1 = m_objects[0]->m_layers[4]->get_region(0);
+    LayerRegion* UP_layer_region1 = m_objects[0]->m_layers[5]->get_region(0);
+    Polygons DOWN_poly_0, UP_poly_0;
+    DOWN_poly_0 = to_polygons(DOWN_layer_region1->slices.surfaces);
+    UP_poly_0 = to_polygons(UP_layer_region1->slices.surfaces);
+    Polylines intersection_a = intersection_pl(DOWN_poly_0, UP_poly_0);
+
+    // find a region in the 0th layer that lies on the bed
+    current_processing_layer = 0;
+    for (size_t region_idx = 0; region_idx < m_objects[0]->num_printing_regions(); region_idx++) {
+        LayerRegion* layer_region;
+        layer_region = m_objects[0]->m_layers[current_processing_layer]->get_region(region_idx);
+        if (layer_region->slices.size() != 0) {
+            current_processing_region = region_idx;
+            printMap[0] = PrintOrder{ iteration_idx,batch_idx,current_processing_layer,current_processing_region };
+            break;
+        }
+    }
+
+    for (size_t layer_idx = 0; layer_idx < m_objects[0]->m_layers.size(); layer_idx++) {
+        //m_objects[0]->m_layers[0]->print_z; // print_z=0.4 -> slice_z = 0.3
+        //m_objects[0]->m_layers[0]->slice_z; // slice_z = print_z-0.1
+        
+        // we do not have to check the print_z for the 1st layer since if region 
+        // slice is empty -> it means this color/tool does not lay on the bed
+        
+
+
+        for (size_t region_idx = 0; region_idx < m_objects[layer_idx]->num_printing_regions(); region_idx++) {
+            LayerRegion *layer_region;
+            layer_region = m_objects[0]->m_layers[0]->get_region(region_idx);
+            if (layer_region->slices.size() != 0 && region_idx == current_processing_region) {
+                current_processing_region = region_idx;
+                current_processing_layer = layer_idx;
+                
+                printMap[0] = PrintOrder{iteration_idx,batch_idx,current_processing_layer,current_processing_region };
+                iteration_idx += 1;
+                cumulative_layer_height += m_objects[0]->m_layers[0]->height;
+            }
+            else {
+                current_processing_region += 1;
+                if (current_processing_region == m_objects[0]->num_printing_regions()) {
+                    current_processing_region = 0;
+                }
+            }
+            
+
+            
+        }
+
+        
+
+        printMap[layer_idx] = PrintOrder{ 0,0,1,2 };
+    }
+
+    // This function checks the cumulative print height and 
+    // intersections between regions in the neighboring layers 
+    double safe_batch_size = 0.66; // mm
+    double cumulative_layer_height = 0.0; // mm
+    size_t    batch_index            = 0;
+
+    // right now it works for one onject only
+    for (size_t layer_idx = 0; layer_idx < m_objects[0]->m_layers.size(); layer_idx++) {
+        cumulative_layer_height += m_objects[0]->m_layers[0]->height;
+        std::cout << "cumulative_layer_height=" << cumulative_layer_height << std::endl;
+        if (cumulative_layer_height >= safe_batch_size) { 
+            batch_index += 1;
+            cumulative_layer_height = 0;
+        }
+        m_objects[0]->m_layers[layer_idx]->batch_index = batch_index;
+        std::cout << "batch_index=" << batch_index << std::endl;
+    }
+    
+    
+    */
+
+    
+
+
+
+    std::cout << "-- layer_batch_labeling() --" << std::endl;
+
+}
+
+void Print::layer_batch_labeling2(){
+    std::cout << "layer_batch_labeling2" << std::endl;
+}
+
+
+void Print::ATC_plan_wipe_toolchange() {
+    std::cout << "\n\n\nvoid Print::ATC_plan_wipe_toolchange()\n\n\n" << std::endl;
+
+    // create atc_wipe_tower
+    std::vector<float> wiping_matrix(cast<float>(m_config.wiping_volumes_matrix.values));
+    std::vector<std::vector<float>> wipe_volumes;
+    const unsigned int number_of_extruders = (unsigned int)(sqrt(wiping_matrix.size()) + EPSILON);
+    for (unsigned int i = 0; i < number_of_extruders; ++i)
+        wipe_volumes.push_back(std::vector<float>(wiping_matrix.begin() + i * number_of_extruders, wiping_matrix.begin() + (i + 1) * number_of_extruders));
+
+    m_ATC_wipe_tower_data.tool_ordering = ToolOrdering(*this, (unsigned int)-1, true);
+
+    WipeTower atc_wipe_tower(m_config, wipe_volumes, m_ATC_wipe_tower_data.tool_ordering.first_extruder());
+    for (size_t i = 0; i < number_of_extruders; ++i)
+        atc_wipe_tower.set_extruder(i, m_config);
+
+
+    // wiping parameters
+    bool need_wipe = true;
+    float atc_wiping_volume = 140.0;
+    size_t atc_old_tool;
+    size_t atc_new_tool;
+    float atc_wiping_layer_height = 0.2;
+    size_t atc_wipe_tower_idx = 0;
+    float atc_print_z;
+    
+
+    // building wiping tool changes
+    m_ATC_wipe_tower_data.clear();
+    // iterate over the printing pieces
+    struct ATC_printing_piece* printing_node;
+    int prev_region_idx = 0;
+    size_t atc_tool_change_counter = 0;
+    for (int printing_node_idx = 0; printing_node_idx < m_ATC_printing_map.get_count(); printing_node_idx++)
+    {
+        printing_node = m_ATC_printing_map.get_node(printing_node_idx);
+        int print_layer_idx = printing_node->layer;
+        int print_region_idx = printing_node->region;
+
+        std::cout << "piece=" << printing_node_idx << " layer=" << print_layer_idx << " region=" << print_region_idx << std::endl;
+
+        if (print_region_idx != prev_region_idx)
+        {
+            std::cout << "wipe tower here" << std::endl;
+            atc_wipe_tower_idx += 1;
+            atc_old_tool = prev_region_idx;
+            atc_new_tool = print_region_idx;
+            atc_print_z = atc_wiping_layer_height * atc_wipe_tower_idx;
+            // printing_node->need_wipe = true;
+            m_ATC_printing_map.get_node(printing_node_idx-1)->need_wipe = true; // wipe before the tool change
+
+            atc_wipe_tower.plan_toolchange(atc_print_z, atc_wiping_layer_height, atc_old_tool, atc_new_tool, atc_wiping_volume);
+            std::cout << "WTower: atc_print_z=" << atc_print_z << " atc_old_tool=" << atc_old_tool << " atc_new_tool=" << atc_new_tool << std::endl;
+            atc_tool_change_counter += 1;
+        }
+        prev_region_idx = print_region_idx;
+        std::cout << "\n===================================\n\n\n" << std::endl;
+        std::cout << "Node=" << printing_node_idx << " Need wipe=" << printing_node->need_wipe << std::endl;
+        std::cout << "\n\n\n===================================\n" << std::endl;
+    }
+
+    m_ATC_wipe_tower_data.tool_changes.reserve(atc_wipe_tower_idx + 1);
+    atc_wipe_tower.generate(m_ATC_wipe_tower_data.tool_changes);
+    std::cout << "\n\n\ncheck size = " << m_ATC_wipe_tower_data.tool_changes.size() << std::endl;
+    //m_ATC_wipe_tower_data.number_of_toolchanges = atc_tool_change_counter;
+    //std::cout << "m_ATC_wipe_tower_data.number_of_toolchanges = " << atc_tool_change_counter << std::endl;
+
+    
+    /*
+    atc_wipe_tower.plan_toolchange(0.2, 0.2, 0, 1, 140.0); //00
+    atc_wipe_tower.plan_toolchange(0.4, 0.2, 1, 2, 70.0);  //10
+    atc_wipe_tower.plan_toolchange(0.6, 0.2, 2, 0, 140.0); //20
+    atc_wipe_tower.plan_toolchange(0.8, 0.2, 0, 0, 0); //30
+    atc_wipe_tower.plan_toolchange(1.0, 0.2, 0, 1, 140.0); //40
+    atc_wipe_tower.plan_toolchange(1.2, 0.2, 1, 2, 140.0); //50
+    atc_wipe_tower.plan_toolchange(1.4, 0.2, 2, 0, 140.0); //60
+    atc_wipe_tower.plan_toolchange(1.6, 0.2, 0, 2, 140.0); //70
+    */
+}
+
 // G-code export process, running at a background thread.
 // The export_gcode may die for various reasons (fails to process filename_format,
 // write error into the G-code, cannot execute post-processing scripts).
@@ -2204,6 +2616,28 @@ std::string Print::export_gcode(const std::string& path_template, GCodeProcessor
 
     //BBS
     result->conflict_result = m_conflict_result;
+    return path.c_str();
+}
+
+std::string Print::export_batched_gcode(const std::string& path_template, GCodeProcessorResult* result, ThumbnailsGeneratorCallback thumbnail_cb)
+{
+    // output everything to a G-code file
+    // The following call may die if the output_filename_format template substitution fails.
+    std::string path = this->output_filepath(path_template);
+    std::string message;
+    if (!path.empty() && result == nullptr) {
+        // Only show the path if preview_data is not set -> running from command line.
+        message = L("Exporting batched G-code");
+        message += " to ";
+        message += path;
+    }
+    else
+        message = L("Generating batched G-code");
+    this->set_status(90, message);
+
+    // Create GCode on heap, it has quite a lot of data.
+    std::unique_ptr<GCode> gcode(new GCode);
+    gcode->do_batched_export(this, path.c_str(), result, thumbnail_cb);
     return path.c_str();
 }
 

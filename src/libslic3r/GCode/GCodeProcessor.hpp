@@ -159,6 +159,8 @@ namespace Slic3r {
             float mm3_per_mm{ 0.0f };
             float fan_speed{ 0.0f }; // percentage
             float temperature{ 0.0f }; // Celsius degrees
+            float atc_batching{ 0.0f }; // ATC Tool Clustering
+            float atc_critical_intersection{ 0.0f }; // ATC Critical Region Intersection
             float time{ 0.0f }; // s
             float layer_duration{ 0.0f }; // s (layer id before finalize)
 
@@ -658,7 +660,12 @@ namespace Slic3r {
             }
         };
 #endif // ENABLE_GCODE_VIEWER_DATA_CHECKING
-
+        
+    public:
+        // ATC tool clustering
+        float m_atc_batch_number; // atc batch number
+        // ATC critical region intersection
+        float m_atc_critical_intersection;
     private:
         GCodeReader m_parser;
         EUnits m_units;

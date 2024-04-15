@@ -2103,6 +2103,21 @@ void TabPrint::build()
         optgroup->append_single_option_line("overhang_reverse_internal_only");
         optgroup->append_single_option_line("overhang_reverse_threshold");
 
+    // ATC Tool clustering
+    page = add_options_page(L("ATC tool clustering"), "atc_tool_clustering");
+        optgroup = page->new_optgroup(L("General parameters (experimental)"));
+        optgroup->append_single_option_line("atc_enable_tool_clustering");
+        optgroup->append_single_option_line("atc_safe_batch_height");
+        //optgroup->append_single_option_line("fill_density");
+
+        optgroup = page->new_optgroup(L("Color intersection (experimental)"));
+        optgroup->append_single_option_line("atc_critical_intersection_area");
+        optgroup->append_single_option_line("atc_extruders_z_jump");
+
+        optgroup = page->new_optgroup(L("ATC wipe tower (experimental)"));
+        optgroup->append_single_option_line("atc_wiping_volume");
+    // ---------------------------
+	
     page = add_options_page(L("Strength"), "empty");
         optgroup = page->new_optgroup(L("Walls"), L"param_wall");
         optgroup->append_single_option_line("wall_loops");

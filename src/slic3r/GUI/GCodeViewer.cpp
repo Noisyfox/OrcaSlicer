@@ -224,7 +224,7 @@ void GCodeViewer::TBuffer::add_path(const GCodeProcessorResult::MoveVertex& move
     // use rounding to reduce the number of generated paths
     paths.push_back({ move.type, move.extrusion_role, move.delta_extruder,
         round_to_bin(move.height), round_to_bin(move.width),
-        move.feedrate, move.fan_speed, move.temperature,
+        move.feedrate, move.fan_speed, move.temperature, move.atc_batching, move.atc_critical_intersection,
         move.volumetric_rate(), move.layer_duration, move.extruder_id, move.cp_color_id, { { endpoint, endpoint } } });
 }
 
@@ -1144,6 +1144,9 @@ void GCodeViewer::refresh(const GCodeProcessorResult& gcode_result, const std::v
             m_extrusions.ranges.width.update_from(round_to_bin(curr.width));
             m_extrusions.ranges.fan_speed.update_from(curr.fan_speed);
             m_extrusions.ranges.temperature.update_from(curr.temperature);
+            // ATC batching
+            m_extrusions.ranges.atc_batching.update_from(curr.atc_batching);
+            m_extrusions.ranges.atc_critical_intersection.update_from(curr.atc_critical_intersection);
             if (curr.extrusion_role != erCustom || is_visible(erCustom))
                 m_extrusions.ranges.volumetric_rate.update_from(round_to_bin(curr.volumetric_rate()));
 
@@ -3206,6 +3209,11 @@ void GCodeViewer::refresh_render_paths(bool keep_sequential_current_first, bool 
         case EViewType::Feedrate:       { color = m_extrusions.ranges.feedrate.get_color_at(path.feedrate); break; }
         case EViewType::FanSpeed:       { color = m_extrusions.ranges.fan_speed.get_color_at(path.fan_speed); break; }
         case EViewType::Temperature:    { color = m_extrusions.ranges.temperature.get_color_at(path.temperature); break; }
+        // instead of 12 should be a batch number // check struct Path in GCodeViewer.hpp
+        //case EViewType::ATCLayerBatching: { color = m_extrusions.ranges.atc_batching.get_color_at(132); break; } 
+        case EViewType::ATCLayerBatching: { color = m_extrusions.ranges.atc_batching.get_color_at(path.atc_batching); break; }
+        case EViewType::ATCCriticalIntersection: { color = m_extrusions.ranges.atc_critical_intersection.get_color_at(path.atc_critical_intersection); break; }
+
         case EViewType::LayerTime:      { color = m_extrusions.ranges.layer_duration.get_color_at(path.layer_time); break; }
         case EViewType::LayerTimeLog:   { color = m_extrusions.ranges.layer_duration_log.get_color_at(path.layer_time); break; }
         case EViewType::VolumetricRate: { color = m_extrusions.ranges.volumetric_rate.get_color_at(path.volumetric_rate); break; }
@@ -5010,6 +5018,8 @@ void GCodeViewer::render_legend(float &legend_height, int canvas_width, int canv
     }
     case EViewType::FanSpeed:       { append_range(m_extrusions.ranges.fan_speed, 0); break; }
     case EViewType::Temperature:    { append_range(m_extrusions.ranges.temperature, 0); break; }
+    case EViewType::ATCLayerBatching:     { append_range(m_extrusions.ranges.atc_batching, 0); break; }
+    case EViewType::ATCCriticalIntersection: { append_range(m_extrusions.ranges.atc_critical_intersection, 4); break; }
     case EViewType::LayerTime:      { append_range(m_extrusions.ranges.layer_duration, true); break; }
     case EViewType::LayerTimeLog:   { append_range(m_extrusions.ranges.layer_duration_log, true); break; }
     case EViewType::VolumetricRate: { append_range(m_extrusions.ranges.volumetric_rate, 2); break; }

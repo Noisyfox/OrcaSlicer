@@ -109,9 +109,10 @@ public:
 
 private:
     WipeTowerIntegration& operator=(const WipeTowerIntegration&);
+public:
     std::string append_tcr(GCode &gcodegen, const WipeTower::ToolChangeResult &tcr, int new_extruder_id, double z = -1.) const;
     std::string append_tcr2(GCode &gcodegen, const WipeTower::ToolChangeResult &tcr, int new_extruder_id, double z = -1.) const;
-
+private:
     // Postprocesses gcode: rotates and moves G1 extrusions and returns result
     std::string post_process_wipe_tower_moves(const WipeTower::ToolChangeResult& tcr, const Vec2f& translation, float angle) const;
     // Left / right edges of the wipe tower, for the planning of wipe moves.
@@ -142,6 +143,201 @@ class ColorPrintColors
     static const std::vector<std::string> Colors;
 public:
     static const std::vector<std::string>& get() { return Colors; }
+};
+
+struct printing_piece_UPD {
+    size_t number;
+    float print_z;
+
+    bool object;
+    bool support;
+
+    int Rlayer;
+    int Blayer;
+    int region;
+
+    float area;
+    float perimeter;
+
+    bool state;
+    int batch;
+    bool need_wipe;
+
+    float region_intersection;
+    //float intersection_ext;
+    //float intersection_void;
+    printing_piece_UPD* next;
+};
+
+
+class atc_linked_list_UPD
+{
+private:
+    printing_piece_UPD* head, * tail;
+public:
+    atc_linked_list_UPD()
+    {
+        head = NULL;
+        tail = NULL;
+    }
+
+    void append_node(size_t number, float print_z, bool object, bool support, int Rlayer, int Blayer, int region, float area, float perimeter, bool state, int batch, bool need_wipe, float region_intersection)
+    {
+        printing_piece_UPD* tmp = new printing_piece_UPD;
+        tmp->number = number;
+        tmp->print_z = print_z;
+        tmp->object = object;
+        tmp->support = support;
+        tmp->Rlayer = Rlayer;
+        tmp->Blayer = Blayer;
+        tmp->region = region;
+        tmp->area = area;
+        tmp->perimeter = perimeter;
+        tmp->state = state;
+        tmp->batch = batch;
+        tmp->need_wipe = need_wipe;
+        tmp->region_intersection = region_intersection;
+        tmp->next = NULL;
+
+        if (head == NULL)
+        {
+            head = tmp;
+            tail = tmp;
+        }
+        else
+        {
+            tail->next = tmp;
+            tail = tail->next;
+        }
+    }
+
+    printing_piece_UPD* gethead()
+    {
+        return head;
+    }
+
+    static void display(printing_piece_UPD* head)
+    {
+        if (head == NULL)
+        {
+            std::cout << "NULL" << std::endl;
+        }
+        else
+        {
+            std::cout << std::fixed;
+            std::cout << std::setprecision(2);
+            std::cout
+                << "#" << head->number
+                << "--z=" << printf("%.2f", head->print_z)
+                << "--o" << head->object
+                << "--s" << head->support
+                << "--RL" << head->Rlayer
+                << ", {BL" << head->Blayer
+                << ", R" << head->region << "}"
+                << ", A=" << head->area
+                << ", P=" << head->perimeter
+                << "--b" << head->batch
+                << "--w" << head->need_wipe
+                << "--region_int=" << head->region_intersection
+                << std::endl;
+            display(head->next);
+        }
+    }
+
+
+    std::pair<int, int> get_layer_and_region_ids(int position)
+    {
+        printing_piece_UPD* temp;
+        temp = head;
+        for (int node_position = 0; node_position < position; node_position++)
+        {
+            temp = temp->next;
+        }
+        int blayer_id = temp->Blayer;
+        int region_id = temp->region;
+        return std::make_pair(blayer_id, region_id);
+    }
+
+    void delete_node(int position)
+    {
+        printing_piece_UPD* temp;
+        printing_piece_UPD* prev;
+
+        if (position == 1)
+        {
+            prev = head;
+            temp = head->next;
+            head = temp;
+            delete(prev);
+        }
+        else
+        {
+            temp = head;
+            prev = NULL;
+            for (int i = 0; i < position - 1 && temp; i++)
+            {
+                prev = temp;
+                temp = temp->next;
+            }
+            if (prev && temp)
+            {
+                prev->next = temp->next;
+                delete(temp);
+            }
+        }
+    }
+
+
+    int get_count()
+    {
+        int number_of_nodes = 0;
+        printing_piece_UPD* current = head;
+        while (current != NULL)
+        {
+            number_of_nodes++;
+            current = current->next;
+        }
+
+        return number_of_nodes;
+    }
+
+    struct printing_piece_UPD* node_search(struct printing_piece_UPD* p, int Blayer, int region)
+    {
+        if (p == NULL)
+            return NULL;
+        if (Blayer == p->Blayer && region == p->region)
+        {
+            //std::cout << "///////////" << p->layer << ", " << p->region << std::endl;
+            return p;
+        }
+        return node_search(p->next, Blayer, region);
+    }
+
+    struct printing_piece_UPD* node_search(struct printing_piece_UPD* p, int state)
+    {
+        if (p == NULL)
+            return NULL;
+        if (p->state == state)
+        {
+            return p;
+        }
+        return node_search(p->next, state);
+    }
+
+    struct printing_piece_UPD* get_node(int position)
+    {
+        printing_piece_UPD* node;
+        node = head;
+        for (int node_position = 0; node_position < position; node_position++)
+        {
+            node = node->next;
+        }
+        return node;
+    }
+
+
+
+
 };
 
 struct LayerResult {
@@ -191,6 +387,7 @@ public:
     // throws std::runtime_exception on error,
     // throws CanceledException through print->throw_if_canceled().
     void            do_export(Print* print, const char* path, GCodeProcessorResult* result = nullptr, ThumbnailsGeneratorCallback thumbnail_cb = nullptr);
+    void            do_batched_export(Print* print, const char* path, GCodeProcessorResult* result = nullptr, ThumbnailsGeneratorCallback thumbnail_cb = nullptr);
 
     //BBS: set offset for gcode writer
     void set_gcode_offset(double x, double y) { m_writer.set_xy_offset(x, y); m_processor.set_xy_offset(x, y);}
@@ -274,6 +471,15 @@ public:
         }
     };
 
+    //----------------------------------------------------------
+    void                    layer_batch_labeling(Print& print);
+    void                    layer_batch_labeling_soluble_supports(Print& print);
+    void                    ATC_plan_wipe_toolchange(Print& print);
+    void                    ATC_plan_wipe_toolchange2(Print& print);
+    void                    ATC_plan_wipe_toolchange2_soluble_supports(Print& print);
+    atc_linked_list_UPD     ATC_printing_map;
+    //----------------------------------------------------------
+
 private:
     class GCodeOutputStream {
     public:
@@ -303,6 +509,7 @@ private:
         GCodeProcessor &m_processor;
     };
     void            _do_export(Print &print, GCodeOutputStream &file, ThumbnailsGeneratorCallback thumbnail_cb);
+    void            _do_batched_export(Print& print, GCodeOutputStream& file, ThumbnailsGeneratorCallback thumbnail_cb);
 
     static std::vector<LayerToPrint>        		                   collect_layers_to_print(const PrintObject &object);
     static std::vector<std::pair<coordf_t, std::vector<LayerToPrint>>> collect_layers_to_print(const Print &print);
@@ -320,6 +527,20 @@ private:
         const size_t                     single_object_idx = size_t(-1),
         // BBS
         const bool                       prime_extruder = false);
+
+    LayerResult process_layer_batched_region(
+        const Print& print,
+        // Set of object & print layers of the same PrintObject and with the same print_z.
+        const std::vector<LayerToPrint>& layers,
+        const LayerTools& layer_tools,
+        const bool                       last_layer,
+        // Pairs of PrintObject index and its instance index.
+        const std::vector<const PrintInstance*>* ordering,
+        // If set to size_t(-1), then print all copies of all objects.
+        // Otherwise print a single copy of a single object.
+        size_t region_in_batch,
+        const size_t                     single_object_idx = size_t(-1));
+    
     // Process all layers of all objects (non-sequential mode) with a parallel pipeline:
     // Generate G-code, run the filters (vase mode, cooling buffer), run the G-code analyser
     // and export G-code into file.
@@ -329,6 +550,13 @@ private:
         const std::vector<const PrintInstance*>                             &print_object_instances_ordering,
         const std::vector<std::pair<coordf_t, std::vector<LayerToPrint>>>   &layers_to_print,
         GCodeOutputStream                                                   &output_stream);
+
+    void atc_process_layers(
+        Print                                                         &print,
+        const ToolOrdering                                            &tool_ordering,
+        GCodeOutputStream                                             &output_stream
+    );
+    
     // Process all layers of a single object instance (sequential mode) with a parallel pipeline:
     // Generate G-code, run the filters (vase mode, cooling buffer), run the G-code analyser
     // and export G-code into file.
@@ -340,6 +568,13 @@ private:
         GCodeOutputStream                       &output_stream,
         // BBS
         const bool                               prime_extruder = false);
+
+    void process_sequential_batched_layers(
+        const Print& print,
+        const ToolOrdering& tool_ordering,
+        std::vector<LayerToPrint>                layers_to_print,
+        const size_t                             single_object_idx,
+        GCodeOutputStream& output_stream);
 
     //BBS
     void check_placeholder_parser_failed();

@@ -424,6 +424,8 @@ public:
     virtual void            set_task(const TaskParams &params) {}
     // Perform the calculation. This is the only method that is to be called at a worker thread.
     virtual void            process(long long *time_cost_with_cache = nullptr, bool use_cache = false) = 0;
+    // This function checks the cumulative print height and intersections between regions in the neighboring layers 
+    virtual void            layer_batch_labeling() = 0;
     virtual int             export_cached_data(const std::string& dir_path, bool with_space=false) { return 0;}
     virtual int            load_cached_data(const std::string& directory) { return 0;}
     // Clean up after process() finished, either with success, error or if canceled.

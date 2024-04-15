@@ -686,6 +686,11 @@ bool SLAPrint::invalidate_step(SLAPrintStep step)
     return invalidated;
 }
 
+void SLAPrint::layer_batch_labeling()
+{
+    std::cout << "-- SLA layer_batch_labeling() --" << std::endl;
+}
+
 void SLAPrint::process(long long *time_cost_with_cache, bool use_cache)
 {
     if (m_objects.empty())

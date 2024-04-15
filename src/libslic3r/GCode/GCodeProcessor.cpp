@@ -1470,6 +1470,8 @@ void GCodeProcessor::reset()
     m_line_id = 0;
     m_last_line_id = 0;
     m_feedrate = 0.0f;
+    m_atc_batch_number = 0.0f;
+    m_atc_critical_intersection = 0.0f;
     m_width = 0.0f;
     m_height = 0.0f;
     m_forced_width = 0.0f;

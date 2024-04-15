@@ -1690,6 +1690,127 @@ void GCode::do_export(Print* print, const char* path, GCodeProcessorResult* resu
     PROFILE_OUTPUT(debug_out_path("gcode-export-profile.txt").c_str());
 }
 
+void GCode::do_batched_export(Print* print, const char* path, GCodeProcessorResult* result, ThumbnailsGeneratorCallback thumbnail_cb)
+{
+    PROFILE_CLEAR();
+
+    CNumericLocalesSetter locales_setter;
+
+    // Does the file exist? If so, we hope that it is still valid.
+    {
+        PrintStateBase::StateWithTimeStamp state = print->step_state_with_timestamp(psGCodeExport);
+        if (!state.enabled || (state.state == PrintStateBase::DONE && boost::filesystem::exists(boost::filesystem::path(path))))
+            return;
+    }
+
+    // Enabled and either not done, or marked as done while the output file is missing.
+    print->set_started(psGCodeExport);
+
+    // check if any custom gcode contains keywords used by the gcode processor to
+    // produce time estimation and gcode toolpaths
+    std::vector<std::pair<std::string, std::string>> validation_res = DoExport::validate_custom_gcode(*print);
+    if (!validation_res.empty()) {
+        std::string reports;
+        for (const auto& [source, keyword] : validation_res) {
+            reports += source + ": \"" + keyword + "\"\n";
+        }
+        print->active_step_add_warning(PrintStateBase::WarningLevel::NON_CRITICAL,
+            _(L("In the custom G-code were found reserved keywords:")) + "\n" +
+            reports +
+            _(L("This may cause problems in g-code visualization and printing time estimation.")));
+    }
+
+    BOOST_LOG_TRIVIAL(info) << "Exporting G-code..." << log_memory_info();
+
+    // Remove the old g-code if it exists.
+    boost::nowide::remove(path);
+
+    std::string path_tmp(path);
+    path_tmp += ".tmp";
+
+    m_processor.initialize(path_tmp);
+    GCodeOutputStream file(boost::nowide::fopen(path_tmp.c_str(), "wb"), m_processor);
+    if (!file.is_open())
+        throw Slic3r::RuntimeError(std::string("G-code export to ") + path + " failed.\nCannot open the file for writing.\n");
+
+    try {
+        m_placeholder_parser_failed_templates.clear();
+        this->_do_batched_export(*print, file, thumbnail_cb);
+        file.flush();
+        if (file.is_error()) {
+            file.close();
+            boost::nowide::remove(path_tmp.c_str());
+            throw Slic3r::RuntimeError(std::string("G-code export to ") + path + " failed\nIs the disk full?\n");
+        }
+    }
+    catch (std::exception& /* ex */) {
+        // Rethrow on any exception. std::runtime_exception and CanceledException are expected to be thrown.
+        // Close and remove the file.
+        file.close();
+        boost::nowide::remove(path_tmp.c_str());
+        throw;
+    }
+    file.close();
+
+    if (!m_placeholder_parser_failed_templates.empty()) {
+        // G-code export proceeded, but some of the PlaceholderParser substitutions failed.
+        //FIXME localize!
+        std::string msg = std::string("G-code export to ") + path + " failed due to invalid custom G-code sections:\n\n";
+        for (const auto& name_and_error : m_placeholder_parser_failed_templates)
+            msg += name_and_error.first + "\n" + name_and_error.second + "\n";
+        msg += "\nPlease inspect the file ";
+        msg += path_tmp + " for error messages enclosed between\n";
+        msg += "        !!!!! Failed to process the custom G-code template ...\n";
+        msg += "and\n";
+        msg += "        !!!!! End of an error report for the custom G-code template ...\n";
+        msg += "for all macro processing errors.";
+        throw Slic3r::PlaceholderParserError(msg);
+    }
+
+    BOOST_LOG_TRIVIAL(debug) << "Start processing gcode, " << log_memory_info();
+
+    // Assign bath numbers to GCodeProcessor for color visualization
+    //m_processor.atc_assign_batch_numbers(gcode);
+    //for (GCodeProcessorResult::MoveVertex& move : m_result.moves)
+    //this->ATC_printing_map.get_node(0);
+    //m_processor.get_result().moves[9].atc_batching = 103;
+
+    /*
+    for (GCodeProcessorResult::MoveVertex& move : result->moves)
+    {
+        if (move.type == EMoveType::Extrude) {
+            move.atc_batching = 52;
+        }
+    }
+    result->moves[30].atc_batching = 103;
+    result->moves[40].atc_batching = 35;
+    */
+
+    // Post-process the G-code to update time stamps.
+    m_processor.finalize(true);
+    
+    //    DoExport::update_print_estimated_times_stats(m_processor, print->m_print_statistics);
+    DoExport::update_print_estimated_stats(m_processor, m_writer.extruders(), print->m_print_statistics);
+    if (result != nullptr) {
+        *result = std::move(m_processor.extract_result());
+        // set the filename to the correct value
+        result->filename = path;
+    }
+    BOOST_LOG_TRIVIAL(debug) << "Finished processing gcode, " << log_memory_info();
+
+    if (rename_file(path_tmp, path))
+        throw Slic3r::RuntimeError(
+            std::string("Failed to rename the output G-code file from ") + path_tmp + " to " + path + '\n' +
+            "Is " + path_tmp + " locked?" + '\n');
+
+    BOOST_LOG_TRIVIAL(info) << "Exporting G-code finished" << log_memory_info();
+    print->set_done(psGCodeExport);
+
+    // Write the profiler measurements to file
+    PROFILE_UPDATE();
+    PROFILE_OUTPUT(debug_out_path("gcode-export-profile.txt").c_str());
+}
+
 // free functions called by GCode::_do_export()
 namespace DoExport {
     static void init_gcode_processor(const PrintConfig& config, GCodeProcessor& processor, bool& silent_time_estimator_enabled)
@@ -2846,6 +2967,567 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
     print.throw_if_canceled();
 }
 
+void GCode::_do_batched_export(Print& print, GCodeOutputStream& file, ThumbnailsGeneratorCallback thumbnail_cb)
+{
+    std::cout << "~~~~~~~~~~~ _do_batched_export() ~~~~~~~~~~~" << std::endl;
+    PROFILE_FUNC();
+
+    // modifies m_silent_time_estimator_enabled
+    DoExport::init_gcode_processor(print.config(), m_processor, m_silent_time_estimator_enabled);
+
+    if (!print.config().gcode_substitutions.values.empty()) {
+        m_find_replace = make_unique<GCodeFindReplace>(print.config());
+        file.set_find_replace(m_find_replace.get(), false);
+    }
+
+    // resets analyzer's tracking data
+    m_last_height = 0.f;
+    m_last_layer_z = 0.f;
+    m_max_layer_z = 0.f;
+    m_last_width = 0.f;
+#if ENABLE_GCODE_VIEWER_DATA_CHECKING
+    m_last_mm3_per_mm = 0.;
+#endif // ENABLE_GCODE_VIEWER_DATA_CHECKING
+
+    // How many times will be change_layer() called?
+    // change_layer() in turn increments the progress bar status.
+    m_layer_count = 0;
+    if (print.config().complete_objects.value) {
+        // Add each of the object's layers separately.
+        for (auto object : print.objects()) {
+            std::vector<coordf_t> zs;
+            zs.reserve(object->layers().size() + object->support_layers().size());
+            for (auto layer : object->layers())
+                zs.push_back(layer->print_z);
+            for (auto layer : object->support_layers())
+                zs.push_back(layer->print_z);
+            std::sort(zs.begin(), zs.end());
+            m_layer_count += (unsigned int)(object->instances().size() * (std::unique(zs.begin(), zs.end()) - zs.begin()));
+        }
+    }
+    else {
+        // Print all objects with the same print_z together.
+        std::vector<coordf_t> zs;
+        for (auto object : print.objects()) {
+            zs.reserve(zs.size() + object->layers().size() + object->support_layers().size());
+            for (auto layer : object->layers())
+                zs.push_back(layer->print_z);
+            for (auto layer : object->support_layers())
+                zs.push_back(layer->print_z);
+        }
+        std::sort(zs.begin(), zs.end());
+        m_layer_count = (unsigned int)(std::unique(zs.begin(), zs.end()) - zs.begin());
+    }
+    print.throw_if_canceled();
+
+    m_enable_cooling_markers = true;
+    this->apply_print_config(print.config());
+
+    m_volumetric_speed = DoExport::autospeed_volumetric_limit(print);
+    print.throw_if_canceled();
+
+    if (print.config().spiral_vase.value)
+        m_spiral_vase = make_unique<SpiralVase>(print.config());
+#ifdef HAS_PRESSURE_EQUALIZER
+    if (print.config().max_volumetric_extrusion_rate_slope_positive.value > 0 ||
+        print.config().max_volumetric_extrusion_rate_slope_negative.value > 0)
+        m_pressure_equalizer = make_unique<PressureEqualizer>(&print.config());
+    m_enable_extrusion_role_markers = (bool)m_pressure_equalizer;
+#else /* HAS_PRESSURE_EQUALIZER */
+    m_enable_extrusion_role_markers = false;
+#endif /* HAS_PRESSURE_EQUALIZER */
+
+    // Write information on the generator.
+    file.write_format("; %s\n\n", Slic3r::header_slic3r_generated().c_str());
+
+    // Unit tests or command line slicing may not define "thumbnails" or "thumbnails_format".
+    // If "thumbnails_format" is not defined, export to PNG.
+    if (const auto [thumbnails, thumbnails_format] = std::make_pair(
+        print.full_print_config().option<ConfigOptionPoints>("thumbnails"),
+        print.full_print_config().option<ConfigOptionEnum<GCodeThumbnailsFormat>>("thumbnails_format"));
+        thumbnails)
+        GCodeThumbnails::export_thumbnails_to_file(
+            thumbnail_cb, thumbnails->values, thumbnails_format ? thumbnails_format->value : GCodeThumbnailsFormat::PNG,
+            [&file](const char* sz) { file.write(sz); },
+            [&print]() { print.throw_if_canceled(); });
+
+    // Write notes (content of the Print Settings tab -> Notes)
+    {
+        std::list<std::string> lines;
+        boost::split(lines, print.config().notes.value, boost::is_any_of("\n"), boost::token_compress_off);
+        for (auto line : lines) {
+            // Remove the trailing '\r' from the '\r\n' sequence.
+            if (!line.empty() && line.back() == '\r')
+                line.pop_back();
+            file.write_format("; %s\n", line.c_str());
+        }
+        if (!lines.empty())
+            file.write("\n");
+    }
+    print.throw_if_canceled();
+
+    // Write some terse information on the slicing parameters.
+    const PrintObject* first_object = print.objects().front();
+    const double       layer_height = first_object->config().layer_height.value;
+    assert(!print.config().first_layer_height.percent);
+    const double       first_layer_height = print.config().first_layer_height.value;
+    for (size_t region_id = 0; region_id < print.num_print_regions(); ++region_id) {
+        const PrintRegion& region = print.get_print_region(region_id);
+        file.write_format("; external perimeters extrusion width = %.2fmm\n", region.flow(*first_object, frExternalPerimeter, layer_height).width());
+        file.write_format("; perimeters extrusion width = %.2fmm\n", region.flow(*first_object, frPerimeter, layer_height).width());
+        file.write_format("; infill extrusion width = %.2fmm\n", region.flow(*first_object, frInfill, layer_height).width());
+        file.write_format("; solid infill extrusion width = %.2fmm\n", region.flow(*first_object, frSolidInfill, layer_height).width());
+        file.write_format("; top infill extrusion width = %.2fmm\n", region.flow(*first_object, frTopSolidInfill, layer_height).width());
+        if (print.has_support_material())
+            file.write_format("; support material extrusion width = %.2fmm\n", support_material_flow(first_object).width());
+        if (print.config().first_layer_extrusion_width.value > 0)
+            file.write_format("; first layer extrusion width = %.2fmm\n", region.flow(*first_object, frPerimeter, first_layer_height, true).width());
+        file.write_format("\n");
+    }
+    print.throw_if_canceled();
+
+    // adds tags for time estimators
+    if (print.config().remaining_times.value)
+        file.write_format(";%s\n", GCodeProcessor::reserved_tag(GCodeProcessor::ETags::First_Line_M73_Placeholder).c_str());
+
+    // Starting now, the G-code find / replace post-processor will be enabled.
+    file.find_replace_enable();
+
+    // Prepare the helper object for replacing placeholders in custom G-code and output filename.
+    m_placeholder_parser = print.placeholder_parser();
+    m_placeholder_parser.update_timestamp();
+    m_placeholder_parser_context.rng = std::mt19937(std::chrono::high_resolution_clock::now().time_since_epoch().count());
+    print.update_object_placeholders(m_placeholder_parser.config_writable(), ".gcode");
+
+    // Get optimal tool ordering to minimize tool switches of a multi-exruder print.
+    // For a print by objects, find the 1st printing object.
+    ToolOrdering tool_ordering;
+    unsigned int initial_extruder_id = (unsigned int)-1;
+    unsigned int final_extruder_id = (unsigned int)-1;
+    bool         has_wipe_tower = false;
+    std::vector<const PrintInstance*> 					print_object_instances_ordering;
+    std::vector<const PrintInstance*>::const_iterator 	print_object_instance_sequential_active;
+    if (print.config().complete_objects.value) {
+        // Order object instances for sequential print.
+        print_object_instances_ordering = sort_object_instances_by_model_order(print);
+        //        print_object_instances_ordering = sort_object_instances_by_max_z(print);
+                // Find the 1st printing object, find its tool ordering and the initial extruder ID.
+        print_object_instance_sequential_active = print_object_instances_ordering.begin();
+        for (; print_object_instance_sequential_active != print_object_instances_ordering.end(); ++print_object_instance_sequential_active) {
+            tool_ordering = ToolOrdering(*(*print_object_instance_sequential_active)->print_object, initial_extruder_id);
+            if ((initial_extruder_id = tool_ordering.first_extruder()) != static_cast<unsigned int>(-1))
+                break;
+        }
+        if (initial_extruder_id == static_cast<unsigned int>(-1))
+            // No object to print was found, cancel the G-code export.
+            throw Slic3r::SlicingError(_(L("No extrusions were generated for objects.")));
+        // We don't allow switching of extruders per layer by Model::custom_gcode_per_print_z in sequential mode.
+        // Use the extruder IDs collected from Regions.
+        this->set_extruders(print.extruders());
+    }
+    else {
+        // Find tool ordering for all the objects at once, and the initial extruder ID.
+        // If the tool ordering has been pre-calculated by Print class for wipe tower already, reuse it.
+        tool_ordering = print.tool_ordering();
+        tool_ordering.assign_custom_gcodes(print);
+        if (tool_ordering.all_extruders().empty())
+            // No object to print was found, cancel the G-code export.
+            throw Slic3r::SlicingError(_(L("No extrusions were generated for objects.")));
+        has_wipe_tower = print.has_wipe_tower() && tool_ordering.has_wipe_tower();
+        initial_extruder_id = (has_wipe_tower && !print.config().single_extruder_multi_material_priming) ?
+            // The priming towers will be skipped.
+            tool_ordering.all_extruders().back() :
+            // Don't skip the priming towers.
+            tool_ordering.first_extruder();
+        // In non-sequential print, the printing extruders may have been modified by the extruder switches stored in Model::custom_gcode_per_print_z.
+        // Therefore initialize the printing extruders from there.
+        this->set_extruders(tool_ordering.all_extruders());
+        // Order object instances using a nearest neighbor search.
+        print_object_instances_ordering = chain_print_object_instances(print);
+    }
+    if (initial_extruder_id == (unsigned int)-1) {
+        // Nothing to print!
+        initial_extruder_id = 0;
+        final_extruder_id = 0;
+    }
+    else {
+        final_extruder_id = tool_ordering.last_extruder();
+        assert(final_extruder_id != (unsigned int)-1);
+    }
+    print.throw_if_canceled();
+
+    m_cooling_buffer = make_unique<CoolingBuffer>(*this);
+    m_cooling_buffer->set_current_extruder(initial_extruder_id);
+
+    // Emit machine envelope limits for the Marlin firmware.
+    this->print_machine_envelope(file, print);
+
+    // Disable fan.
+    if (!print.config().cooling.get_at(initial_extruder_id) || print.config().disable_fan_first_layers.get_at(initial_extruder_id))
+        file.write(m_writer.set_fan(0));
+
+    // Let the start-up script prime the 1st printing tool.
+    m_placeholder_parser.set("initial_tool", initial_extruder_id);
+    m_placeholder_parser.set("initial_extruder", initial_extruder_id);
+    m_placeholder_parser.set("current_extruder", initial_extruder_id);
+    //Set variable for total layer count so it can be used in custom gcode.
+    m_placeholder_parser.set("total_layer_count", m_layer_count);
+    // Useful for sequential prints.
+    m_placeholder_parser.set("current_object_idx", 0);
+    // For the start / end G-code to do the priming and final filament pull in case there is no wipe tower provided.
+    m_placeholder_parser.set("has_wipe_tower", has_wipe_tower);
+    m_placeholder_parser.set("has_single_extruder_multi_material_priming", has_wipe_tower && print.config().single_extruder_multi_material_priming);
+    m_placeholder_parser.set("total_toolchanges", std::max(0, print.wipe_tower_data().number_of_toolchanges)); // Check for negative toolchanges (single extruder mode) and set to 0 (no tool change).
+    {
+        BoundingBoxf bbox(print.config().bed_shape.values);
+        m_placeholder_parser.set("print_bed_min", new ConfigOptionFloats({ bbox.min.x(), bbox.min.y() }));
+        m_placeholder_parser.set("print_bed_max", new ConfigOptionFloats({ bbox.max.x(), bbox.max.y() }));
+        m_placeholder_parser.set("print_bed_size", new ConfigOptionFloats({ bbox.size().x(), bbox.size().y() }));
+    }
+    {
+        // Convex hull of the 1st layer extrusions, for bed leveling and placing the initial purge line.
+        // It encompasses the object extrusions, support extrusions, skirt, brim, wipe tower.
+        // It does NOT encompass user extrusions generated by custom G-code,
+        // therefore it does NOT encompass the initial purge line.
+        // It does NOT encompass MMU/MMU2 starting (wipe) areas.
+        auto pts = std::make_unique<ConfigOptionPoints>();
+        pts->values.reserve(print.first_layer_convex_hull().size());
+        for (const Point& pt : print.first_layer_convex_hull().points)
+            pts->values.emplace_back(unscale(pt));
+        BoundingBoxf bbox(pts->values);
+        m_placeholder_parser.set("first_layer_print_convex_hull", pts.release());
+        m_placeholder_parser.set("first_layer_print_min", new ConfigOptionFloats({ bbox.min.x(), bbox.min.y() }));
+        m_placeholder_parser.set("first_layer_print_max", new ConfigOptionFloats({ bbox.max.x(), bbox.max.y() }));
+        m_placeholder_parser.set("first_layer_print_size", new ConfigOptionFloats({ bbox.size().x(), bbox.size().y() }));
+    }
+    std::string start_gcode = this->placeholder_parser_process("start_gcode", print.config().start_gcode.value, initial_extruder_id);
+    // Set bed temperature if the start G-code does not contain any bed temp control G-codes.
+    this->_print_first_layer_bed_temperature(file, print, start_gcode, initial_extruder_id, true);
+    // Set extruder(s) temperature before and after start G-code.
+    this->_print_first_layer_extruder_temperatures(file, print, start_gcode, initial_extruder_id, false);
+
+    // adds tag for processor
+    file.write_format(";%s%s\n", GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Role).c_str(), ExtrusionEntity::role_to_string(erCustom).c_str());
+
+    // Write the custom start G-code
+    file.writeln(start_gcode);
+
+    this->_print_first_layer_extruder_temperatures(file, print, start_gcode, initial_extruder_id, true);
+    print.throw_if_canceled();
+
+    // Set other general things.
+    file.write(this->preamble());
+
+    // Calculate wiping points if needed
+    DoExport::init_ooze_prevention(print, m_ooze_prevention);
+    print.throw_if_canceled();
+
+    // Collect custom seam data from all objects.
+    m_seam_placer.init(print);
+
+    if (!(has_wipe_tower && print.config().single_extruder_multi_material_priming)) {
+        // Set initial extruder only after custom start G-code.
+        // Ugly hack: Do not set the initial extruder if the extruder is primed using the MMU priming towers at the edge of the print bed.
+        file.write(this->set_extruder(initial_extruder_id, 0.));
+    }
+
+    // Do all objects for each layer. (SEQUENTIAL)
+    //if (print.config().complete_objects.value) {
+    if (false) {
+        std::cout << "~~~~~~~~~~~ Do all objects for each layer ~~~~~~~~~~~" << std::endl;
+        size_t finished_objects = 0;
+        const PrintObject* prev_object = (*print_object_instance_sequential_active)->print_object;
+        for (; print_object_instance_sequential_active != print_object_instances_ordering.end(); ++print_object_instance_sequential_active) {
+            const PrintObject& object = *(*print_object_instance_sequential_active)->print_object;
+            if (&object != prev_object || tool_ordering.first_extruder() != final_extruder_id) {
+                tool_ordering = ToolOrdering(object, final_extruder_id);
+                unsigned int new_extruder_id = tool_ordering.first_extruder();
+                if (new_extruder_id == (unsigned int)-1)
+                    // Skip this object.
+                    continue;
+                initial_extruder_id = new_extruder_id;
+                final_extruder_id = tool_ordering.last_extruder();
+                assert(final_extruder_id != (unsigned int)-1);
+            }
+            print.throw_if_canceled();
+            this->set_origin(unscale((*print_object_instance_sequential_active)->shift));
+            if (finished_objects > 0) {
+                // Move to the origin position for the copy we're going to print.
+                // This happens before Z goes down to layer 0 again, so that no collision happens hopefully.
+                m_enable_cooling_markers = false; // we're not filtering these moves through CoolingBuffer
+                m_avoid_crossing_perimeters.use_external_mp_once();
+                file.write(this->retract());
+                file.write(this->travel_to(Point(0, 0), erNone, "move to origin position for next object"));
+                m_enable_cooling_markers = true;
+                // Disable motion planner when traveling to first object point.
+                m_avoid_crossing_perimeters.disable_once();
+                // Ff we are printing the bottom layer of an object, and we have already finished
+                // another one, set first layer temperatures. This happens before the Z move
+                // is triggered, so machine has more time to reach such temperatures.
+                m_placeholder_parser.set("current_object_idx", int(finished_objects));
+                std::string between_objects_gcode = this->placeholder_parser_process("between_objects_gcode", print.config().between_objects_gcode.value, initial_extruder_id);
+                // Set first layer bed and extruder temperatures, don't wait for it to reach the temperature.
+                this->_print_first_layer_bed_temperature(file, print, between_objects_gcode, initial_extruder_id, false);
+                this->_print_first_layer_extruder_temperatures(file, print, between_objects_gcode, initial_extruder_id, false);
+                file.writeln(between_objects_gcode);
+            }
+            // Reset the cooling buffer internal state (the current position, feed rate, accelerations).
+            m_cooling_buffer->reset(this->writer().get_position());
+            m_cooling_buffer->set_current_extruder(initial_extruder_id);
+            // Process all layers of a single object instance (sequential mode) with a parallel pipeline:
+            // Generate G-code, run the filters (vase mode, cooling buffer), run the G-code analyser
+            // and export G-code into file.
+            std::cout << "~~~~~~~~~~~ process_sequential_batched_layers ~~~~~~~~~~~" << std::endl;
+            this->process_sequential_batched_layers(print, tool_ordering, collect_layers_to_print(object), *print_object_instance_sequential_active - object.instances().data(), file);
+#ifdef HAS_PRESSURE_EQUALIZER
+            if (m_pressure_equalizer)
+                file.write(m_pressure_equalizer->process("", true));
+#endif /* HAS_PRESSURE_EQUALIZER */
+            ++finished_objects;
+            // Flag indicating whether the nozzle temperature changes from 1st to 2nd layer were performed.
+            // Reset it when starting another object from 1st layer.
+            m_second_layer_things_done = false;
+            prev_object = &object;
+        }
+    }
+    // NON-SEQUENTIAL
+    //else {
+    //if(!print.config().complete_objects.value) {
+    if(false) {
+        std::cout << "~~~~~~~~~~~ Sort layers by Z ~~~~~~~~~~~" << std::endl;
+        // Sort layers by Z.
+        // All extrusion moves with the same top layer height are extruded uninterrupted.
+        std::vector<std::pair<coordf_t, std::vector<LayerToPrint>>> layers_to_print = collect_layers_to_print(print);
+
+        // Prusa Multi-Material wipe tower.
+        if (has_wipe_tower && !layers_to_print.empty()) {
+            m_wipe_tower.reset(new WipeTowerIntegration(print.config(), *print.wipe_tower_data().priming.get(), print.wipe_tower_data().tool_changes, *print.wipe_tower_data().final_purge.get()));
+            file.write(m_writer.travel_to_z(first_layer_height + m_config.z_offset.value, "Move to the first layer height"));
+            if (print.config().single_extruder_multi_material_priming) {
+                file.write(m_wipe_tower->prime(*this));
+                // Verify, whether the print overaps the priming extrusions.
+                BoundingBoxf bbox_print(get_print_extrusions_extents(print));
+                coordf_t twolayers_printz = ((layers_to_print.size() == 1) ? layers_to_print.front() : layers_to_print[1]).first + EPSILON;
+                for (const PrintObject* print_object : print.objects())
+                    bbox_print.merge(get_print_object_extrusions_extents(*print_object, twolayers_printz));
+                bbox_print.merge(get_wipe_tower_extrusions_extents(print, twolayers_printz));
+                BoundingBoxf bbox_prime(get_wipe_tower_priming_extrusions_extents(print));
+                bbox_prime.offset(0.5f);
+                bool overlap = bbox_prime.overlap(bbox_print);
+
+                if (print.config().gcode_flavor == gcfMarlinLegacy || print.config().gcode_flavor == gcfMarlinFirmware) {
+                    file.write(this->retract());
+                    file.write("M300 S800 P500\n"); // Beep for 500ms, tone 800Hz.
+                    if (overlap) {
+                        // Wait for the user to remove the priming extrusions.
+                        file.write("M1 Remove priming towers and click button.\n");
+                    }
+                    else {
+                        // Just wait for a bit to let the user check, that the priming succeeded.
+                        //TODO Add a message explaining what the printer is waiting for. This needs a firmware fix.
+                        file.write("M1 S10\n");
+                    }
+                }
+                else {
+                    // This is not Marlin, M1 command is probably not supported.
+                    // (See https://github.com/prusa3d/PrusaSlicer/issues/5441.)
+                    if (overlap) {
+                        print.active_step_add_warning(PrintStateBase::WarningLevel::CRITICAL,
+                            _(L("Your print is very close to the priming regions. "
+                                "Make sure there is no collision.")));
+                    }
+                    else {
+                        // Just continue printing, no action necessary.
+                    }
+
+                }
+            }
+            print.throw_if_canceled();
+        }
+        // Process all layers of all objects (non-sequential mode) with a parallel pipeline:
+        // Generate G-code, run the filters (vase mode, cooling buffer), run the G-code analyser
+        // and export G-code into file.
+        this->process_layers(print, tool_ordering, print_object_instances_ordering, layers_to_print, file);
+        
+#ifdef HAS_PRESSURE_EQUALIZER
+        if (m_pressure_equalizer)
+            file.write(m_pressure_equalizer->process("", true));
+#endif /* HAS_PRESSURE_EQUALIZER */
+        if (m_wipe_tower)
+            // Purge the extruder, pull out the active filament.
+            file.write(m_wipe_tower->finalize(*this));
+    }
+
+
+
+    
+    
+    
+    
+    // ATC // put here whatever in the "else" statement above // inherit from the NON-SEQUENTIAL mode
+    //if (print.default_object_config().atc_enable_wipe_tower)
+    if (true)
+    {
+        std::cout << "~~~~~~~~~~~ ATC NON-SEQUENTIAL mode ~~~~~~~~~~~" << std::endl;
+        // Sort layers by Z.
+        // All extrusion moves with the same top layer height are extruded uninterrupted.
+        std::vector<std::pair<coordf_t, std::vector<LayerToPrint>>> layers_to_print = collect_layers_to_print(print);
+        // Prusa Multi-Material wipe tower.
+        if (has_wipe_tower && !layers_to_print.empty()) {
+            m_wipe_tower.reset(new WipeTowerIntegration(print.config(), *print.wipe_tower_data().priming.get(), print.wipe_tower_data().tool_changes, *print.wipe_tower_data().final_purge.get()));
+            file.write(m_writer.travel_to_z(first_layer_height + m_config.z_offset.value, "Move to the first layer height"));
+            if (print.config().single_extruder_multi_material_priming) {
+                file.write(m_wipe_tower->prime(*this));
+                // Verify, whether the print overaps the priming extrusions.
+                BoundingBoxf bbox_print(get_print_extrusions_extents(print));
+                coordf_t twolayers_printz = ((layers_to_print.size() == 1) ? layers_to_print.front() : layers_to_print[1]).first + EPSILON;
+                for (const PrintObject* print_object : print.objects())
+                    bbox_print.merge(get_print_object_extrusions_extents(*print_object, twolayers_printz));
+                bbox_print.merge(get_wipe_tower_extrusions_extents(print, twolayers_printz));
+                BoundingBoxf bbox_prime(get_wipe_tower_priming_extrusions_extents(print));
+                bbox_prime.offset(0.5f);
+                bool overlap = bbox_prime.overlap(bbox_print);
+
+                if (print.config().gcode_flavor == gcfMarlinLegacy || print.config().gcode_flavor == gcfMarlinFirmware) {
+                    file.write(this->retract());
+                    file.write("M300 S800 P500\n"); // Beep for 500ms, tone 800Hz.
+                    if (overlap) {
+                        // Wait for the user to remove the priming extrusions.
+                        file.write("M1 Remove priming towers and click button.\n");
+                    }
+                    else {
+                        // Just wait for a bit to let the user check, that the priming succeeded.
+                        //TODO Add a message explaining what the printer is waiting for. This needs a firmware fix.
+                        file.write("M1 S10\n");
+                    }
+                }
+                else {
+                    // This is not Marlin, M1 command is probably not supported.
+                    // (See https://github.com/prusa3d/PrusaSlicer/issues/5441.)
+                    if (overlap) {
+                        print.active_step_add_warning(PrintStateBase::WarningLevel::CRITICAL,
+                            _(L("Your print is very close to the priming regions. "
+                                "Make sure there is no collision.")));
+                    }
+                    else {
+                        // Just continue printing, no action necessary.
+                    }
+
+                }
+            }
+            print.throw_if_canceled();
+        }
+        // Process all layers of all objects (non-sequential mode) with a parallel pipeline:
+        // Generate G-code, run the filters (vase mode, cooling buffer), run the G-code analyser
+        // and export G-code into file.
+        // ===========================================================
+        // ATC should be another function
+
+
+        //print.layer_batch_labeling();
+        // HERE ! or right in the atc_process_layers(print, tool_ordering, file) function
+
+
+
+
+
+        this->atc_process_layers(print, tool_ordering, file);
+        // this->process_layers(print, tool_ordering, print_object_instances_ordering, layers_to_print, file);
+        // ===========================================================
+
+#ifdef HAS_PRESSURE_EQUALIZER
+        if (m_pressure_equalizer)
+            file.write(m_pressure_equalizer->process("", true));
+#endif /* HAS_PRESSURE_EQUALIZER */
+        if (m_wipe_tower)
+            // Purge the extruder, pull out the active filament.
+            file.write(m_wipe_tower->finalize(*this));
+    }
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    // Write end commands to file.
+    file.write(this->retract());
+    file.write(m_writer.set_fan(0));
+
+    // adds tag for processor
+    file.write_format(";%s%s\n", GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Role).c_str(), ExtrusionEntity::role_to_string(erCustom).c_str());
+
+    // Process filament-specific gcode in extruder order.
+    {
+        DynamicConfig config;
+        config.set_key_value("layer_num", new ConfigOptionInt(m_layer_index));
+        config.set_key_value("layer_z", new ConfigOptionFloat(m_writer.get_position()(2) - m_config.z_offset.value));
+        config.set_key_value("max_layer_z", new ConfigOptionFloat(m_max_layer_z));
+        if (print.config().single_extruder_multi_material) {
+            // Process the end_filament_gcode for the active filament only.
+            int extruder_id = m_writer.extruder()->id();
+            config.set_key_value("filament_extruder_id", new ConfigOptionInt(extruder_id));
+            file.writeln(this->placeholder_parser_process("end_filament_gcode", print.config().end_filament_gcode.get_at(extruder_id), extruder_id, &config));
+        }
+        else {
+            for (const std::string& end_gcode : print.config().end_filament_gcode.values) {
+                int extruder_id = (unsigned int)(&end_gcode - &print.config().end_filament_gcode.values.front());
+                config.set_key_value("filament_extruder_id", new ConfigOptionInt(extruder_id));
+                file.writeln(this->placeholder_parser_process("end_filament_gcode", end_gcode, extruder_id, &config));
+            }
+        }
+        file.writeln(this->placeholder_parser_process("end_gcode", print.config().end_gcode, m_writer.extruder()->id(), &config));
+    }
+    file.write(m_writer.update_progress(m_layer_count, m_layer_count, true)); // 100%
+    file.write(m_writer.postamble());
+
+    // From now to the end of G-code, the G-code find / replace post-processor will be disabled.
+    // Thus the PrusaSlicer generated config will NOT be processed by the G-code post-processor, see GH issue #7952.
+    file.find_replace_supress();
+
+    // adds tags for time estimators
+    if (print.config().remaining_times.value)
+        file.write_format(";%s\n", GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Last_Line_M73_Placeholder).c_str());
+
+    print.throw_if_canceled();
+
+    // Get filament stats.
+    file.write(DoExport::update_print_stats_and_format_filament_stats(
+        // Const inputs
+        has_wipe_tower, print.wipe_tower_data(),
+        // ---here you can update your ATC stats:
+        //has_wipe_tower, print.m_ATC_wipe_tower_data,
+        
+        this->config(),
+        m_writer.extruders(),
+        initial_extruder_id,
+        // Modifies
+        print.m_print_statistics));
+
+    print.m_print_statistics.total_toolchanges = print.m_ATC_wipe_tower_data.number_of_toolchanges;
+
+    file.write("\n");
+    file.write_format("; total filament used [g] = %.2lf\n", print.m_print_statistics.total_weight);
+    file.write_format("; total filament cost = %.2lf\n", print.m_print_statistics.total_cost);
+    if (print.m_print_statistics.total_toolchanges > 0)
+        file.write_format("; total toolchanges = %i\n", print.m_print_statistics.total_toolchanges);
+    file.write_format(";%s\n", GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Estimated_Printing_Time_Placeholder).c_str());
+
+    // Append full config, delimited by two 'phony' configuration keys prusaslicer_config = begin and prusaslicer_config = end.
+    // The delimiters are structured as configuration key / value pairs to be parsable by older versions of PrusaSlicer G-code viewer.
+    {
+        file.write("\n; prusaslicer_config = begin\n");
+        std::string full_config;
+        append_full_config(print, full_config);
+        if (!full_config.empty())
+            file.write(full_config);
+        file.write("; prusaslicer_config = end\n");
+    }
+    print.throw_if_canceled();
+}
+
 //BBS
 void GCode::check_placeholder_parser_failed()
 {
@@ -3043,6 +3725,116 @@ void GCode::process_layers(
         tbb::parallel_pipeline(12, generator & pressure_equalizer & cooling & fan_mover & output);
     else
     	tbb::parallel_pipeline(12, generator & cooling & fan_mover & output);
+}
+
+void GCode::process_sequential_batched_layers(
+    const Print& print,
+    const ToolOrdering& tool_ordering,
+    std::vector<LayerToPrint>                layers_to_print,
+    const size_t                             single_object_idx,
+    GCodeOutputStream& output_stream)
+{
+    std::cout << "~~~~~~~~~~~~~~~ process_sequential_batched_layers() ~~~~~~~~~~~~~~~" << std::endl;
+
+    /*
+    for (size_t layer_number = 0; layer_number < layers_to_print.size(); layer_number++) {
+        LayerToPrint& layer = layers_to_print[0];
+        size_t region_in_batch = 3;
+        this->process_layer_batched_region(print, { std::move(layer) }, tool_ordering.tools_for_layer(layer.print_z()), &layer == &layers_to_print.back(), nullptr, region_in_batch, single_object_idx);
+
+    }
+    */
+
+
+    ATC_linked_list ATC_printing_map;
+    ATC_printing_map = print.m_ATC_printing_map;
+    std::cout << "ATC_printing_map.get_count() = " << ATC_printing_map.get_count() << std::endl;
+    ATC_printing_map.display(ATC_printing_map.gethead());
+
+    struct ATC_printing_piece* printing_piece;
+    int atc_current_tool = 0;
+    int atc_statistics_number_of_TC = 0;
+    for (int print_step = 0; print_step < ATC_printing_map.get_count(); print_step++)
+    {
+        printing_piece = ATC_printing_map.get_node(print_step);
+        int print_layer_idx = printing_piece->layer;
+        int print_region_idx = printing_piece->region;
+
+        GCode::LayerResult printing_piece_gcode;
+        GCode::LayerToPrint& layer = layers_to_print[print_layer_idx];
+        printing_piece_gcode = this->process_layer_batched_region(print, { std::move(layer) },
+            tool_ordering.tools_for_layer(layer.print_z()), &layer == &layers_to_print.back(), nullptr, print_region_idx, single_object_idx);
+
+        /*
+        if (print_region_idx != atc_current_tool)
+        {
+            atc_current_tool = print_region_idx;
+            atc_statistics_number_of_TC += 1;
+            printing_piece_gcode.gcode += "; --- ATC Tool Change ---\n";
+            printing_piece_gcode.gcode += "T" + std::to_string(atc_current_tool) + "\n";
+            printing_piece_gcode.gcode += "M104 S215; set temperature\n";
+            printing_piece_gcode.gcode += "M900 K0.05; Filament gcode LA 1.5\n";
+            printing_piece_gcode.gcode += "M900 K30; Filament gcode LA 1.0\n";
+        }
+        */
+
+        output_stream.write(printing_piece_gcode.gcode);
+    }
+    std::cout << "\n\n\n\n\n\n\n\n atc_statistics_number_of_TC:" + std::to_string(atc_statistics_number_of_TC) + "\n\n\n\n\n\n" << std::endl;
+
+
+
+    /*
+    // The pipeline is variable: The vase mode filter is optional.
+    size_t layer_to_print_idx = 0;
+    const auto generator = tbb::make_filter<void, GCode::LayerResult>(slic3r_tbb_filtermode::serial_in_order,
+        [this, &print, &tool_ordering, &layers_to_print, &layer_to_print_idx, single_object_idx](tbb::flow_control& fc) -> GCode::LayerResult {
+            if (layer_to_print_idx == layers_to_print.size()) {
+                fc.stop();
+                return {};
+            }
+            else {
+                LayerToPrint& layer = layers_to_print[layer_to_print_idx++];
+                print.throw_if_canceled();
+                size_t region_in_batch = 3;
+                return this->process_layer_batched_region(print, { std::move(layer) }, tool_ordering.tools_for_layer(layer.print_z()), &layer == &layers_to_print.back(), nullptr, region_in_batch, single_object_idx);
+            }
+        });
+    const auto spiral_vase = tbb::make_filter<GCode::LayerResult, GCode::LayerResult>(slic3r_tbb_filtermode::serial_in_order,
+        [&spiral_vase = *this->m_spiral_vase.get()](GCode::LayerResult in)->GCode::LayerResult {
+        spiral_vase.enable(in.spiral_vase_enable);
+        return { spiral_vase.process_layer(std::move(in.gcode)), in.layer_id, in.spiral_vase_enable, in.cooling_buffer_flush };
+    });
+    const auto cooling = tbb::make_filter<GCode::LayerResult, std::string>(slic3r_tbb_filtermode::serial_in_order,
+        [&cooling_buffer = *this->m_cooling_buffer.get()](GCode::LayerResult in)->std::string {
+        return cooling_buffer.process_layer(std::move(in.gcode), in.layer_id, in.cooling_buffer_flush);
+    });
+    const auto find_replace = tbb::make_filter<std::string, std::string>(slic3r_tbb_filtermode::serial_in_order,
+        [&self = *this->m_find_replace.get()](std::string s)->std::string {
+        return self.process_layer(std::move(s));
+    });
+    const auto output = tbb::make_filter<std::string, void>(slic3r_tbb_filtermode::serial_in_order,
+        [&output_stream](std::string s) { output_stream.write(s); }
+    );
+
+    // It registers a handler that sets locales to "C" before any TBB thread starts participating in tbb::parallel_pipeline.
+    // Handler is unregistered when the destructor is called.
+    TBBLocalesSetter locales_setter;
+
+    // The pipeline elements are joined using const references, thus no copying is performed.
+    output_stream.find_replace_supress();
+    if (m_spiral_vase && m_find_replace)
+        tbb::parallel_pipeline(12, generator & spiral_vase & cooling & find_replace & output);
+    else if (m_spiral_vase)
+        tbb::parallel_pipeline(12, generator & spiral_vase & cooling & output);
+    else if (m_find_replace)
+        tbb::parallel_pipeline(12, generator & cooling & find_replace & output);
+    else
+        tbb::parallel_pipeline(12, generator & cooling & output);
+
+
+    */
+    output_stream.find_replace_enable();
 }
 
 std::string GCode::placeholder_parser_process(const std::string &name, const std::string &templ, unsigned int current_extruder_id, const DynamicConfig *config_override)
@@ -3574,6 +4366,1600 @@ inline std::string get_instance_name(const PrintObject *object, size_t inst_id) 
 
 inline std::string get_instance_name(const PrintObject *object, const PrintInstance &inst) {
     return get_instance_name(object, inst.id);
+}
+
+// --------------------------------------------------------------------
+double ATC_check_region_intersection2(LayerRegion& upper, LayerRegion& lower)
+{
+    ExPolygons A_polygons = to_expolygons(upper.slices.surfaces); // upper
+    ExPolygons B_polygons = to_expolygons(lower.slices.surfaces); // lower
+    ExPolygons region_intersection = intersection_ex(A_polygons, B_polygons);
+
+    double A_expolygon_area = area(A_polygons);
+    //double A_expolygon_perimeter = perimeter
+
+    double B_expolygon_area = area(B_polygons);
+    double intersection_area = area(region_intersection);
+    return intersection_area;
+}
+// --------------------------------------------------------------------
+double ATC_find_region_area(LayerRegion& region)
+{
+    ExPolygons region_polygon = to_expolygons(region.slices.surfaces);
+    double region_area = area(region_polygon);
+    return region_area;
+}
+
+double ATC_find_region_perimiter(LayerRegion& region)
+{
+    ExPolygons region_polygon = to_expolygons(region.slices.surfaces);
+    //region_polygon[0].contour;
+    double region_perimiter = region_polygon[0].contour.length();
+    return region_perimiter;
+}
+// --------------------------------------------------------------------
+
+void GCode::layer_batch_labeling(Print& print)
+{
+    std::cout << "-- GCode:: layer_batch_labeling() --" << std::endl;
+    
+    std::vector<GCode::LayerToPrint> layers_to_print_ATC = collect_layers_to_print(*print.m_objects[0]);
+
+    atc_linked_list_UPD printing_map_initial, printing_map_batched;
+    atc_linked_list_UPD support_map;
+    bool need_wipe = 0;
+
+
+    int BL = 0; // here we add additional variable just for batching analysis
+    bool state = false; // initially all nodes are not processed
+    int batch = 0; // initial batch is zero
+    size_t atc_map_number = 0;
+
+    float region_area = 0;
+    float region_perimeter = 0;
+
+    float atc_region_order_flip = 1;
+
+
+    for (size_t RL = 0; RL < layers_to_print_ATC.size(); RL++) {
+        if (layers_to_print_ATC[RL].object_layer != NULL)
+        {
+            for (size_t R = 0; R < layers_to_print_ATC[RL].object_layer->regions().size(); R++)
+            {
+                //if (layers_to_print_ATC[RL].object_layer->regions()[R]->slices.surfaces.size() != 0)
+                if (layers_to_print_ATC[RL].object_layer->regions()[R]->perimeters.entities.size() != 0)
+                {
+                    printing_map_initial.append_node(
+                        atc_map_number, // consecutive number
+                        layers_to_print_ATC[RL].object_layer->print_z, // print_z
+                        true, // object layer
+                        false, // support layer
+                        RL, // layer,
+                        BL, // batch layer
+                        R,  // region
+                        region_area,  // area
+                        region_perimeter,  // perimeter
+                        state, // node processed state
+                        batch, // batch
+                        need_wipe, // wiping layer
+                        0 // region_intersection
+                    );
+                    atc_map_number += 1;
+                }
+            }
+            /*
+            if (atc_region_order_flip > 0)
+            {
+                for (size_t R = 0; R < layers_to_print_ATC[RL].object_layer->regions().size(); R++)
+                {
+                    if (layers_to_print_ATC[RL].object_layer->regions()[R]->slices.surfaces.size() != 0)
+                    {
+                        printing_map_initial.append_node(
+                            atc_map_number, // consecutive number
+                            layers_to_print_ATC[RL].object_layer->print_z, // print_z
+                            true, // object layer
+                            false, // support layer
+                            RL, // layer,
+                            BL, // batch layer
+                            R,  // region
+                            state, // node processed state
+                            batch, // batch
+                            need_wipe, // wiping layer
+                            0 // region_intersection
+                        );
+                        atc_map_number += 1;
+                    }
+                }
+            }
+
+            if (atc_region_order_flip < 0)
+            {
+                for (int R = layers_to_print_ATC[RL].object_layer->regions().size()-1; R > -1 ; R--)
+                {
+                    if (layers_to_print_ATC[RL].object_layer->regions()[R]->slices.surfaces.size() != 0)
+                    {
+                        printing_map_initial.append_node(
+                            atc_map_number, // consecutive number
+                            layers_to_print_ATC[RL].object_layer->print_z, // print_z
+                            true, // object layer
+                            false, // support layer
+                            RL, // layer,
+                            BL, // batch layer
+                            R,  // region
+                            state, // node processed state
+                            batch, // batch
+                            need_wipe, // wiping layer
+                            0 // region_intersection
+                        );
+                        atc_map_number += 1;
+                    }
+                }
+            }
+            */
+            
+            BL += 1;
+            atc_region_order_flip = atc_region_order_flip * (-1);
+        }
+    }
+
+    atc_map_number = 0;
+    for (size_t RL = 0; RL < layers_to_print_ATC.size(); RL++) {
+        if (layers_to_print_ATC[RL].support_layer != NULL)
+        {
+            support_map.append_node(
+                atc_map_number, // consecutive number
+                -1, // print_z
+                false, // object layer
+                true, // support layer
+                RL, // layer,
+                -1, // batch layer
+                -1,  // region
+                region_area,  // area
+                region_perimeter,  // perimeter
+                false, // node processed state
+                -1, // batch
+                need_wipe, // wiping layer
+                0 // region_intersection
+            );
+            atc_map_number += 1;
+        }
+    }
+
+    std::cout << "PRINTING MAP INITIAL: (count=" << printing_map_initial.get_count() << ")" << std::endl;
+    atc_linked_list_UPD::display(printing_map_initial.gethead());
+    std::cout << "\n\nSUPPORT MAP: (count=" << support_map.get_count() << ")" << std::endl;
+    atc_linked_list_UPD::display(support_map.gethead());
+
+
+
+
+    int printing_pieces_count = printing_map_initial.get_count();
+    int atc_appending_node_number = 0;
+    float atc_print_z = 0;
+    double cum_layer_height = 0;
+    //float atc_batch_epsilon = 0.02; // in mm, additional batch height to make sure the batch size is a multiple of a layer height
+    double atc_safe_height = print.m_objects[0]->config().atc_safe_batch_height.value; // 0.4 default value in mm
+    double atc_running_height = 0; // check it more thoroughly at the later stages
+    int batch_new = 0;
+    double region_intersection = 0;
+    double critical_intersection = print.m_objects[0]->config().atc_critical_intersection_area; // 0.5
+    double intersection_self = 0;
+
+    //this->config().bed_temperature;
+
+    int number_of_colors = print.get_object(0)->all_regions().size();
+    int max_layers_in_object = print.get_object(0)->layers().size();
+    int intersected_node_state;
+
+    //int atc_iterator = 0;
+    //int atc_step = 0;
+    
+    int intersected_region;
+    struct printing_piece_UPD* node;
+    node = NULL;
+    struct printing_piece_UPD* last_node;
+    last_node = NULL;
+    struct printing_piece_UPD* last_appended_node;
+    last_appended_node = NULL;
+    struct printing_piece_UPD* candidate_node;
+    candidate_node = NULL;
+    int overall_intersections_below = 0;
+    
+    
+    int current_Rlayer_idx, current_Blayer_idx, current_region_idx, candidate_Blayer_idx, candidate_region_idx;
+
+    std::cout << "*********************************************" << std::endl;
+    std::cout << "************** UPD MAIN ALGORITHM ***************" << std::endl;
+    while (printing_map_batched.get_count() <= printing_map_initial.get_count() - 1)
+    {
+        //atc_step += 1;
+        // get the first node in the list with zero-state (which is not done)
+        if (last_node != NULL)
+            node = last_node;
+        if (last_node == NULL)
+            node = printing_map_initial.node_search(printing_map_initial.gethead(), 0); // get first node with zero-state
+
+        
+
+
+        atc_print_z = node->print_z;
+        current_Rlayer_idx = node->Rlayer;
+        current_Blayer_idx = node->Blayer;
+        current_region_idx = node->region;
+        candidate_Blayer_idx = node->Blayer + 1;
+        candidate_region_idx = node->region; // the same region
+
+        // find area and perimeter
+        //Layer* layer_current_area = print.get_object(0)->layers()[current_Rlayer_idx];
+        //LayerRegion& region_current_area = *layer_current_area->regions()[current_region_idx];
+        //region_area = ATC_find_region_area(region_current_area);
+        //region_perimeter = ATC_find_region_perimiter(region_current_area);
+
+        //std::cout << "--STEP-- " << atc_step << ", PROCESSED NODES=" << atc_iterator << std::endl;
+        std::cout << "got node {L" << current_Blayer_idx << ", R" << current_region_idx << "}" << " -- candidate {Lc" << candidate_Blayer_idx << ", Rc" << candidate_region_idx << "}" << std::endl;
+
+
+
+        if (node->state == 0)
+        {
+            printing_map_batched.append_node(
+                atc_appending_node_number,
+                atc_print_z,
+                true, // object_layer
+                false, // support_layer
+                current_Rlayer_idx, // regular layer idx
+                current_Blayer_idx,
+                current_region_idx,
+                region_area,  // area
+                region_perimeter,  // perimeter
+                1, // state = 1
+                batch_new,
+                need_wipe,
+                intersection_self
+            );
+
+            atc_appending_node_number += 1;
+            last_node = printing_map_initial.node_search(printing_map_initial.gethead(), current_Blayer_idx, current_region_idx);
+            printing_map_initial.node_search(printing_map_initial.gethead(), current_Blayer_idx, current_region_idx)->state = 1;
+            std::cout << "appended node {L" << current_Blayer_idx << ", R" << current_region_idx << "}" << std::endl;
+            //atc_iterator += 1;
+            atc_running_height += print.get_object(0)->layers()[current_Blayer_idx]->height; //in mm
+            std::cout << "===atc_running_height===" << atc_running_height << "mm" << std::endl;
+        }
+
+        if (printing_map_initial.node_search(printing_map_initial.gethead(), candidate_Blayer_idx, candidate_region_idx) && candidate_Blayer_idx < max_layers_in_object)
+        {
+            Layer* layer_candidate = print.get_object(0)->layers()[candidate_Blayer_idx];
+            Layer* layer_current = print.get_object(0)->layers()[current_Blayer_idx];
+            LayerRegion& region_candidate = *layer_candidate->regions()[current_region_idx];
+
+            overall_intersections_below = 0;
+            for (int color = 0; color < number_of_colors; color++)
+            {
+                LayerRegion& region_below = *layer_current->regions()[color];
+
+                region_intersection = ATC_check_region_intersection2(region_candidate, region_below) / 1e+10;
+                std::cout << "checking intersections for {L" << current_Blayer_idx << ", R" << color << "}: region_intersection=" << region_intersection << std::endl;
+                if (printing_map_initial.node_search(printing_map_initial.gethead(), current_Blayer_idx, color))
+                {
+                    intersected_node_state = printing_map_initial.node_search(printing_map_initial.gethead(), current_Blayer_idx, color)->state;
+                    if (color != current_region_idx && region_intersection > critical_intersection && intersected_node_state == 0)
+                    {
+                        overall_intersections_below += 1;
+                        std::cout << "overall_intersections_below=" << overall_intersections_below << std::endl;
+                    }
+                }
+            }
+
+            for (int color = 0; color < number_of_colors; color++)
+            {
+                LayerRegion& region_below = *layer_current->regions()[color];
+                region_intersection = ATC_check_region_intersection2(region_candidate, region_below) / 1e+10;
+                std::cout << "checking intersections for {L" << current_Blayer_idx << ", R" << color << "}: region_intersection=" << region_intersection << std::endl;
+                if (color == current_region_idx)
+                {
+                    intersection_self = 0;
+                }
+                if (printing_map_initial.node_search(printing_map_initial.gethead(), current_Blayer_idx, color))
+                {
+                    intersected_node_state = printing_map_initial.node_search(printing_map_initial.gethead(), current_Blayer_idx, color)->state;
+                    if (color != current_region_idx && (region_intersection > critical_intersection && intersected_node_state == 0))
+                    {
+                        // stop, remap
+                        std::cout << "detected intersection with {L" << current_Blayer_idx << ", R" << color << "}" << std::endl;
+                        std::cout << "breaking" << std::endl;
+                        last_node = NULL;
+                        break;
+                    }
+                    if (color != current_region_idx && region_intersection <= critical_intersection && overall_intersections_below == 0)
+                    {
+                        candidate_node = printing_map_initial.node_search(printing_map_initial.gethead(), candidate_Blayer_idx, candidate_region_idx);
+                        if (candidate_node)
+                        {
+                            region_area = ATC_find_region_area(region_candidate);
+                            region_perimeter = ATC_find_region_perimiter(region_candidate);
+                            // append new node to the batched map
+                            printing_map_batched.append_node(
+                                atc_appending_node_number,
+                                candidate_node->print_z,
+                                true,
+                                false,
+                                candidate_node->Rlayer,
+                                candidate_Blayer_idx,
+                                candidate_region_idx,
+                                region_area,  // area
+                                region_perimeter,  // perimeter
+                                1, // state = 1
+                                batch_new,
+                                need_wipe,
+                                region_intersection
+                            );
+
+                            atc_appending_node_number += 1;
+                            last_node = printing_map_initial.node_search(printing_map_initial.gethead(), candidate_Blayer_idx, candidate_region_idx);
+                            atc_running_height += print.get_object(0)->layers()[current_Blayer_idx]->height; //in mm
+                            std::cout << "===atc_running_height===" << atc_running_height << "mm" << std::endl;
+
+                            printing_map_initial.node_search(printing_map_initial.gethead(), candidate_Blayer_idx, candidate_region_idx)->state = 1;
+                            //atc_iterator += 1;
+                            std::cout << "no intersections --> appending node {L" << candidate_Blayer_idx << ", R" << candidate_region_idx << "}" << std::endl;
+                            break;
+                        }
+                        else
+                        {
+                            std::cout << "no intersections, BUT the candidate node is not found: breaking" << std::endl;
+                            last_node = NULL;
+                            break;
+                        }
+                    }
+                }
+                else
+                {
+                    std::cout << "before intersection check the candidate node is not found: continuing" << std::endl;
+                    last_node = NULL;
+                    continue;
+                }
+            }
+        }
+
+        if (candidate_Blayer_idx >= max_layers_in_object || printing_map_initial.node_search(printing_map_initial.gethead(), candidate_Blayer_idx, candidate_region_idx) == NULL)
+        {
+            std::cout << "candidate_layer_idx >= max_layers_in_object OR printing node==NULL: continuing" << std::endl;
+            last_node = NULL;
+            continue;
+        }
+
+        if (atc_running_height >= atc_safe_height)
+        {
+            atc_running_height = 0;
+            std::cout << "detected critical height: continuing" << std::endl;
+            last_node = NULL;
+            continue;
+        }
+
+        //this->ATC_printing_map = printing_map_batched;
+    }
+    std::cout << "********** END of UPD MAIN ALGORITHM ************" << std::endl;
+    std::cout << "*********************************************" << std::endl;
+
+    std::cout << "::::::::::::::::::::::::::::::::::\n\n\n" << std::endl;
+    std::cout << "PRINTING MAP INITIAL (" << printing_map_initial.get_count() << "):" << std::endl;
+    atc_linked_list_UPD::display(printing_map_initial.gethead());
+    std::cout << "\nPRINTING MAP BATCHED (" << printing_map_batched.get_count() << "):" << std::endl;
+    atc_linked_list_UPD::display(printing_map_batched.gethead());
+    std::cout << "\nSUPPORT MAP (" << support_map.get_count() << "):" << std::endl;
+    atc_linked_list_UPD::display(support_map.gethead());
+    std::cout << "\n\n\n::::::::::::::::::::::::::::::::::" << std::endl;
+
+
+
+    std::cout << "*************************************************************************" << std::endl;
+    std::cout << "********** ANALYZE BATCHES BEFORE COMBINING INTO A FINAL MAP ************" << std::endl;
+
+    struct printing_piece_UPD* temp_batch_piece;
+    int running_batch = 0;
+    int last_region = 0;
+    size_t atc_temp_tool_changes = 0;
+    for (int i = 0; i < printing_map_batched.get_count(); i++)
+    {
+        temp_batch_piece = printing_map_batched.get_node(i);
+        int print_region_idx = temp_batch_piece->region;
+
+        if (print_region_idx != last_region)
+        {
+            running_batch = running_batch + 1;
+            temp_batch_piece->batch = running_batch;
+            last_region = print_region_idx;
+            atc_temp_tool_changes = atc_temp_tool_changes + 1;
+        }
+        temp_batch_piece->batch = running_batch;
+    }
+
+    std::cout << "\n NUMBER OF BATCHED TOOL CHANGES = " << atc_temp_tool_changes << std::endl;
+    std::cout << "\n******* END of ANALYZE BATCHES BEFORE COMBINING INTO A FINAL MAP ********" << std::endl;
+    std::cout << "*************************************************************************" << std::endl;
+
+
+
+    std::cout << "*************************************************************************" << std::endl;
+    std::cout << "****** COMBINE OBJECT AND SUPPORT PIECES INTO A FINAL SINGLE MAP ********" << std::endl;
+    atc_linked_list_UPD FINAL_MAP;
+
+    struct printing_piece_UPD* obj_temp_piece;
+    struct printing_piece_UPD* supp_temp_piece;
+    size_t atc_final_map_counter = 0;
+    for (int i = 0; i < printing_map_batched.get_count(); i++)
+    {
+        obj_temp_piece = printing_map_batched.get_node(i);
+        int print_Rlayer_idx = obj_temp_piece->Rlayer;
+        int print_region_idx = obj_temp_piece->region;
+        std::cout << "{RL" << print_Rlayer_idx << ", R" << print_region_idx << "}" << std::endl;
+        FINAL_MAP.append_node(
+            atc_final_map_counter, // consecutive number
+            obj_temp_piece->print_z, // print_z
+            true, // object layer
+            false, // support layer
+            obj_temp_piece->Rlayer, // layer,
+            obj_temp_piece->Blayer, // batch layer
+            obj_temp_piece->region,  // region
+            region_area,  // area
+            region_perimeter,  // perimeter
+            false, // node processed state
+            obj_temp_piece->batch, // batch
+            obj_temp_piece->need_wipe, // need_wipe
+            obj_temp_piece->region_intersection
+        );
+        atc_final_map_counter += 1;
+
+        for (int k = 0; k < support_map.get_count(); k++)
+        {
+            supp_temp_piece = support_map.get_node(k);
+            if (!supp_temp_piece->state)
+            {
+                int support_Rlayer_idx = supp_temp_piece->Rlayer;
+                //std::cout << "Support L" << support_Rlayer_idx << ", state=" << supp_temp_piece->state << std::endl;
+                //if ((print_Rlayer_idx - support_Rlayer_idx) <= 1 || (support_Rlayer_idx - print_Rlayer_idx) <= 1)
+                if ((support_Rlayer_idx - print_Rlayer_idx) <= 1)
+                {
+                    std::cout << "-- S, RL" << support_Rlayer_idx << std::endl;
+                    FINAL_MAP.append_node(
+                        atc_final_map_counter, // consecutive number
+                        supp_temp_piece->print_z, // print_z
+                        false, // object layer
+                        true, // support layer
+                        supp_temp_piece->Rlayer, // layer,
+                        supp_temp_piece->Blayer, // batch layer
+                        obj_temp_piece->region,  // region
+                        region_area,  // area
+                        region_perimeter,  // perimeter
+                        false, // node processed state
+                        obj_temp_piece->batch, // batch
+                        obj_temp_piece->need_wipe, // need_wipe
+                        obj_temp_piece->region_intersection
+                    );
+                    atc_final_map_counter += 1;
+                    supp_temp_piece->state = 1;
+                    break;
+                }
+
+            }
+        }
+    }
+
+
+    //this->ATC_printing_map = printing_map_batched;
+    this->ATC_printing_map = FINAL_MAP;
+
+    
+    
+
+    std::cout << "\n********** FINAL MAP ************\n" << std::endl;
+    std::cout << "\FINAL MAP (" << this->ATC_printing_map.get_count() << "):" << std::endl;
+    //atc_linked_list_UPD::display(this->ATC_printing_map.gethead());
+    this->ATC_printing_map.display(this->ATC_printing_map.gethead());
+    std::cout << "\n******** EOF FINAL MAP **********\n" << std::endl;
+
+    std::cout << "*** END of COMBINE OBJECT AND SUPPORT PIECES INTO A FINAL SINGLE MAP ****" << std::endl;
+    std::cout << "*************************************************************************" << std::endl;
+}
+
+void GCode::layer_batch_labeling_soluble_supports(Print& print)
+{
+    std::cout << "-- GCode:: layer_batch_labeling() --" << std::endl;
+
+    std::vector<GCode::LayerToPrint> layers_to_print_ATC = collect_layers_to_print(*print.m_objects[0]);
+
+    atc_linked_list_UPD printing_map_initial, printing_map_batched;
+    atc_linked_list_UPD support_map;
+    bool need_wipe = 0;
+
+
+    int BL = 0; // here we add additional variable just for batching analysis
+    bool state = false; // initially all nodes are not processed
+    int batch = 0; // initial batch is zero
+    size_t atc_map_number = 0;
+
+    float region_area = 0;
+    float region_perimeter = 0;
+
+    float atc_region_order_flip = 1;
+
+
+    for (size_t RL = 0; RL < layers_to_print_ATC.size(); RL++) {
+        if (layers_to_print_ATC[RL].object_layer != NULL)
+        {
+            for (size_t R = 0; R < layers_to_print_ATC[RL].object_layer->regions().size(); R++)
+            {
+                //if (layers_to_print_ATC[RL].object_layer->regions()[R]->slices.surfaces.size() != 0)
+                if (layers_to_print_ATC[RL].object_layer->regions()[R]->perimeters.entities.size() != 0)
+                {
+                    printing_map_initial.append_node(
+                        atc_map_number, // consecutive number
+                        layers_to_print_ATC[RL].object_layer->print_z, // print_z
+                        true, // object layer
+                        false, // support layer
+                        RL, // layer,
+                        BL, // batch layer
+                        R,  // region
+                        region_area,  // area
+                        region_perimeter,  // perimeter
+                        state, // node processed state
+                        batch, // batch
+                        need_wipe, // wiping layer
+                        0 // region_intersection
+                    );
+                    atc_map_number += 1;
+                }
+            }
+
+            BL += 1;
+            atc_region_order_flip = atc_region_order_flip * (-1);
+        }
+    }
+
+    atc_map_number = 0;
+    for (size_t RL = 0; RL < layers_to_print_ATC.size(); RL++) {
+        if (layers_to_print_ATC[RL].support_layer != NULL)
+        {
+            support_map.append_node(
+                atc_map_number, // consecutive number
+                -1, // print_z
+                false, // object layer
+                true, // support layer
+                RL, // layer,
+                -1, // batch layer
+                -1,  // region
+                region_area,  // area
+                region_perimeter,  // perimeter
+                false, // node processed state
+                -1, // batch
+                need_wipe, // wiping layer
+                0 // region_intersection
+            );
+            atc_map_number += 1;
+        }
+    }
+
+    std::cout << "PRINTING MAP INITIAL: (count=" << printing_map_initial.get_count() << ")" << std::endl;
+    atc_linked_list_UPD::display(printing_map_initial.gethead());
+    std::cout << "\n\nSUPPORT MAP: (count=" << support_map.get_count() << ")" << std::endl;
+    atc_linked_list_UPD::display(support_map.gethead());
+
+
+    int printing_pieces_count = printing_map_initial.get_count();
+    int atc_appending_node_number = 0;
+    float atc_print_z = 0;
+    double cum_layer_height = 0;
+    //float atc_batch_epsilon = 0.02; // in mm, additional batch height to make sure the batch size is a multiple of a layer height
+    double atc_safe_height = print.m_objects[0]->config().atc_safe_batch_height.value; // 0.4 default value in mm
+    double atc_running_height = 0; // check it more thoroughly at the later stages
+    int batch_new = 0;
+    double region_intersection = 0;
+    double critical_intersection = print.m_objects[0]->config().atc_critical_intersection_area; // 0.5
+    double intersection_self = 0;
+
+    //this->config().bed_temperature;
+
+    int number_of_colors = print.get_object(0)->all_regions().size();
+    int max_layers_in_object = print.get_object(0)->layers().size();
+    int intersected_node_state;
+
+
+    int intersected_region;
+    struct printing_piece_UPD* node;
+    node = NULL;
+    struct printing_piece_UPD* last_node;
+    last_node = NULL;
+    struct printing_piece_UPD* last_appended_node;
+    last_appended_node = NULL;
+    struct printing_piece_UPD* candidate_node;
+    candidate_node = NULL;
+    int overall_intersections_below = 0;
+
+
+    int current_Rlayer_idx, current_Blayer_idx, current_region_idx, candidate_Blayer_idx, candidate_region_idx;
+
+    std::cout << "*********************************************" << std::endl;
+    std::cout << "************** UPD MAIN ALGORITHM ***************" << std::endl;
+    while (printing_map_batched.get_count() <= printing_map_initial.get_count() - 1)
+    {
+        //atc_step += 1;
+        // get the first node in the list with zero-state (which is not done)
+        if (last_node != NULL)
+            node = last_node;
+        if (last_node == NULL)
+            node = printing_map_initial.node_search(printing_map_initial.gethead(), 0); // get first node with zero-state
+
+        atc_print_z = node->print_z;
+        current_Rlayer_idx = node->Rlayer;
+        current_Blayer_idx = node->Blayer;
+        current_region_idx = node->region;
+        candidate_Blayer_idx = node->Blayer + 1;
+        candidate_region_idx = node->region; // the same region
+
+        // find area and perimeter
+        //Layer* layer_current_area = print.get_object(0)->layers()[current_Rlayer_idx];
+        //LayerRegion& region_current_area = *layer_current_area->regions()[current_region_idx];
+        //region_area = ATC_find_region_area(region_current_area);
+        //region_perimeter = ATC_find_region_perimiter(region_current_area);
+
+        //std::cout << "--STEP-- " << atc_step << ", PROCESSED NODES=" << atc_iterator << std::endl;
+        std::cout << "got node {L" << current_Blayer_idx << ", R" << current_region_idx << "}" << " -- candidate {Lc" << candidate_Blayer_idx << ", Rc" << candidate_region_idx << "}" << std::endl;
+
+        if (node->state == 0)
+        {
+            printing_map_batched.append_node(
+                atc_appending_node_number,
+                atc_print_z,
+                true, // object_layer
+                false, // support_layer
+                current_Rlayer_idx, // regular layer idx
+                current_Blayer_idx,
+                current_region_idx,
+                region_area,  // area
+                region_perimeter,  // perimeter
+                1, // state = 1
+                batch_new,
+                need_wipe,
+                intersection_self
+            );
+
+            atc_appending_node_number += 1;
+            last_node = printing_map_initial.node_search(printing_map_initial.gethead(), current_Blayer_idx, current_region_idx);
+            printing_map_initial.node_search(printing_map_initial.gethead(), current_Blayer_idx, current_region_idx)->state = 1;
+            std::cout << "appended node {L" << current_Blayer_idx << ", R" << current_region_idx << "}" << std::endl;
+            //atc_iterator += 1;
+            atc_running_height += print.get_object(0)->layers()[current_Blayer_idx]->height; //in mm
+            std::cout << "===atc_running_height===" << atc_running_height << "mm" << std::endl;
+        }
+
+        if (printing_map_initial.node_search(printing_map_initial.gethead(), candidate_Blayer_idx, candidate_region_idx) && candidate_Blayer_idx < max_layers_in_object)
+        {
+            Layer* layer_candidate = print.get_object(0)->layers()[candidate_Blayer_idx];
+            Layer* layer_current = print.get_object(0)->layers()[current_Blayer_idx];
+            LayerRegion& region_candidate = *layer_candidate->regions()[current_region_idx];
+
+            overall_intersections_below = 0;
+            for (int color = 0; color < number_of_colors; color++)
+            {
+                LayerRegion& region_below = *layer_current->regions()[color];
+
+                region_intersection = ATC_check_region_intersection2(region_candidate, region_below) / 1e+10;
+                std::cout << "checking intersections for {L" << current_Blayer_idx << ", R" << color << "}: region_intersection=" << region_intersection << std::endl;
+                if (printing_map_initial.node_search(printing_map_initial.gethead(), current_Blayer_idx, color))
+                {
+                    intersected_node_state = printing_map_initial.node_search(printing_map_initial.gethead(), current_Blayer_idx, color)->state;
+                    if (color != current_region_idx && region_intersection > critical_intersection && intersected_node_state == 0)
+                    {
+                        overall_intersections_below += 1;
+                        std::cout << "overall_intersections_below=" << overall_intersections_below << std::endl;
+                    }
+                }
+            }
+
+            for (int color = 0; color < number_of_colors; color++)
+            {
+                LayerRegion& region_below = *layer_current->regions()[color];
+                region_intersection = ATC_check_region_intersection2(region_candidate, region_below) / 1e+10;
+                std::cout << "checking intersections for {L" << current_Blayer_idx << ", R" << color << "}: region_intersection=" << region_intersection << std::endl;
+                if (color == current_region_idx)
+                {
+                    intersection_self = 0;
+                }
+                if (printing_map_initial.node_search(printing_map_initial.gethead(), current_Blayer_idx, color))
+                {
+                    intersected_node_state = printing_map_initial.node_search(printing_map_initial.gethead(), current_Blayer_idx, color)->state;
+                    if (color != current_region_idx && (region_intersection > critical_intersection && intersected_node_state == 0))
+                    {
+                        // stop, remap
+                        std::cout << "detected intersection with {L" << current_Blayer_idx << ", R" << color << "}" << std::endl;
+                        std::cout << "breaking" << std::endl;
+                        last_node = NULL;
+                        break;
+                    }
+                    if (color != current_region_idx && region_intersection <= critical_intersection && overall_intersections_below == 0)
+                    {
+                        candidate_node = printing_map_initial.node_search(printing_map_initial.gethead(), candidate_Blayer_idx, candidate_region_idx);
+                        if (candidate_node)
+                        {
+                            region_area = ATC_find_region_area(region_candidate);
+                            region_perimeter = ATC_find_region_perimiter(region_candidate);
+                            // append new node to the batched map
+                            printing_map_batched.append_node(
+                                atc_appending_node_number,
+                                candidate_node->print_z,
+                                true,
+                                false,
+                                candidate_node->Rlayer,
+                                candidate_Blayer_idx,
+                                candidate_region_idx,
+                                region_area,  // area
+                                region_perimeter,  // perimeter
+                                1, // state = 1
+                                batch_new,
+                                need_wipe,
+                                region_intersection
+                            );
+
+                            atc_appending_node_number += 1;
+                            last_node = printing_map_initial.node_search(printing_map_initial.gethead(), candidate_Blayer_idx, candidate_region_idx);
+                            atc_running_height += print.get_object(0)->layers()[current_Blayer_idx]->height; //in mm
+                            std::cout << "===atc_running_height===" << atc_running_height << "mm" << std::endl;
+
+                            printing_map_initial.node_search(printing_map_initial.gethead(), candidate_Blayer_idx, candidate_region_idx)->state = 1;
+                            //atc_iterator += 1;
+                            std::cout << "no intersections --> appending node {L" << candidate_Blayer_idx << ", R" << candidate_region_idx << "}" << std::endl;
+                            break;
+                        }
+                        else
+                        {
+                            std::cout << "no intersections, BUT the candidate node is not found: breaking" << std::endl;
+                            last_node = NULL;
+                            break;
+                        }
+                    }
+                }
+                else
+                {
+                    std::cout << "before intersection check the candidate node is not found: continuing" << std::endl;
+                    last_node = NULL;
+                    continue;
+                }
+            }
+        }
+
+        if (candidate_Blayer_idx >= max_layers_in_object || printing_map_initial.node_search(printing_map_initial.gethead(), candidate_Blayer_idx, candidate_region_idx) == NULL)
+        {
+            std::cout << "candidate_layer_idx >= max_layers_in_object OR printing node==NULL: continuing" << std::endl;
+            last_node = NULL;
+            continue;
+        }
+
+        if (atc_running_height >= atc_safe_height)
+        {
+            atc_running_height = 0;
+            std::cout << "detected critical height: continuing" << std::endl;
+            last_node = NULL;
+            continue;
+        }
+
+        //this->ATC_printing_map = printing_map_batched;
+    }
+    std::cout << "********** END of UPD MAIN ALGORITHM ************" << std::endl;
+    std::cout << "*********************************************" << std::endl;
+
+    std::cout << "::::::::::::::::::::::::::::::::::\n\n\n" << std::endl;
+    std::cout << "PRINTING MAP INITIAL (" << printing_map_initial.get_count() << "):" << std::endl;
+    atc_linked_list_UPD::display(printing_map_initial.gethead());
+    std::cout << "\nPRINTING MAP BATCHED (" << printing_map_batched.get_count() << "):" << std::endl;
+    atc_linked_list_UPD::display(printing_map_batched.gethead());
+    std::cout << "\nSUPPORT MAP (" << support_map.get_count() << "):" << std::endl;
+    atc_linked_list_UPD::display(support_map.gethead());
+    std::cout << "\n\n\n::::::::::::::::::::::::::::::::::" << std::endl;
+
+
+
+    std::cout << "*************************************************************************" << std::endl;
+    std::cout << "********** ANALYZE BATCHES BEFORE COMBINING INTO A FINAL MAP ************" << std::endl;
+
+    struct printing_piece_UPD* temp_batch_piece;
+    int running_batch = 0;
+    int last_region = 0;
+    size_t atc_temp_tool_changes = 0;
+    for (int i = 0; i < printing_map_batched.get_count(); i++)
+    {
+        temp_batch_piece = printing_map_batched.get_node(i);
+        int print_region_idx = temp_batch_piece->region;
+
+        if (print_region_idx != last_region)
+        {
+            running_batch = running_batch + 1;
+            temp_batch_piece->batch = running_batch;
+            last_region = print_region_idx;
+            atc_temp_tool_changes = atc_temp_tool_changes + 1;
+        }
+        temp_batch_piece->batch = running_batch;
+    }
+
+    std::cout << "\n NUMBER OF BATCHED TOOL CHANGES = " << atc_temp_tool_changes << std::endl;
+    std::cout << "\n******* END of ANALYZE BATCHES BEFORE COMBINING INTO A FINAL MAP ********" << std::endl;
+    std::cout << "*************************************************************************" << std::endl;
+
+
+
+    std::cout << "*************************************************************************" << std::endl;
+    std::cout << "****** COMBINE OBJECT AND SUPPORT PIECES INTO A FINAL SINGLE MAP ********" << std::endl;
+    atc_linked_list_UPD FINAL_MAP;
+
+    struct printing_piece_UPD* obj_temp_piece;
+    struct printing_piece_UPD* supp_temp_piece;
+    size_t atc_final_map_counter = 0;
+    for (int i = 0; i < printing_map_batched.get_count(); i++)
+    {
+        obj_temp_piece = printing_map_batched.get_node(i);
+        int print_Rlayer_idx = obj_temp_piece->Rlayer;
+        int print_region_idx = obj_temp_piece->region;
+        std::cout << "{RL" << print_Rlayer_idx << ", R" << print_region_idx << "}" << std::endl;
+        FINAL_MAP.append_node(
+            atc_final_map_counter, // consecutive number
+            obj_temp_piece->print_z, // print_z
+            true, // object layer
+            false, // support layer
+            obj_temp_piece->Rlayer, // layer,
+            obj_temp_piece->Blayer, // batch layer
+            obj_temp_piece->region,  // region
+            region_area,  // area
+            region_perimeter,  // perimeter
+            false, // node processed state
+            obj_temp_piece->batch, // batch
+            obj_temp_piece->need_wipe, // need_wipe
+            obj_temp_piece->region_intersection
+        );
+        atc_final_map_counter += 1;
+
+        for (int k = 0; k < support_map.get_count(); k++)
+        {
+            supp_temp_piece = support_map.get_node(k);
+            if (!supp_temp_piece->state)
+            {
+                int support_Rlayer_idx = supp_temp_piece->Rlayer;
+                //std::cout << "Support L" << support_Rlayer_idx << ", state=" << supp_temp_piece->state << std::endl;
+                //if ((print_Rlayer_idx - support_Rlayer_idx) <= 1 || (support_Rlayer_idx - print_Rlayer_idx) <= 1)
+                if ((support_Rlayer_idx - print_Rlayer_idx) <= 1)
+                {
+                    std::cout << "-- S, RL" << support_Rlayer_idx << std::endl;
+                    FINAL_MAP.append_node(
+                        atc_final_map_counter, // consecutive number
+                        supp_temp_piece->print_z, // print_z
+                        false, // object layer
+                        true, // support layer
+                        supp_temp_piece->Rlayer, // layer,
+                        supp_temp_piece->Blayer, // batch layer
+                        //obj_temp_piece->region,  // region
+                        3,
+                        region_area,  // area
+                        region_perimeter,  // perimeter
+                        false, // node processed state
+                        obj_temp_piece->batch, // batch
+                        obj_temp_piece->need_wipe, // need_wipe
+                        obj_temp_piece->region_intersection
+                    );
+                    atc_final_map_counter += 1;
+                    supp_temp_piece->state = 1;
+                    break;
+                }
+
+            }
+        }
+    }
+
+
+    //this->ATC_printing_map = printing_map_batched;
+    this->ATC_printing_map = FINAL_MAP;
+
+
+
+
+    std::cout << "\n********** FINAL MAP ************\n" << std::endl;
+    std::cout << "\FINAL MAP (" << this->ATC_printing_map.get_count() << "):" << std::endl;
+    //atc_linked_list_UPD::display(this->ATC_printing_map.gethead());
+    this->ATC_printing_map.display(this->ATC_printing_map.gethead());
+    std::cout << "\n******** EOF FINAL MAP **********\n" << std::endl;
+
+    std::cout << "*** END of COMBINE OBJECT AND SUPPORT PIECES INTO A FINAL SINGLE MAP ****" << std::endl;
+    std::cout << "*************************************************************************" << std::endl;
+}
+
+
+// wipe tower as a single brick
+void GCode::ATC_plan_wipe_toolchange(Print& print)
+{
+    std::cout << "\n\n\nvoid GCode::ATC_plan_wipe_toolchange()\n\n\n" << std::endl;
+    // create atc_wipe_tower
+    std::vector<float> wiping_matrix(cast<float>(print.m_config.wiping_volumes_matrix.values));
+    std::vector<std::vector<float>> wipe_volumes;
+    const unsigned int number_of_extruders = (unsigned int)(sqrt(wiping_matrix.size()) + EPSILON);
+    for (unsigned int i = 0; i < number_of_extruders; ++i)
+        wipe_volumes.push_back(std::vector<float>(wiping_matrix.begin() + i * number_of_extruders, wiping_matrix.begin() + (i + 1) * number_of_extruders));
+
+    print.m_ATC_wipe_tower_data.tool_ordering = ToolOrdering(print, (unsigned int)-1, true);
+
+    WipeTower atc_wipe_tower(print.m_config, wipe_volumes, print.m_ATC_wipe_tower_data.tool_ordering.first_extruder());
+    for (size_t i = 0; i < number_of_extruders; ++i)
+        atc_wipe_tower.set_extruder(i, print.m_config);
+
+
+    // wiping parameters
+    //bool need_wipe = true;
+    float atc_wiping_volume = 320.0; // 140 hardcoded for now
+    size_t atc_old_tool;
+    size_t atc_new_tool;
+    float atc_wiping_layer_height = 0.2; // hardcoded for now
+    size_t atc_wipe_tower_idx = 0;
+    float atc_print_z;
+
+    // building wiping tool changes
+    print.m_ATC_wipe_tower_data.clear();
+    // iterate over the printing pieces
+    struct printing_piece_UPD* printing_node;
+    int prev_region_idx = 0;
+    for (int printing_node_idx = 0; printing_node_idx < ATC_printing_map.get_count(); printing_node_idx++)
+    {
+        printing_node = ATC_printing_map.get_node(printing_node_idx);
+        int print_Rlayer_idx = printing_node->Rlayer;
+        int print_Blayer_idx = printing_node->Blayer;
+        int print_region_idx = printing_node->region;
+
+        //std::cout << "piece=" << printing_node_idx << " Rlayer=" << print_Rlayer_idx << " region=" << print_region_idx << std::endl;
+
+        if (print_Blayer_idx != -1)
+        {
+            if (print_region_idx != prev_region_idx)
+            {
+                std::cout << "wipe tower here" << std::endl;
+                atc_wipe_tower_idx += 1;
+                atc_old_tool = prev_region_idx;
+                atc_new_tool = print_region_idx;
+                atc_print_z = atc_wiping_layer_height * atc_wipe_tower_idx;
+                // printing_node->need_wipe = true;
+                ATC_printing_map.get_node(printing_node_idx - 1)->need_wipe = true; // wipe before the tool change
+
+                atc_wipe_tower.plan_toolchange(atc_print_z, atc_wiping_layer_height, atc_old_tool, atc_new_tool, atc_wiping_volume);
+                //std::cout << "WTower: atc_print_z=" << atc_print_z << " atc_old_tool=" << atc_old_tool << " atc_new_tool=" << atc_new_tool << std::endl;
+            }
+            prev_region_idx = print_region_idx;
+            //std::cout << "\n===================================\n\n\n" << std::endl;
+            //std::cout << "Node=" << printing_node_idx << " Need wipe=" << printing_node->need_wipe << std::endl;
+            //std::cout << "\n\n\n===================================\n" << std::endl;
+        }
+    }
+
+    print.m_ATC_wipe_tower_data.tool_changes.reserve(atc_wipe_tower_idx + 1);
+    atc_wipe_tower.generate(print.m_ATC_wipe_tower_data.tool_changes);
+    std::cout << "\n\n\ncheck size = " << print.m_ATC_wipe_tower_data.tool_changes.size() << std::endl;
+
+
+
+}
+
+// wipe tower width (# of transition bricks) depends on # of colors
+void GCode::ATC_plan_wipe_toolchange2(Print& print)
+{
+    std::cout << "\n\n\nvoid GCode::ATC_plan_wipe_toolchange()\n\n\n" << std::endl;
+    // create atc_wipe_tower
+    std::vector<float> wiping_matrix(cast<float>(print.m_config.wiping_volumes_matrix.values));
+    std::vector<std::vector<float>> wipe_volumes;
+    const unsigned int number_of_extruders = (unsigned int)(sqrt(wiping_matrix.size()) + EPSILON);
+    for (unsigned int i = 0; i < number_of_extruders; ++i)
+        wipe_volumes.push_back(std::vector<float>(wiping_matrix.begin() + i * number_of_extruders, wiping_matrix.begin() + (i + 1) * number_of_extruders));
+
+    print.m_ATC_wipe_tower_data.tool_ordering = ToolOrdering(print, (unsigned int)-1, true);
+
+    WipeTower atc_wipe_tower(print.m_config, wipe_volumes, print.m_ATC_wipe_tower_data.tool_ordering.first_extruder());
+    for (size_t i = 0; i < number_of_extruders; ++i)
+        atc_wipe_tower.set_extruder(i, print.m_config);
+
+    // wiping parameters
+    int atc_wipe_plan_total_bricks = print.get_object(0)->all_regions().size()-1; // max number of colors - 1
+    int atc_wipe_plan_brick_idx = -1; // iterator over the bricks, starts with -1
+    int atc_wipe_plan_layer = 1; // start building wipe tower with layer 1 (0.2 mm)
+
+    //float atc_wiping_volume = print.m_config.option<ConfigOptionFloat>("atc_wiping_volume")->value; // hardcoded for now (140.0 default)
+    float atc_wiping_volume = print.m_objects[0]->config().atc_wiping_volume;
+    
+
+    size_t atc_old_tool;
+    size_t atc_new_tool;
+    float atc_wiping_layer_height = 0.2; // hardcoded for now
+    size_t atc_wipe_tower_idx = 0;
+    float atc_print_z;
+
+    // building wiping tool changes
+    print.m_ATC_wipe_tower_data.clear();
+    // iterate over the printing pieces
+    struct printing_piece_UPD* printing_node;
+    int prev_region_idx = 0;
+    size_t atc_tool_change_counter = 0;
+    for (int printing_node_idx = 0; printing_node_idx < ATC_printing_map.get_count(); printing_node_idx++)
+    {
+        printing_node = ATC_printing_map.get_node(printing_node_idx);
+        int print_Rlayer_idx = printing_node->Rlayer;
+        int print_Blayer_idx = printing_node->Blayer;
+        int print_region_idx = printing_node->region;
+
+        //std::cout << "piece=" << printing_node_idx << " Rlayer=" << print_Rlayer_idx << " region=" << print_region_idx << std::endl;
+
+        if (print_Blayer_idx != -1)
+        {
+            if (print_region_idx != prev_region_idx)
+            {
+                //std::cout << "wipe tower here" << std::endl;
+                atc_wipe_tower_idx += 1;
+                atc_wipe_plan_brick_idx += 1;
+                atc_old_tool = prev_region_idx;
+                atc_new_tool = print_region_idx;
+                //atc_print_z = atc_wiping_layer_height * atc_wipe_tower_idx;
+                atc_print_z = atc_wiping_layer_height * atc_wipe_plan_layer;
+                // printing_node->need_wipe = true;
+                ATC_printing_map.get_node(printing_node_idx - 1)->need_wipe = true; // wipe before the tool change
+                if (atc_wipe_plan_brick_idx >= atc_wipe_plan_total_bricks - 1)
+                {
+                    atc_wipe_plan_brick_idx = -1;
+                    atc_wipe_plan_layer += 1;
+                }
+
+                atc_wipe_tower.plan_toolchange(atc_print_z, atc_wiping_layer_height, atc_old_tool, atc_new_tool, atc_wiping_volume);
+                std::cout << "WTower: atc_print_z=" << atc_print_z << " atc_old_tool=" << atc_old_tool << " atc_new_tool=" << atc_new_tool << std::endl;
+                atc_tool_change_counter += 1;
+            }
+            prev_region_idx = print_region_idx;
+            //std::cout << "\n===================================\n\n\n" << std::endl;
+            //std::cout << "Node=" << printing_node_idx << " Need wipe=" << printing_node->need_wipe << std::endl;
+            //std::cout << "\n\n\n===================================\n" << std::endl;
+        }
+    }
+
+    print.m_ATC_wipe_tower_data.tool_changes.reserve(atc_wipe_tower_idx + 1);
+    atc_wipe_tower.generate(print.m_ATC_wipe_tower_data.tool_changes);
+    std::cout << "\n\n\ncheck size = " << print.m_ATC_wipe_tower_data.tool_changes.size() << std::endl;
+    std::cout << "\n\n# of TC = " << atc_wipe_tower_idx << std::endl;
+    print.m_ATC_wipe_tower_data.number_of_toolchanges = atc_tool_change_counter;
+    std::cout << "print.m_ATC_wipe_tower_data.number_of_toolchanges = " << atc_tool_change_counter << std::endl;
+    std::cout << "\n\n\nEND of void GCode::ATC_plan_wipe_toolchange2()\n\n\n" << std::endl;
+}
+
+
+
+
+
+
+
+void GCode::atc_process_layers(Print& print, const ToolOrdering& tool_ordering, GCodeOutputStream& output_stream)
+{
+    bool ATC_soluble_supports = false;
+    bool ATC_export_csv = true;
+    
+    // for non-soluble supports
+    if (!ATC_soluble_supports) {
+        this->layer_batch_labeling(print); // non-soluble supports
+        this->ATC_plan_wipe_toolchange2(print); // non-soluble supports
+    }
+
+    // for soluble supports
+    if (ATC_soluble_supports) {
+        this->layer_batch_labeling_soluble_supports(print); // soluble supports
+        this->ATC_plan_wipe_toolchange2_soluble_supports(print); // non-soluble supports
+    }
+
+    std::cout << "\n********** atc_process_layers ************" << std::endl; 
+    std::cout << "********** FINAL MAP ************\n" << std::endl;
+    //std::cout << "\FINAL MAP (" << this->ATC_printing_map.get_count() << "):" << std::endl;
+    this->ATC_printing_map.display(this->ATC_printing_map.gethead());
+    std::cout << "\n******** EOF FINAL MAP **********\n" << std::endl;
+
+    // export CSV file
+    if (ATC_export_csv) {
+        std::ofstream myfile;
+        myfile.open("FINAL_MAP_002.csv");
+        myfile << "-=0101=-\n";
+        myfile << "No.,Z height,Object,Support,RL,BL,R,Batch,Area,Perimeter,Shared perimeter,Intersection,\n";
+        //myfile << "c,s,v,\n";
+        struct printing_piece_UPD* ATC_CSV_printing_piece;
+        for (int i = 0; i < this->ATC_printing_map.get_count(); i++)
+        {
+            ATC_CSV_printing_piece = this->ATC_printing_map.get_node(i);
+            //int print_Rlayer_idx = obj_temp_piece->Rlayer;
+            myfile
+                << std::to_string(i) << ","
+                << std::to_string(ATC_CSV_printing_piece->print_z) << ","
+                << std::to_string(ATC_CSV_printing_piece->object) << ","
+                << std::to_string(ATC_CSV_printing_piece->support) << ","
+                << std::to_string(ATC_CSV_printing_piece->Rlayer) << ","
+                << std::to_string(ATC_CSV_printing_piece->Blayer) << ","
+                << std::to_string(ATC_CSV_printing_piece->region) << ","
+                << std::to_string(ATC_CSV_printing_piece->batch) << ","
+                << std::to_string(ATC_CSV_printing_piece->area) << ","
+                << std::to_string(ATC_CSV_printing_piece->perimeter) << ","
+                //<< std::to_string(ATC_CSV_printing_piece->shared_perimeter) << ","
+                //<< std::to_string(ATC_CSV_printing_piece->intersection_self) << ","
+                << "\n";
+        }
+        myfile.close();
+    }
+
+
+    //std::cout << "--- GCode::atc_process_layers() ---" << std::endl;
+    print.get_ATC_printing_map().display(print.get_ATC_printing_map().gethead());
+    // get to the generated wipe tower
+    print.m_ATC_wipe_tower_data.tool_changes[0][0];
+
+
+    std::vector<GCode::LayerToPrint> layers_to_print = GCode::collect_layers_to_print(*print.m_objects[0]);
+    struct printing_piece_UPD* printing_node;
+    unsigned int atc_wiping_layer_idx = 0;
+    int atc_wiping_brick_idx = -1; // for multiple bricks tower
+
+    //for (size_t printing_node_idx = 0; printing_node_idx < print.m_ATC_printing_map.get_count(); printing_node_idx++)
+    for (size_t printing_node_idx = 0; printing_node_idx < this->ATC_printing_map.get_count(); printing_node_idx++)
+    {
+        printing_node = this->ATC_printing_map.get_node(printing_node_idx);
+        size_t print_layer_idx = printing_node->Rlayer;
+        size_t print_region_idx = printing_node->region;
+        unsigned int current_extruder_idx = print_region_idx;
+        //std::cout << "~~~ NODE: print_layer_idx=" << print_layer_idx << ", print_region_idx=" << print_region_idx << ", current_extruder_idx=" << current_extruder_idx << std::endl;
+
+        float atc_batch_number_in_the_cycle = printing_node->batch;
+        float atc_region_intersection_in_the_cycle = printing_node->region_intersection;
+
+        GCode::LayerResult my_atc_piece_result;
+        GCode::LayerToPrint& layer_to_print = layers_to_print[print_layer_idx];
+
+
+        {
+            // ---!NB Input parameters
+            // GCode::LayerToPrint& layer = layers_to_print[print_layer_idx]; - input param, so it is already here
+            const LayerTools& layer_tools = tool_ordering.tools_for_layer(layer_to_print.print_z());
+            const size_t single_object_instance_idx = 0;
+            //const GCode::LayerToPrint& layer_to_print = layers_to_print[print_layer_idx];
+            // ---!NB Input parameters
+
+
+            const Layer* object_layer = nullptr;
+            const SupportLayer* support_layer = nullptr;
+            const SupportLayer* raft_layer = nullptr;
+
+            if (layer_to_print.object_layer && !object_layer) object_layer = layer_to_print.object_layer;
+            if (layer_to_print.support_layer) {
+                if (!support_layer) support_layer = layer_to_print.support_layer;
+                if (!raft_layer && support_layer->id() < support_layer->object()->slicing_parameters().raft_layers())
+                    raft_layer = support_layer;
+            }
+
+            const Layer& layer = (object_layer != nullptr) ? *object_layer : *support_layer;
+            //GCode::LayerResult result{ {}, layer.id(), false, &layers_to_print[print_layer_idx] == &layers_to_print.back() };
+
+            coordf_t     print_z = layer.print_z;
+            bool         first_layer = layer.id() == 0;
+
+            this->m_config.apply(layer.object()->config(), true);
+            // gcode->m_enable_loop_clipping = true; -- we probably dont need that
+            //result.spiral_vase_enable = false;
+
+            std::string gcode_string;
+            gcode_string += ";" + GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Layer_Change) + "\n"; // add tag for processor
+            gcode_string += std::string(";Z:") + float_to_string_decimal_point(print_z) + "\n"; // export layer z
+            float height = first_layer ? static_cast<float>(print_z) : static_cast<float>(print_z) - m_last_layer_z;
+            gcode_string += std::string(";") + GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Height) + float_to_string_decimal_point(height) + "\n";
+            m_last_layer_z = static_cast<float>(print_z);
+            m_max_layer_z = std::max(m_max_layer_z, m_last_layer_z);
+            m_last_height = height;
+
+            if (!print.config().before_layer_gcode.value.empty()) {
+                DynamicConfig config;
+                config.set_key_value("layer_num", new ConfigOptionInt(m_layer_index + 1));
+                config.set_key_value("layer_z", new ConfigOptionFloat(print_z));
+                config.set_key_value("max_layer_z", new ConfigOptionFloat(m_max_layer_z));
+                gcode_string += placeholder_parser_process("before_layer_gcode", print.config().before_layer_gcode.value, m_writer.extruder()->id(), &config) + "\n";
+            }
+
+            // what about (gcode->m_layer_index + 1) vs gcode->change_layer(print_z) ??
+            gcode_string += change_layer(print_z); // this will increase m_layer_index
+            m_layer = &layer;
+            m_object_layer_over_raft = false;
+
+            if (!print.config().layer_gcode.value.empty()) {
+                DynamicConfig config;
+                config.set_key_value("layer_num", new ConfigOptionInt(m_layer_index));
+                config.set_key_value("layer_z", new ConfigOptionFloat(print_z));
+                config.set_key_value("max_layer_z", new ConfigOptionFloat(m_max_layer_z));
+                gcode_string += placeholder_parser_process("layer_gcode", print.config().layer_gcode.value, m_writer.extruder()->id(), &config) + "\n";
+            }
+
+            if (!first_layer && !m_second_layer_things_done) {
+                // Transition from 1st to 2nd layer. Adjust nozzle temperatures as prescribed by the nozzle dependent first_layer_temperature vs temperature settings.
+                for (const Extruder& extruder : m_writer.extruders()) {
+                    if (print.config().single_extruder_multi_material.value && extruder.id() != m_writer.extruder()->id())
+                        continue; // In single extruder multi material mode, set the temperature for the current extruder only.
+                    int temperature = print.config().temperature.get_at(extruder.id());
+                    if (temperature > 0 && temperature != print.config().first_layer_temperature.get_at(extruder.id()))
+                        gcode_string += m_writer.set_temperature(temperature, false, extruder.id());
+                }
+                gcode_string += m_writer.set_bed_temperature(print.config().bed_temperature.get_at(current_extruder_idx));
+                // Mark the temperature transition from 1st to 2nd layer to be finished.
+                m_second_layer_things_done = true;
+            }
+
+            // Extrude skirt at the print_z of the raft layers and normal object layers not at the print_z of the interlaced support material layers.
+            // Map from extruder ID to <begin, end> index of skirt loops to be extruded with that extruder.
+            std::map<unsigned int, std::pair<size_t, size_t>> skirt_loops_per_extruder;
+            skirt_loops_per_extruder = Skirt::make_skirt_loops_per_extruder_1st_layer(print, layer_tools, m_skirt_done);
+
+            // Group extrusions by an extruder, then by an object, an island and a region.
+            std::map<unsigned int, std::vector<GCode::ObjectByExtruder>> by_extruder;
+            bool is_anything_overridden = const_cast<LayerTools&>(layer_tools).wiping_extrusions().is_anything_overridden();
+
+
+            if (layer_to_print.support_layer != nullptr) {
+                const SupportLayer& support_layer = *layer_to_print.support_layer;
+                const PrintObject& object = *support_layer.object();
+                if (!support_layer.support_fills.entities.empty()) {
+                    ExtrusionRole   role = support_layer.support_fills.role();
+                    bool            has_support = role == erMixed || role == erSupportMaterial;
+                    bool            has_interface = role == erMixed || role == erSupportMaterialInterface;
+                    // Extruder ID of the support base. -1 if "don't care".
+                    unsigned int    support_extruder = object.config().support_material_extruder.value - 1;
+                    // Shall the support be printed with the active extruder, preferably with non-soluble, to avoid tool changes?
+                    bool            support_dontcare = object.config().support_material_extruder.value == 0;
+                    // Extruder ID of the support interface. -1 if "don't care".
+                    unsigned int    interface_extruder = object.config().support_material_interface_extruder.value - 1;
+                    // Shall the support interface be printed with the active extruder, preferably with non-soluble, to avoid tool changes?
+                    bool            interface_dontcare = object.config().support_material_interface_extruder.value == 0;
+                    if (support_dontcare || interface_dontcare) {
+                        // Some support will be printed with "don't care" material, preferably non-soluble.
+                        // Is the current extruder assigned a soluble filament?
+                        unsigned int dontcare_extruder = current_extruder_idx;
+                        if (print.config().filament_soluble.get_at(dontcare_extruder)) {
+                            // The last extruder printed on the previous layer extrudes soluble filament.
+                            // Try to find a non-soluble extruder on the same layer.
+
+                            for (unsigned int extruder_id : layer_tools.extruders)
+                                if (!print.config().filament_soluble.get_at(extruder_id)) {
+                                    dontcare_extruder = extruder_id;
+                                    break;
+                                }
+
+                            ;
+                        }
+                        if (support_dontcare)
+                            support_extruder = dontcare_extruder;
+                        if (interface_dontcare)
+                            interface_extruder = dontcare_extruder;
+                    }
+                    //support_extruder = printing_node->region;
+                    //interface_extruder = printing_node->region;
+                    // Both the support and the support interface are printed with the same extruder, therefore
+                    // the interface may be interleaved with the support base.
+                    bool single_extruder = !has_support || support_extruder == interface_extruder;
+                    // Assign an extruder to the base.
+                    //GCode::ObjectByExtruder& obj = object_by_extruder(by_extruder, has_support ? support_extruder : interface_extruder, &layer_to_print - layers_to_print.data(), layers_to_print.size());
+                    GCode::ObjectByExtruder& obj = object_by_extruder(by_extruder, has_support ? support_extruder : interface_extruder, 0, 1);
+
+                    obj.support = &support_layer.support_fills;
+                    obj.support_extrusion_role = single_extruder ? erMixed : erSupportMaterial;
+                    if (!single_extruder && has_interface) {
+                        //GCode::ObjectByExtruder& obj_interface = object_by_extruder(by_extruder, interface_extruder, &layer_to_print - layers_to_print.data(), layers_to_print.size());
+                        GCode::ObjectByExtruder& obj_interface = object_by_extruder(by_extruder, interface_extruder, 0, 1);
+                        obj_interface.support = &support_layer.support_fills;
+                        obj_interface.support_extrusion_role = erSupportMaterialInterface;
+                    }
+                }
+            }
+
+
+
+
+            if (layer_to_print.object_layer != nullptr) {
+                const Layer& layer = *layer_to_print.object_layer;
+                size_t n_slices = layer.lslices.size();
+                const std::vector<BoundingBox>& layer_surface_bboxes = layer.lslices_bboxes;
+                // Traverse the slices in an increasing order of bounding box size, so that the islands inside another islands are tested first, so we can just test a point inside ExPolygon::contour and we may skip testing the holes.
+                std::vector<size_t> slices_test_order;
+                slices_test_order.reserve(n_slices);
+                for (size_t i = 0; i < n_slices; ++i)
+                    slices_test_order.emplace_back(i);
+                std::sort(slices_test_order.begin(), slices_test_order.end(), [&layer_surface_bboxes](size_t i, size_t j) {const Vec2d s1 = layer_surface_bboxes[i].size().cast<double>(); const Vec2d s2 = layer_surface_bboxes[j].size().cast<double>(); return s1.x() * s1.y() < s2.x() * s2.y(); });
+                auto point_inside_surface = [&layer, &layer_surface_bboxes](const size_t i, const Point& point) {const BoundingBox& bbox = layer_surface_bboxes[i]; return point(0) >= bbox.min(0) && point(0) < bbox.max(0) && point(1) >= bbox.min(1) && point(1) < bbox.max(1) && layer.lslices[i].contour.contains(point); };
+
+                const LayerRegion* atc_layer_region = layer.regions()[print_region_idx];
+                {
+                    if (atc_layer_region == nullptr) continue;
+                    const PrintRegion& atc_print_region = print.get_print_region(print_region_idx);
+                    std::vector<unsigned int> printing_extruders;
+                    for (const GCode::ObjectByExtruder::Island::Region::Type entity_type : {GCode::ObjectByExtruder::Island::Region::INFILL, GCode::ObjectByExtruder::Island::Region::PERIMETERS}) {
+                        for (const ExtrusionEntity* ee : (entity_type == GCode::ObjectByExtruder::Island::Region::INFILL) ? atc_layer_region->fills.entities : atc_layer_region->perimeters.entities) {
+                            assert(dynamic_cast<const ExtrusionEntityCollection*>(ee) != nullptr);
+                            const auto* extrusions = static_cast<const ExtrusionEntityCollection*>(ee);
+                            if (extrusions->entities.empty()) // This shouldn't happen but first_point() would fail.
+                                continue;
+
+                            const WipingExtrusions::ExtruderPerCopy* entity_overrides = nullptr;
+                            printing_extruders.emplace_back(current_extruder_idx);
+
+                            size_t atc_object_idx = 0;
+                            std::vector<GCode::ObjectByExtruder::Island>& islands = object_islands_by_extruder(by_extruder, current_extruder_idx, atc_object_idx, 1, n_slices + 1);
+                            for (size_t i = 0; i <= n_slices; ++i) {
+                                bool   last = i == n_slices;
+                                size_t island_idx = last ? n_slices : slices_test_order[i];
+                                if (last || point_inside_surface(island_idx, extrusions->first_point())) { // extrusions->first_point does not fit inside any slice OR extrusions->first_point fits inside ith slice
+                                    if (islands[island_idx].by_region.empty())
+                                        islands[island_idx].by_region.assign(print.num_print_regions(), GCode::ObjectByExtruder::Island::Region());
+                                    islands[island_idx].by_region[atc_print_region.print_region_id()].append(entity_type, extrusions, entity_overrides);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                } // for regions
+            }
+            // --- so now we have islands
+
+
+
+            // Extrude the skirt, brim, support, perimeters, infill ordered by the extruders.
+            // ---NB!----------------------------------------------------------------------------
+            //gcode += (layer_tools.has_wipe_tower && gcode->m_wipe_tower) ? gcode->m_wipe_tower->tool_change(*this, extruder_id, extruder_id == layer_tools.extruders.back()) : this->set_extruder(extruder_id, print_z);
+            //gcode_string += gcode->set_extruder(current_extruder_idx, print_z);
+
+
+            if (auto loops_it = skirt_loops_per_extruder.find(current_extruder_idx); loops_it != skirt_loops_per_extruder.end()) {
+                const std::pair<size_t, size_t> loops = loops_it->second;
+                this->set_origin(0., 0.);
+                m_avoid_crossing_perimeters.use_external_mp();
+                Flow layer_skirt_flow = print.skirt_flow().with_height(float(m_skirt_done.back() - (m_skirt_done.size() == 1 ? 0. : m_skirt_done[m_skirt_done.size() - 2])));
+                double mm3_per_mm = layer_skirt_flow.mm3_per_mm();
+                for (size_t i = loops.first; i < loops.second; ++i) {
+                    // Adjust flow according to this layer's layer height.
+                    ExtrusionLoop loop = *dynamic_cast<const ExtrusionLoop*>(print.skirt().entities[i]);
+                    for (ExtrusionPath& path : loop.paths) {
+                        path.height = layer_skirt_flow.height();
+                        path.mm3_per_mm = mm3_per_mm;
+                    }
+                    //FIXME using the support_material_speed of the 1st object printed.
+                    gcode_string += this->extrude_loop(loop, "skirt"sv, m_config.support_material_speed.value);
+                }
+                m_avoid_crossing_perimeters.use_external_mp(false);
+                // Allow a straight travel move to the first object point if this is the first layer (but don't in next layers).
+                if (first_layer && loops.first == 0)
+                    m_avoid_crossing_perimeters.disable_once();
+            }
+
+            // Extrude brim with the extruder of the 1st region.
+            if (!m_brim_done) {
+                this->set_origin(0., 0.);
+                m_avoid_crossing_perimeters.use_external_mp();
+                for (const ExtrusionEntity* ee : print.brim().entities) {
+                    gcode_string += this->extrude_entity(*ee, "brim"sv, m_config.support_material_speed.value);
+                }
+                m_brim_done = true;
+                m_avoid_crossing_perimeters.use_external_mp(false);
+                // Allow a straight travel move to the first object point.
+                m_avoid_crossing_perimeters.disable_once();
+            }
+
+
+            // =================== SUBSTITUTE for gcode->set_extruder(...) ====================
+            //std::string GCode::set_extruder(unsigned int extruder_id, double print_z)
+            //if (!m_writer.need_toolchange(current_extruder_idx))
+                //std::cout << "return \"\";" << std::endl;
+
+            // if we are running a single-extruder setup, just set the extruder and return nothing
+            if (!m_writer.multiple_extruders) {
+                m_placeholder_parser.set("current_extruder", current_extruder_idx);
+
+                // Append the filament start G-code.
+                const std::string& start_filament_gcode = print.m_config.start_filament_gcode.get_at(current_extruder_idx);
+                if (!start_filament_gcode.empty()) {
+                    // Process the start_filament_gcode for the filament.
+                    DynamicConfig config;
+                    config.set_key_value("filament_extruder_id", new ConfigOptionInt(int(current_extruder_idx)));
+                    gcode_string += placeholder_parser_process("start_filament_gcode", start_filament_gcode, current_extruder_idx, &config);
+                    check_add_eol(gcode_string);
+                }
+                gcode_string += m_writer.toolchange(current_extruder_idx);
+            }
+
+            // prepend retraction on the current extruder
+            //std::string gcode_string = gcode->retract(true);
+            gcode_string += retract(true);
+
+            // Always reset the extrusion path, even if the tool change retract is set to zero.
+            m_wipe.reset_path();
+
+            if (m_writer.extruder() != nullptr) {
+                // Process the custom end_filament_gcode. set_extruder() is only called if there is no wipe tower
+                // so it should not be injected twice.
+                unsigned int        old_extruder_id = m_writer.extruder()->id();
+                const std::string& end_filament_gcode = m_config.end_filament_gcode.get_at(old_extruder_id);
+                if (!end_filament_gcode.empty()) {
+                    gcode_string += placeholder_parser_process("end_filament_gcode", end_filament_gcode, old_extruder_id);
+                    check_add_eol(gcode_string);
+                }
+            }
+
+
+            // If ooze prevention is enabled, park current extruder in the nearest
+            // standby point and set it to the standby temperature.
+            if (m_ooze_prevention.enable && m_writer.extruder() != nullptr)
+                gcode_string += m_ooze_prevention.pre_toolchange(*this);
+
+            const std::string& toolchange_gcode = m_config.toolchange_gcode.value;
+            std::string toolchange_gcode_parsed;
+
+            // Process the custom toolchange_gcode. If it is empty, insert just a Tn command.
+            if (!toolchange_gcode.empty()) {
+                DynamicConfig config;
+                config.set_key_value("previous_extruder", new ConfigOptionInt((int)(m_writer.extruder() != nullptr ? m_writer.extruder()->id() : -1)));
+                config.set_key_value("next_extruder", new ConfigOptionInt((int)current_extruder_idx));
+                config.set_key_value("layer_num", new ConfigOptionInt(m_layer_index));
+                config.set_key_value("layer_z", new ConfigOptionFloat(print_z));
+                config.set_key_value("toolchange_z", new ConfigOptionFloat(print_z));
+                config.set_key_value("max_layer_z", new ConfigOptionFloat(m_max_layer_z));
+                toolchange_gcode_parsed = placeholder_parser_process("toolchange_gcode", toolchange_gcode, current_extruder_idx, &config);
+                gcode_string += toolchange_gcode_parsed;
+                check_add_eol(gcode_string);
+            }
+
+            // We inform the writer about what is happening, but we may not use the resulting gcode.
+            std::string toolchange_command = m_writer.toolchange(current_extruder_idx);
+            if (!custom_gcode_changes_tool(toolchange_gcode_parsed, m_writer.toolchange_prefix(), current_extruder_idx))
+                gcode_string += toolchange_command;
+            else {
+                // user provided his own toolchange gcode, no need to do anything
+            }
+
+            // Set the temperature if the wipe tower didn't (not needed for non-single extruder MM)
+            if (m_config.single_extruder_multi_material && !m_config.wipe_tower) {
+                int temp = (m_layer_index <= 0 ? m_config.first_layer_temperature.get_at(current_extruder_idx) :
+                    m_config.temperature.get_at(current_extruder_idx));
+
+                gcode_string += m_writer.set_temperature(temp, false);
+            }
+
+            m_placeholder_parser.set("current_extruder", current_extruder_idx);
+
+            // Append the filament start G-code.
+            const std::string& start_filament_gcode = m_config.start_filament_gcode.get_at(current_extruder_idx);
+            if (!start_filament_gcode.empty()) {
+                // Process the start_filament_gcode for the new filament.
+                DynamicConfig config;
+                config.set_key_value("filament_extruder_id", new ConfigOptionInt(int(current_extruder_idx)));
+                gcode_string += placeholder_parser_process("start_filament_gcode", start_filament_gcode, current_extruder_idx, &config);
+                check_add_eol(gcode_string);
+            }
+            // Set the new extruder to the operating temperature.
+            if (m_ooze_prevention.enable)
+                gcode_string += m_ooze_prevention.post_toolchange(*this);
+
+
+
+            // =================== END of SUBSTITUTE for gcode->set_extruder(...) =============
+
+
+        // ---END NB!----------------------------------------------------------------------------
+        //gfile.write(gcode->m_wipe_tower->append_tcr(*gcode, gcode->m_wipe_tower->m_tool_changes[0][0], 1, 0.2));
+
+        // let analyzer tag generator aware of a role type change
+            if (layer_tools.has_wipe_tower && m_wipe_tower)
+                m_last_processor_extrusion_role = erWipeTower;
+
+
+            auto objects_by_extruder_it = by_extruder.find(current_extruder_idx);
+            if (objects_by_extruder_it == by_extruder.end()) continue;
+
+            const std::vector<const PrintInstance*>* ordering = nullptr;
+            std::vector<GCode::InstanceToPrint> instances_to_print = sort_print_object_instances(objects_by_extruder_it->second, { layer_to_print }, ordering, single_object_instance_idx);
+
+            // We are almost ready to print. However, we must go through all the objects twice to print the the overridden extrusions first (infill/perimeter wiping feature):
+            std::vector<GCode::ObjectByExtruder::Island::Region> by_region_per_copy_cache;
+            for (int print_wipe_extrusions = is_anything_overridden; print_wipe_extrusions >= 0; --print_wipe_extrusions) {
+                if (is_anything_overridden && print_wipe_extrusions == 0)
+                    gcode_string += "; PURGING FINISHED\n";
+
+                for (GCode::InstanceToPrint& instance_to_print : instances_to_print) {
+                    //const GCode::LayerToPrint& layer_to_print = layers[instance_to_print.layer_id];
+                    // To control print speed of the 1st object layer printed over raft interface.
+                    bool object_layer_over_raft = layer_to_print.object_layer && layer_to_print.object_layer->id() > 0 && instance_to_print.print_object.slicing_parameters().raft_layers() == layer_to_print.object_layer->id();
+                    m_config.apply(instance_to_print.print_object.config(), true);
+                    m_layer = layer_to_print.layer();
+                    m_object_layer_over_raft = object_layer_over_raft;
+                    if (m_config.avoid_crossing_perimeters)
+                        m_avoid_crossing_perimeters.init_layer(*m_layer);
+                    if (config().gcode_label_objects)
+                        gcode_string += std::string("; printing object ") + instance_to_print.print_object.model_object()->name + " id:" + std::to_string(instance_to_print.layer_id) + " copy " + std::to_string(instance_to_print.instance_id) + "\n";
+                    // When starting a new object, use the external motion planner for the first travel move.
+                    const Point& offset = instance_to_print.print_object.instances()[instance_to_print.instance_id].shift;
+                    std::pair<const PrintObject*, Point>  this_object_copy(&instance_to_print.print_object, offset);
+                    if (m_last_obj_copy != this_object_copy)
+                        m_avoid_crossing_perimeters.use_external_mp_once();
+                    m_last_obj_copy = this_object_copy;
+                    set_origin(unscale(offset));
+                    if (instance_to_print.object_by_extruder.support != nullptr && !print_wipe_extrusions) {
+                        m_layer = layer_to_print.support_layer;
+                        m_object_layer_over_raft = false;
+                        // support_extrusion_role is erSupportMaterial, erSupportMaterialInterface or erMixed for all extrusion paths.
+                        gcode_string += extrude_support(instance_to_print.object_by_extruder.support->chained_path_from(m_last_pos, instance_to_print.object_by_extruder.support_extrusion_role));
+                        std::cout << "~~~ EXTRUDE SUPPORT" << std::endl;
+                        m_layer = layer_to_print.layer();
+                        m_object_layer_over_raft = object_layer_over_raft;
+                    }
+                    for (GCode::ObjectByExtruder::Island& island : instance_to_print.object_by_extruder.islands) {
+                        const auto& by_region_specific = is_anything_overridden ? island.by_region_per_copy(by_region_per_copy_cache, static_cast<unsigned int>(instance_to_print.instance_id), current_extruder_idx, print_wipe_extrusions != 0) : island.by_region;
+                        //gcode_string += extrude_infill(print, by_region_specific, false);
+                        //gcode_string += extrude_perimeters(print, by_region_specific);
+
+                        if (print.config().infill_first) {
+                            gcode_string += extrude_infill(print, by_region_specific, false);
+                            gcode_string += extrude_perimeters(print, by_region_specific);
+                        }
+                        else {
+                            gcode_string += extrude_perimeters(print, by_region_specific);
+                            gcode_string += extrude_infill(print, by_region_specific, false);
+                        }
+
+
+                        //std::cout << "~~~ EXTRUDE INFILL AND PERIMETERS" << std::endl;
+                    }
+                }
+            }
+
+
+
+            BOOST_LOG_TRIVIAL(trace) << "Exported layer " << layer.id() << " print_z " << print_z << log_memory_info();
+
+            my_atc_piece_result.gcode = std::move(gcode_string);
+            const bool last_layer = 0;
+            //last_layer = &layer == &layers_to_print.back()
+            my_atc_piece_result.cooling_buffer_flush = object_layer || raft_layer || last_layer;
+            //return result;
+        }
+
+        m_processor.m_atc_critical_intersection = atc_region_intersection_in_the_cycle;
+        
+        m_processor.m_atc_batch_number = atc_batch_number_in_the_cycle;
+        output_stream.write(my_atc_piece_result.gcode); // gcode for a single color piece
+
+        // for a multiple-brick wipe tower
+        if (printing_node->need_wipe)
+        {
+            atc_wiping_brick_idx += 1;
+            //if (atc_wiping_brick_idx > print.atc_wipe_tower_data.tool_changes[atc_wiping_layer_idx].size()) break;
+            output_stream.write(m_wipe_tower->append_tcr(*this,
+                print.m_ATC_wipe_tower_data.tool_changes[atc_wiping_layer_idx][atc_wiping_brick_idx],
+                print.m_ATC_wipe_tower_data.tool_changes[atc_wiping_layer_idx][atc_wiping_brick_idx].new_tool,
+                print.m_ATC_wipe_tower_data.tool_changes[atc_wiping_layer_idx][atc_wiping_brick_idx].print_z));
+
+
+            // # of bricks = max number of colors - 1
+            if (atc_wiping_brick_idx >= print.get_object(0)->all_regions().size() - 2) // # of bricks - 1 = max number of colors - 2
+            {
+                atc_wiping_layer_idx += 1;
+                atc_wiping_brick_idx = -1;
+            }
+
+        }
+
+        // for a single-brick wipe tower
+        /*
+        if (printing_node->need_wipe)
+        {
+            output_stream.write(m_wipe_tower->append_tcr(*this,
+                print.m_ATC_wipe_tower_data.tool_changes[atc_wiping_layer_idx][0],
+                print.m_ATC_wipe_tower_data.tool_changes[atc_wiping_layer_idx][0].new_tool,
+                print.m_ATC_wipe_tower_data.tool_changes[atc_wiping_layer_idx][0].print_z));
+            atc_wiping_layer_idx += 1;
+        }
+        */
+    }
 }
 
 // In sequential mode, process_layer is called once per each object and its copy,
@@ -4423,6 +6809,446 @@ LayerResult GCode::process_layer(
             m_writer.set_position(pos);
         }
     }
+
+    result.gcode = std::move(gcode);
+    result.cooling_buffer_flush = object_layer || raft_layer || last_layer;
+    return result;
+}
+
+GCode::LayerResult GCode::process_layer_batched_region(
+    const Print& print,
+    // Set of object & print layers of the same PrintObject and with the same print_z.
+    const std::vector<LayerToPrint>& layers,
+    const LayerTools& layer_tools,
+    const bool                               last_layer,
+    // Pairs of PrintObject index and its instance index.
+    const std::vector<const PrintInstance*>* ordering,
+    // If set to size_t(-1), then print all copies of all objects.
+    // Otherwise print a single copy of a single object.
+    size_t region_in_batch,
+    const size_t                     		 single_object_instance_idx)
+{
+    std::cout << "============= process_layer_batched_region() =============" << std::endl;
+    assert(!layers.empty());
+    // Either printing all copies of all objects, or just a single copy of a single object.
+    assert(single_object_instance_idx == size_t(-1) || layers.size() == 1);
+
+    // First object, support and raft layer, if available.
+    const Layer* object_layer = nullptr;
+    const SupportLayer* support_layer = nullptr;
+    const SupportLayer* raft_layer = nullptr;
+    for (const LayerToPrint& l : layers) {
+        if (l.object_layer && !object_layer)
+            object_layer = l.object_layer;
+        if (l.support_layer) {
+            if (!support_layer)
+                support_layer = l.support_layer;
+            if (!raft_layer && support_layer->id() < support_layer->object()->slicing_parameters().raft_layers())
+                raft_layer = support_layer;
+        }
+    }
+    const Layer& layer = (object_layer != nullptr) ? *object_layer : *support_layer;
+    GCode::LayerResult   result{ {}, layer.id(), false, last_layer };
+    if (layer_tools.extruders.empty())
+        // Nothing to extrude.
+        return result;
+
+    // Extract 1st object_layer and support_layer of this set of layers with an equal print_z.
+    coordf_t             print_z = layer.print_z;
+    bool                 first_layer = layer.id() == 0;
+    unsigned int         first_extruder_id = layer_tools.extruders.front();
+
+    // Initialize config with the 1st object to be printed at this layer.
+    m_config.apply(layer.object()->config(), true);
+
+    // Check whether it is possible to apply the spiral vase logic for this layer.
+    // Just a reminder: A spiral vase mode is allowed for a single object, single material print only.
+    m_enable_loop_clipping = true;
+    if (m_spiral_vase && layers.size() == 1 && support_layer == nullptr) {
+        bool enable = (layer.id() > 0 || !print.has_brim()) && (layer.id() >= (size_t)print.config().skirt_height.value && !print.has_infinite_skirt());
+        if (enable) {
+            for (const LayerRegion* layer_region : layer.regions())
+                if (size_t(layer_region->region().config().bottom_solid_layers.value) > layer.id() ||
+                    layer_region->perimeters.items_count() > 1u ||
+                    layer_region->fills.items_count() > 0) {
+                    enable = false;
+                    break;
+                }
+        }
+        result.spiral_vase_enable = enable;
+        // If we're going to apply spiralvase to this layer, disable loop clipping.
+        m_enable_loop_clipping = !enable;
+    }
+
+    std::string gcode;
+    assert(is_decimal_separator_point()); // for the sprintfs
+
+    // add tag for processor
+    gcode += ";" + GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Layer_Change) + "\n";
+    // export layer z
+    gcode += std::string(";Z:") + float_to_string_decimal_point(print_z) + "\n";
+
+    // export layer height
+    float height = first_layer ? static_cast<float>(print_z) : static_cast<float>(print_z) - m_last_layer_z;
+    gcode += std::string(";") + GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Height)
+        + float_to_string_decimal_point(height) + "\n";
+
+    // update caches
+    m_last_layer_z = static_cast<float>(print_z);
+    m_max_layer_z = std::max(m_max_layer_z, m_last_layer_z);
+    m_last_height = height;
+
+    // Set new layer - this will change Z and force a retraction if retract_layer_change is enabled.
+    if (!print.config().before_layer_gcode.value.empty()) {
+        DynamicConfig config;
+        config.set_key_value("layer_num", new ConfigOptionInt(m_layer_index + 1));
+        config.set_key_value("layer_z", new ConfigOptionFloat(print_z));
+        config.set_key_value("max_layer_z", new ConfigOptionFloat(m_max_layer_z));
+        gcode += this->placeholder_parser_process("before_layer_gcode",
+            print.config().before_layer_gcode.value, m_writer.extruder()->id(), &config)
+            + "\n";
+    }
+    gcode += this->change_layer(print_z);  // this will increase m_layer_index
+    m_layer = &layer;
+    m_object_layer_over_raft = false;
+    if (!print.config().layer_gcode.value.empty()) {
+        DynamicConfig config;
+        config.set_key_value("layer_num", new ConfigOptionInt(m_layer_index));
+        config.set_key_value("layer_z", new ConfigOptionFloat(print_z));
+        config.set_key_value("max_layer_z", new ConfigOptionFloat(m_max_layer_z));
+        gcode += this->placeholder_parser_process("layer_gcode",
+            print.config().layer_gcode.value, m_writer.extruder()->id(), &config)
+            + "\n";
+    }
+
+    if (!first_layer && !m_second_layer_things_done) {
+        // Transition from 1st to 2nd layer. Adjust nozzle temperatures as prescribed by the nozzle dependent
+        // first_layer_temperature vs. temperature settings.
+        for (const Extruder& extruder : m_writer.extruders()) {
+            if (print.config().single_extruder_multi_material.value && extruder.id() != m_writer.extruder()->id())
+                // In single extruder multi material mode, set the temperature for the current extruder only.
+                continue;
+            int temperature = print.config().temperature.get_at(extruder.id());
+            if (temperature > 0 && temperature != print.config().first_layer_temperature.get_at(extruder.id()))
+                gcode += m_writer.set_temperature(temperature, false, extruder.id());
+        }
+        gcode += m_writer.set_bed_temperature(print.config().bed_temperature.get_at(first_extruder_id));
+        // Mark the temperature transition from 1st to 2nd layer to be finished.
+        m_second_layer_things_done = true;
+    }
+
+    // Map from extruder ID to <begin, end> index of skirt loops to be extruded with that extruder.
+    std::map<unsigned int, std::pair<size_t, size_t>> skirt_loops_per_extruder;
+
+    if (single_object_instance_idx == size_t(-1)) {
+        // Normal (non-sequential) print.
+        gcode += ProcessLayer::emit_custom_gcode_per_print_z(*this, layer_tools.custom_gcode, m_writer.extruder()->id(), first_extruder_id, print.config());
+    }
+    // Extrude skirt at the print_z of the raft layers and normal object layers
+    // not at the print_z of the interlaced support material layers.
+    skirt_loops_per_extruder = first_layer ?
+        Skirt::make_skirt_loops_per_extruder_1st_layer(print, layer_tools, m_skirt_done) :
+        Skirt::make_skirt_loops_per_extruder_other_layers(print, layer_tools, m_skirt_done);
+
+    // Group extrusions by an extruder, then by an object, an island and a region.
+    std::map<unsigned int, std::vector<ObjectByExtruder>> by_extruder;
+    bool is_anything_overridden = const_cast<LayerTools&>(layer_tools).wiping_extrusions().is_anything_overridden();
+    for (const LayerToPrint& layer_to_print : layers) {
+        if (layer_to_print.support_layer != nullptr) {
+            const SupportLayer& support_layer = *layer_to_print.support_layer;
+            const PrintObject& object = *support_layer.object();
+            if (!support_layer.support_fills.entities.empty()) {
+                ExtrusionRole   role = support_layer.support_fills.role();
+                bool            has_support = role == erMixed || role == erSupportMaterial;
+                bool            has_interface = role == erMixed || role == erSupportMaterialInterface;
+                // Extruder ID of the support base. -1 if "don't care".
+                unsigned int    support_extruder = object.config().support_material_extruder.value - 1;
+                // Shall the support be printed with the active extruder, preferably with non-soluble, to avoid tool changes?
+                bool            support_dontcare = object.config().support_material_extruder.value == 0;
+                // Extruder ID of the support interface. -1 if "don't care".
+                unsigned int    interface_extruder = object.config().support_material_interface_extruder.value - 1;
+                // Shall the support interface be printed with the active extruder, preferably with non-soluble, to avoid tool changes?
+                bool            interface_dontcare = object.config().support_material_interface_extruder.value == 0;
+                if (support_dontcare || interface_dontcare) {
+                    // Some support will be printed with "don't care" material, preferably non-soluble.
+                    // Is the current extruder assigned a soluble filament?
+                    unsigned int dontcare_extruder = first_extruder_id;
+                    if (print.config().filament_soluble.get_at(dontcare_extruder)) {
+                        // The last extruder printed on the previous layer extrudes soluble filament.
+                        // Try to find a non-soluble extruder on the same layer.
+                        for (unsigned int extruder_id : layer_tools.extruders)
+                            if (!print.config().filament_soluble.get_at(extruder_id)) {
+                                dontcare_extruder = extruder_id;
+                                break;
+                            }
+                    }
+                    if (support_dontcare)
+                        support_extruder = dontcare_extruder;
+                    if (interface_dontcare)
+                        interface_extruder = dontcare_extruder;
+                }
+                // Both the support and the support interface are printed with the same extruder, therefore
+                // the interface may be interleaved with the support base.
+                bool single_extruder = !has_support || support_extruder == interface_extruder;
+                // Assign an extruder to the base.
+                ObjectByExtruder& obj = object_by_extruder(by_extruder, has_support ? support_extruder : interface_extruder, &layer_to_print - layers.data(), layers.size());
+                obj.support = &support_layer.support_fills;
+                obj.support_extrusion_role = single_extruder ? erMixed : erSupportMaterial;
+                if (!single_extruder && has_interface) {
+                    ObjectByExtruder& obj_interface = object_by_extruder(by_extruder, interface_extruder, &layer_to_print - layers.data(), layers.size());
+                    obj_interface.support = &support_layer.support_fills;
+                    obj_interface.support_extrusion_role = erSupportMaterialInterface;
+                }
+            }
+        }
+        if (layer_to_print.object_layer != nullptr) {
+            const Layer& layer = *layer_to_print.object_layer;
+            // We now define a strategy for building perimeters and fills. The separation
+            // between regions doesn't matter in terms of printing order, as we follow
+            // another logic instead:
+            // - we group all extrusions by extruder so that we minimize toolchanges
+            // - we start from the last used extruder
+            // - for each extruder, we group extrusions by island
+            // - for each island, we extrude perimeters first, unless user set the infill_first
+            //   option
+            // (Still, we have to keep track of regions because we need to apply their config)
+            size_t n_slices = layer.lslices.size();
+            const std::vector<BoundingBox>& layer_surface_bboxes = layer.lslices_bboxes;
+            // Traverse the slices in an increasing order of bounding box size, so that the islands inside another islands are tested first,
+            // so we can just test a point inside ExPolygon::contour and we may skip testing the holes.
+            std::vector<size_t> slices_test_order;
+            slices_test_order.reserve(n_slices);
+            for (size_t i = 0; i < n_slices; ++i)
+                slices_test_order.emplace_back(i);
+            std::sort(slices_test_order.begin(), slices_test_order.end(), [&layer_surface_bboxes](size_t i, size_t j) {
+                const Vec2d s1 = layer_surface_bboxes[i].size().cast<double>();
+                const Vec2d s2 = layer_surface_bboxes[j].size().cast<double>();
+                return s1.x() * s1.y() < s2.x() * s2.y();
+                });
+            auto point_inside_surface = [&layer, &layer_surface_bboxes](const size_t i, const Point& point) {
+                const BoundingBox& bbox = layer_surface_bboxes[i];
+                return point(0) >= bbox.min(0) && point(0) < bbox.max(0) &&
+                    point(1) >= bbox.min(1) && point(1) < bbox.max(1) &&
+                    layer.lslices[i].contour.contains(point);
+            };
+
+            //for (size_t region_id = 0; region_id < layer.regions().size(); ++region_id) 
+             size_t region_id = region_in_batch;
+            {
+                const LayerRegion* layerm = layer.regions()[region_id];
+                if (layerm == nullptr)
+                    continue;
+                // PrintObjects own the PrintRegions, thus the pointer to PrintRegion would be unique to a PrintObject, they would not
+                // identify the content of PrintRegion accross the whole print uniquely. Translate to a Print specific PrintRegion.
+                const PrintRegion& region = print.get_print_region(layerm->region().print_region_id());
+
+                // Now we must process perimeters and infills and create islands of extrusions in by_region std::map.
+                // It is also necessary to save which extrusions are part of MM wiping and which are not.
+                // The process is almost the same for perimeters and infills - we will do it in a cycle that repeats twice:
+                std::vector<unsigned int> printing_extruders;
+                for (const ObjectByExtruder::Island::Region::Type entity_type : { ObjectByExtruder::Island::Region::INFILL, ObjectByExtruder::Island::Region::PERIMETERS }) {
+                    for (const ExtrusionEntity* ee : (entity_type == ObjectByExtruder::Island::Region::INFILL) ? layerm->fills.entities : layerm->perimeters.entities) {
+                        // extrusions represents infill or perimeter extrusions of a single island.
+                        assert(dynamic_cast<const ExtrusionEntityCollection*>(ee) != nullptr);
+                        const auto* extrusions = static_cast<const ExtrusionEntityCollection*>(ee);
+                        if (extrusions->entities.empty()) // This shouldn't happen but first_point() would fail.
+                            continue;
+
+                        // This extrusion is part of certain Region, which tells us which extruder should be used for it:
+                        int correct_extruder_id = layer_tools.extruder(*extrusions, region);
+
+                        // Let's recover vector of extruder overrides:
+                        const WipingExtrusions::ExtruderPerCopy* entity_overrides = nullptr;
+                        if (!layer_tools.has_extruder(correct_extruder_id)) {
+                            // this entity is not overridden, but its extruder is not in layer_tools - we'll print it
+                            // by last extruder on this layer (could happen e.g. when a wiping object is taller than others - dontcare extruders are eradicated from layer_tools)
+                            correct_extruder_id = layer_tools.extruders.back();
+                        }
+                        printing_extruders.clear();
+                        if (is_anything_overridden) {
+                            entity_overrides = const_cast<LayerTools&>(layer_tools).wiping_extrusions().get_extruder_overrides(extrusions, correct_extruder_id, layer_to_print.object()->instances().size());
+                            if (entity_overrides == nullptr) {
+                                printing_extruders.emplace_back(correct_extruder_id);
+                            }
+                            else {
+                                printing_extruders.reserve(entity_overrides->size());
+                                for (int extruder : *entity_overrides)
+                                    printing_extruders.emplace_back(extruder >= 0 ?
+                                        // at least one copy is overridden to use this extruder
+                                        extruder :
+                                        // at least one copy would normally be printed with this extruder (see get_extruder_overrides function for explanation)
+                                        static_cast<unsigned int>(-extruder - 1));
+                                Slic3r::sort_remove_duplicates(printing_extruders);
+                            }
+                        }
+                        else
+                            printing_extruders.emplace_back(correct_extruder_id);
+
+                        // Now we must add this extrusion into the by_extruder map, once for each extruder that will print it:
+                        for (unsigned int extruder : printing_extruders)
+                        {
+                            std::vector<ObjectByExtruder::Island>& islands = object_islands_by_extruder(
+                                by_extruder,
+                                extruder,
+                                &layer_to_print - layers.data(),
+                                layers.size(), n_slices + 1);
+                            for (size_t i = 0; i <= n_slices; ++i) {
+                                bool   last = i == n_slices;
+                                size_t island_idx = last ? n_slices : slices_test_order[i];
+                                if (// extrusions->first_point does not fit inside any slice
+                                    last ||
+                                    // extrusions->first_point fits inside ith slice
+                                    point_inside_surface(island_idx, extrusions->first_point())) {
+                                    if (islands[island_idx].by_region.empty())
+                                        islands[island_idx].by_region.assign(print.num_print_regions(), ObjectByExtruder::Island::Region());
+                                    islands[island_idx].by_region[region.print_region_id()].append(entity_type, extrusions, entity_overrides);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            } // for regions
+        }
+    } // for objects
+
+    // Extrude the skirt, brim, support, perimeters, infill ordered by the extruders.
+    for (unsigned int extruder_id : layer_tools.extruders)
+    {
+        // ATC fork: We implemented the TC gcode above in this function
+        // search "if (print_region_idx != atc_current_tool){...}"
+        gcode += (layer_tools.has_wipe_tower && m_wipe_tower) ? m_wipe_tower->tool_change(*this, extruder_id, extruder_id == layer_tools.extruders.back()) : this->set_extruder(extruder_id, print_z);
+
+        // let analyzer tag generator aware of a role type change
+        if (layer_tools.has_wipe_tower && m_wipe_tower)
+            m_last_processor_extrusion_role = erWipeTower;
+
+        if (auto loops_it = skirt_loops_per_extruder.find(extruder_id); loops_it != skirt_loops_per_extruder.end()) {
+            const std::pair<size_t, size_t> loops = loops_it->second;
+            this->set_origin(0., 0.);
+            m_avoid_crossing_perimeters.use_external_mp();
+            Flow layer_skirt_flow = print.skirt_flow().with_height(float(m_skirt_done.back() - (m_skirt_done.size() == 1 ? 0. : m_skirt_done[m_skirt_done.size() - 2])));
+            double mm3_per_mm = layer_skirt_flow.mm3_per_mm();
+            for (size_t i = loops.first; i < loops.second; ++i) {
+                // Adjust flow according to this layer's layer height.
+                ExtrusionLoop loop = *dynamic_cast<const ExtrusionLoop*>(print.skirt().entities[i]);
+                for (ExtrusionPath& path : loop.paths) {
+                    path.height = layer_skirt_flow.height();
+                    path.mm3_per_mm = mm3_per_mm;
+                }
+                //FIXME using the support_material_speed of the 1st object printed.
+                gcode += this->extrude_loop(loop, "skirt"sv, m_config.support_material_speed.value);
+            }
+            m_avoid_crossing_perimeters.use_external_mp(false);
+            // Allow a straight travel move to the first object point if this is the first layer (but don't in next layers).
+            if (first_layer && loops.first == 0)
+                m_avoid_crossing_perimeters.disable_once();
+        }
+
+        // Extrude brim with the extruder of the 1st region.
+        if (!m_brim_done) {
+            this->set_origin(0., 0.);
+            m_avoid_crossing_perimeters.use_external_mp();
+            for (const ExtrusionEntity* ee : print.brim().entities) {
+                gcode += this->extrude_entity(*ee, "brim"sv, m_config.support_material_speed.value);
+            }
+            m_brim_done = true;
+            m_avoid_crossing_perimeters.use_external_mp(false);
+            // Allow a straight travel move to the first object point.
+            m_avoid_crossing_perimeters.disable_once();
+        }
+
+
+        auto objects_by_extruder_it = by_extruder.find(extruder_id);
+        if (objects_by_extruder_it == by_extruder.end())
+            continue;
+
+        std::vector<InstanceToPrint> instances_to_print = sort_print_object_instances(objects_by_extruder_it->second, layers, ordering, single_object_instance_idx);
+
+        // We are almost ready to print. However, we must go through all the objects twice to print the the overridden extrusions first (infill/perimeter wiping feature):
+        std::vector<ObjectByExtruder::Island::Region> by_region_per_copy_cache;
+        for (int print_wipe_extrusions = is_anything_overridden; print_wipe_extrusions >= 0; --print_wipe_extrusions) {
+            if (is_anything_overridden && print_wipe_extrusions == 0)
+                gcode += "; PURGING FINISHED\n";
+
+            for (InstanceToPrint& instance_to_print : instances_to_print) {
+                const LayerToPrint& layer_to_print = layers[instance_to_print.layer_id];
+                // To control print speed of the 1st object layer printed over raft interface.
+                bool object_layer_over_raft = layer_to_print.object_layer && layer_to_print.object_layer->id() > 0 &&
+                    instance_to_print.print_object.slicing_parameters().raft_layers() == layer_to_print.object_layer->id();
+                m_config.apply(instance_to_print.print_object.config(), true);
+                m_layer = layer_to_print.layer();
+                m_object_layer_over_raft = object_layer_over_raft;
+                if (m_config.avoid_crossing_perimeters)
+                    m_avoid_crossing_perimeters.init_layer(*m_layer);
+                if (this->config().gcode_label_objects)
+                    gcode += std::string("; printing object ") + instance_to_print.print_object.model_object()->name + " id:" + std::to_string(instance_to_print.layer_id) + " copy " + std::to_string(instance_to_print.instance_id) + "\n";
+                // When starting a new object, use the external motion planner for the first travel move.
+                const Point& offset = instance_to_print.print_object.instances()[instance_to_print.instance_id].shift;
+                std::pair<const PrintObject*, Point> this_object_copy(&instance_to_print.print_object, offset);
+                if (m_last_obj_copy != this_object_copy)
+                    m_avoid_crossing_perimeters.use_external_mp_once();
+                m_last_obj_copy = this_object_copy;
+                this->set_origin(unscale(offset));
+                if (instance_to_print.object_by_extruder.support != nullptr && !print_wipe_extrusions) {
+                    m_layer = layer_to_print.support_layer;
+                    m_object_layer_over_raft = false;
+                    gcode += this->extrude_support(
+                        // support_extrusion_role is erSupportMaterial, erSupportMaterialInterface or erMixed for all extrusion paths.
+                        instance_to_print.object_by_extruder.support->chained_path_from(m_last_pos, instance_to_print.object_by_extruder.support_extrusion_role));
+                    m_layer = layer_to_print.layer();
+                    m_object_layer_over_raft = object_layer_over_raft;
+                }
+                //FIXME order islands?
+                // Sequential tool path ordering of multiple parts within the same object, aka. perimeter tracking (#5511)
+                for (ObjectByExtruder::Island& island : instance_to_print.object_by_extruder.islands) {
+                    const auto& by_region_specific = is_anything_overridden ? island.by_region_per_copy(by_region_per_copy_cache, static_cast<unsigned int>(instance_to_print.instance_id), extruder_id, print_wipe_extrusions != 0) : island.by_region;
+                    //FIXME the following code prints regions in the order they are defined, the path is not optimized in any way.
+                    if (print.config().infill_first) {
+                        gcode += this->extrude_infill(print, by_region_specific, false);
+                        gcode += this->extrude_perimeters(print, by_region_specific);
+                    }
+                    else {
+                        gcode += this->extrude_perimeters(print, by_region_specific);
+                        gcode += this->extrude_infill(print, by_region_specific, false);
+                    }
+                    // ironing
+                    gcode += this->extrude_infill(print, by_region_specific, true);
+                }
+                if (this->config().gcode_label_objects)
+                    gcode += std::string("; stop printing object ") + instance_to_print.print_object.model_object()->name + " id:" + std::to_string(instance_to_print.layer_id) + " copy " + std::to_string(instance_to_print.instance_id) + "\n";
+            }
+        }
+    }
+
+#if 0
+    // Apply spiral vase post-processing if this layer contains suitable geometry
+    // (we must feed all the G-code into the post-processor, including the first
+    // bottom non-spiral layers otherwise it will mess with positions)
+    // we apply spiral vase at this stage because it requires a full layer.
+    // Just a reminder: A spiral vase mode is allowed for a single object per layer, single material print only.
+    if (m_spiral_vase)
+        gcode = m_spiral_vase->process_layer(std::move(gcode));
+
+    // Apply cooling logic; this may alter speeds.
+    if (m_cooling_buffer)
+        gcode = m_cooling_buffer->process_layer(std::move(gcode), layer.id(),
+            // Flush the cooling buffer at each object layer or possibly at the last layer, even if it contains just supports (This should not happen).
+            object_layer || last_layer);
+
+#ifdef HAS_PRESSURE_EQUALIZER
+    // Apply pressure equalization if enabled;
+    // printf("G-code before filter:\n%s\n", gcode.c_str());
+    if (m_pressure_equalizer)
+        gcode = m_pressure_equalizer->process(gcode.c_str(), false);
+    // printf("G-code after filter:\n%s\n", out.c_str());
+#endif /* HAS_PRESSURE_EQUALIZER */
+
+    file.write(gcode);
+#endif
+
+    BOOST_LOG_TRIVIAL(trace) << "Exported layer " << layer.id() << " print_z " << print_z <<
+        log_memory_info();
 
     result.gcode = std::move(gcode);
     result.cooling_buffer_flush = object_layer || raft_layer || last_layer;

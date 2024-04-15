@@ -237,7 +237,10 @@ void BackgroundSlicingProcess::process_fff()
 
 		//BBS: add plate index into render params
 		m_temp_output_path = this->get_current_plate()->get_tmp_gcode_path();
-		m_fff_print->export_gcode(m_temp_output_path, m_gcode_result, [this](const ThumbnailsParams& params) { return this->render_thumbnails(params); });
+	    if(m_print->full_print_config().option<ConfigOptionBool>("atc_enable_tool_clustering")->value == true) // atc layer batching
+		    m_fff_print->export_batched_gcode(m_temp_output_path, m_gcode_result, [this](const ThumbnailsParams& params) { return this->render_thumbnails(params); }); // atc layer batching
+	    else // regular slicing
+		    m_fff_print->export_gcode(m_temp_output_path, m_gcode_result, [this](const ThumbnailsParams& params) { return this->render_thumbnails(params); });
 		finalize_gcode();
 		BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << boost::format(": export gcode finished");
 	}

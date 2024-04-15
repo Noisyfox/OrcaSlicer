@@ -219,6 +219,8 @@ class GCodeViewer
         float feedrate{ 0.0f };
         float fan_speed{ 0.0f };
         float temperature{ 0.0f };
+        float atc_batching{ 0.0f };
+        float atc_critical_intersection{ 0.0f };
         float volumetric_rate{ 0.0f };
         float layer_time{ 0.0f };
         unsigned char extruder_id{ 0 };
@@ -427,6 +429,10 @@ class GCodeViewer
             Range volumetric_rate;
             // Color mapping by extrusion temperature.
             Range temperature;
+            // Color mapping by ATC batch number.
+            Range atc_batching;
+            // Color mapping for ATC critical region intersection
+            Range atc_critical_intersection;
             // Color mapping by layer time.
             Range layer_duration;
 Range layer_duration_log;
@@ -437,6 +443,8 @@ Range layer_duration_log;
                 fan_speed.reset();
                 volumetric_rate.reset();
                 temperature.reset();
+                atc_batching.reset();
+                atc_critical_intersection.reset();
                 layer_duration.reset();
                 layer_duration_log.reset(true);
             }
@@ -717,6 +725,8 @@ public:
         FanSpeed,
         Temperature,
         VolumetricRate,
+        ATCLayerBatching,
+        ATCCriticalIntersection,
         Tool,
         ColorPrint,
         FilamentId,
