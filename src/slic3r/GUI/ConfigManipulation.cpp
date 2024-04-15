@@ -38,22 +38,22 @@ t_config_option_keys const &ConfigManipulation::applying_keys() const
     return m_applying_keys;
 }
 
-void ConfigManipulation::toggle_field(const std::string &opt_key, const bool toggle, int opt_index /* = -1*/)
+void ConfigManipulation::toggle_field(const std::string &opt_key, const bool toggle, int opt_index /* = -1*/, const std::string& disabled_reason)
 {
     if (local_config) {
         if (local_config->option(opt_key) == nullptr) return;
     }
-    cb_toggle_field(opt_key, toggle, opt_index);
+    cb_toggle_field(opt_key, toggle, opt_index, disabled_reason);
 }
 
-void ConfigManipulation::toggle_line(const std::string& opt_key, const bool toggle)
+void ConfigManipulation::toggle_line(const std::string& opt_key, const bool toggle, const std::string& disabled_reason)
 {
     if (local_config) {
         if (local_config->option(opt_key) == nullptr)
             return;
     }
     if (cb_toggle_line)
-        cb_toggle_line(opt_key, toggle);
+        cb_toggle_line(opt_key, toggle, disabled_reason);
 }
 
 void ConfigManipulation::check_nozzle_recommended_temperature_range(DynamicPrintConfig *config) {

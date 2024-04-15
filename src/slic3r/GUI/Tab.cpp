@@ -1332,7 +1332,7 @@ Field* Tab::get_field(const t_config_option_key& opt_key, Page** selected_page, 
     return field;
 }
 
-void Tab::toggle_option(const std::string& opt_key, bool toggle, int opt_index/* = -1*/)
+void Tab::toggle_option(const std::string& opt_key, bool toggle, int opt_index /* = -1*/, const std::string& disabled_reason)
 {
     if (!m_active_page)
         return;
@@ -1341,7 +1341,7 @@ void Tab::toggle_option(const std::string& opt_key, bool toggle, int opt_index/*
         field->toggle(toggle);
 }
 
-void Tab::toggle_line(const std::string &opt_key, bool toggle)
+void Tab::toggle_line(const std::string& opt_key, bool toggle, const std::string& disabled_reason)
 {
     if (!m_active_page) return;
     Line *line = m_active_page->get_line(opt_key);
@@ -6337,12 +6337,12 @@ ConfigManipulation Tab::get_config_manipulation()
         update();
     };
 
-    auto cb_toggle_field = [this](const t_config_option_key& opt_key, bool toggle, int opt_index) {
-        return toggle_option(opt_key, toggle, opt_index);
+    auto cb_toggle_field = [this](const t_config_option_key& opt_key, bool toggle, int opt_index, const std::string& disabled_reason) {
+        return toggle_option(opt_key, toggle, opt_index, disabled_reason);
     };
 
-    auto cb_toggle_line = [this](const t_config_option_key& opt_key, bool toggle) {
-        return toggle_line(opt_key, toggle);
+    auto cb_toggle_line = [this](const t_config_option_key& opt_key, bool toggle, const std::string& disabled_reason) {
+        return toggle_line(opt_key, toggle, disabled_reason);
     };
 
     auto cb_value_change = [this](const std::string& opt_key, const boost::any& value) {
