@@ -1,7 +1,7 @@
 #include "wxMediaCtrl2.h"
 #include "libslic3r/Time.hpp"
 #include "I18N.hpp"
-#include "GUI_App.hpp"
+#include "libslic3r/Utils.hpp"
 #include "LinuxDisplayBackend.hpp"
 #include <boost/filesystem/operations.hpp>
 #include <string>
@@ -329,8 +329,8 @@ void wxMediaCtrl2::Load(wxURI url)
         if (!notified) CallAfter([] {
             auto res = wxMessageBox(_L("Windows Media Player is required for this task! Do you want to enable 'Windows Media Player' for your operation system?"), _L("Error"), wxOK | wxCANCEL);
             if (res == wxOK) {
-                wxString url = IsWindows10OrGreater() 
-                        ? "ms-settings:optionalfeatures?activationSource=SMC-Article-14209" 
+                wxString url = IsWindows10OrGreater()
+                        ? "ms-settings:optionalfeatures?activationSource=SMC-Article-14209"
                         : "https://support.microsoft.com/en-au/windows/get-windows-media-player-81718e0d-cfce-25b1-aee3-94596b658287";
                 wxExecute("cmd /c start " + url, wxEXEC_HIDE_CONSOLE);
             }
@@ -345,7 +345,7 @@ void wxMediaCtrl2::Load(wxURI url)
     {
         wxRegKey key11(wxRegKey::HKCU, L"SOFTWARE\\Classes\\CLSID\\" CLSID_BAMBU_SOURCE L"\\InProcServer32");
         wxRegKey key12(wxRegKey::HKCR, L"CLSID\\" CLSID_BAMBU_SOURCE L"\\InProcServer32");
-        wxString path = key11.Exists() ? key11.QueryDefaultValue() 
+        wxString path = key11.Exists() ? key11.QueryDefaultValue()
                                        : key12.Exists() ? key12.QueryDefaultValue() : wxString{};
         wxRegKey key2(wxRegKey::HKCR, "bambu");
         wxString clsid;
@@ -428,14 +428,14 @@ void wxMediaCtrl2::Load(wxURI url)
 #ifdef __WXGTK3__
     GstElementFactory *factory;
     int hasplugins = 1;
-    
+
     factory = gst_element_factory_find("h264parse");
     if (!factory) {
         hasplugins = 0;
     } else {
         gst_object_unref(factory);
     }
-    
+
     factory = gst_element_factory_find("openh264dec");
     if (!factory) {
         factory = gst_element_factory_find("avdec_h264");
@@ -457,7 +457,7 @@ void wxMediaCtrl2::Load(wxURI url)
     } else {
         gst_object_unref(factory);
     }
-    
+
     if (!hasplugins) {
         CallAfter([] {
             wxMessageBox(_L("Your system is missing H.264 codecs for GStreamer, which are required to play video. (Try installing the gstreamer1.0-plugins-bad or gstreamer1.0-libav packages, then restart Orca Slicer?)"), _L("Error"), wxOK);
@@ -547,8 +547,9 @@ void wxMediaCtrl2::Stop()
     if (!m_imp)
         return;
 #endif
-    wxMediaCtrl::Stop();
-}
+    wxMediaCtrl::Stop(); }
+
+void wxMediaCtrl2::SetIdleImage(wxString const &image) {}
 
 wxMediaState wxMediaCtrl2::GetState()
 {
@@ -594,6 +595,13 @@ wxSize wxMediaCtrl2::GetVideoSize() const
 wxSize wxMediaCtrl2::DoGetBestSize() const
 {
     return {-1, -1};
+}
+
+void wxMediaCtrl2::DoSetSize(int x, int y, int width, int height, int sizeFlags)
+{
+    wxWindow::DoSetSize(x, y, width, height, sizeFlags);
+    if (sizeFlags & wxSIZE_USE_EXISTING) return;
+    wxMediaCtrl_OnSize(this, m_video_size, width, height);
 }
 
 #ifdef __WIN32__

@@ -75,7 +75,7 @@ if (SLIC3R_GUI)
         list(FILTER wxWidgets_LIBRARIES EXCLUDE REGEX expat)
         list(APPEND wxWidgets_LIBRARIES ${EXPAT_LIBRARIES})
     endif ()
-    
+
     # This is an issue in the new wxWidgets cmake build, doesn't deal with librt
     find_library(LIBRT rt)
     if(LIBRT)
@@ -277,6 +277,16 @@ if (WIN32)
 
 
 else ()
+    if (NOT APPLE)
+        set(output_sos_Release "")
+        set(output_sos_Debug "")
+        add_custom_target(BambuStudioSosCopy ALL DEPENDS BambuStudio)
+        if ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
+            bambustudio_copy_sos(BambuStudioSosCopy "Debug" "d" output_sos_Debug)
+        else()
+            bambustudio_copy_sos(BambuStudioSosCopy "Release" "" output_sos_Release)
+        endif()
+    endif()
     if (APPLE AND NOT CMAKE_MACOSX_BUNDLE)
         # On OSX, the name of the binary matches the name of the Application.
         add_custom_command(TARGET OrcaSlicer POST_BUILD
@@ -352,5 +362,9 @@ if (WIN32)
     install(FILES ${output_dlls_${build_type}} DESTINATION ".")
     install(DIRECTORY "${CMAKE_PREFIX_PATH}/libpython/" DESTINATION "python")
 else ()
+    if (APPLE)
+    else()
+        install(FILES ${output_sos_${build_type}} DESTINATION "${CMAKE_INSTALL_PREFIX}")
+    endif()
     install(TARGETS OrcaSlicer RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}" BUNDLE DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif ()
