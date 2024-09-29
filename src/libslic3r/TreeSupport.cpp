@@ -919,7 +919,8 @@ void TreeSupport::detect_overhangs(bool detect_first_sharp_tail_only)
 
                     // check cantilever
                     {
-                        auto cluster_boundary_ex = intersection_ex(poly, offset_ex(lower_layer->lslices, scale_(0.5)));
+                        // lower_layer_offset may be very small, so we need to do max and then add 0.1
+                        auto cluster_boundary_ex = intersection_ex(poly, offset_ex(lower_layer->lslices, scale_(std::max(extrusion_width,lower_layer_offset)+0.1)));
                         Polygons cluster_boundary = to_polygons(cluster_boundary_ex);
                         if (cluster_boundary.empty()) continue;
                         double dist_max = 0;
