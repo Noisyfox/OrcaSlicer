@@ -13,8 +13,10 @@
 #include <libnest2d/backends/libslic3r/geometries.hpp>
 
 #include <boost/log/trivial.hpp>
+#include <tbb/concurrent_unordered_set.h>
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
+#include <tbb/parallel_for_each.h>
 
 #define _L(s) Slic3r::I18N::translate(s)
 
@@ -882,8 +884,9 @@ void TreeSupport::detect_overhangs(bool detect_first_sharp_tail_only)
                 }
 
                 // normal overhang
+                SupportLayer* ts_layer = m_object->get_support_layer(layer_nr + m_raft_layers);
                 ExPolygons lower_layer_offseted = offset_ex(lower_polys, support_offset_scaled, SUPPORT_SURFACES_OFFSET_PARAMETERS);
-                ExPolygons overhang_areas = diff_ex(curr_polys, lower_layer_offseted);
+                ts_layer->overhang_areas = std::move(diff_ex(curr_polys, lower_layer_offseted));
 
                 if (is_auto(stype) && g_config_support_sharp_tails)
                 {
@@ -900,7 +903,7 @@ void TreeSupport::detect_overhangs(bool detect_first_sharp_tail_only)
                             ExPolygons overhang = diff_ex({ *expoly }, lower_polys);
                             layer->sharp_tails.push_back(*expoly);
                             layer->sharp_tails_height.insert({ expoly, layer->height });
-                            append(overhang_areas, overhang);
+                            append(ts_layer->overhang_areas, overhang);
 
                             if (!overhang.empty()) {
                                 has_sharp_tails = true;
@@ -913,31 +916,27 @@ void TreeSupport::detect_overhangs(bool detect_first_sharp_tail_only)
                     }
                 }
 
-                SupportLayer* ts_layer = m_object->get_support_layer(layer_nr + m_raft_layers);
-                for (ExPolygon& poly : overhang_areas) {
-                    ts_layer->overhang_areas.emplace_back(poly);
-
-                    // check cantilever
-                    {
-                        // lower_layer_offset may be very small, so we need to do max and then add 0.1
-                        auto cluster_boundary_ex = intersection_ex(poly, offset_ex(lower_layer->lslices, scale_(std::max(extrusion_width,lower_layer_offset)+0.1)));
-                        Polygons cluster_boundary = to_polygons(cluster_boundary_ex);
-                        if (cluster_boundary.empty()) continue;
-                        double dist_max = 0;
-                        for (auto& pt : poly.contour.points) {
-                            double dist_pt = std::numeric_limits<double>::max();
-                            for (auto& ply : cluster_boundary) {
-                                double d = ply.distance_to(pt);
-                                dist_pt = std::min(dist_pt, d);
-                            }
-                            dist_max = std::max(dist_max, dist_pt);
+                // check cantilever
+                // lower_layer_offset may be very small, so we need to do max and then add 0.1
+                lower_layer_offseted = offset_ex(lower_layer_offseted, scale_(std::max(extrusion_width - lower_layer_offset, 0.) + 0.1));
+                for (ExPolygon& poly : ts_layer->overhang_areas) {
+                    auto cluster_boundary_ex = intersection_ex(poly, lower_layer_offseted);
+                    Polygons cluster_boundary = to_polygons(cluster_boundary_ex);
+                    if (cluster_boundary.empty()) continue;
+                    double dist_max = 0;
+                    for (auto& pt : poly.contour.points) {
+                        double dist_pt = std::numeric_limits<double>::max();
+                        for (auto& ply : cluster_boundary) {
+                            double d = ply.distance_to(pt);
+                            dist_pt = std::min(dist_pt, d);
                         }
-                        if (dist_max > scale_(3)) {  // is cantilever if the farmost point is larger than 3mm away from base                            
-                            max_cantilever_dist = std::max(max_cantilever_dist, dist_max);
-                            layer->cantilevers.emplace_back(poly);
-                            BOOST_LOG_TRIVIAL(debug) << "found a cantilever cluster. layer_nr=" << layer_nr << dist_max;
-                            has_cantilever = true;
-                        }
+                        dist_max = std::max(dist_max, dist_pt);
+                    }
+                    if (dist_max > scale_(3)) {  // is cantilever if the farmost point is larger than 3mm away from base                            
+                        max_cantilever_dist = std::max(max_cantilever_dist, dist_max);
+                        layer->cantilevers.emplace_back(poly);
+                        BOOST_LOG_TRIVIAL(debug) << "found a cantilever cluster. layer_nr=" << layer_nr << dist_max;
+                        has_cantilever = true;
                     }
                 }
             }
@@ -1031,19 +1030,6 @@ void TreeSupport::detect_overhangs(bool detect_first_sharp_tail_only)
             }          
         }
     }
-    
-    // group overhang clusters
-    for (size_t layer_nr = 0; layer_nr < m_object->layer_count(); layer_nr++) {
-        if (m_object->print()->canceled())
-            break;
-        SupportLayer* ts_layer = m_object->get_support_layer(layer_nr + m_raft_layers);
-        Layer* layer = m_object->get_layer(layer_nr);
-        for (auto& overhang : ts_layer->overhang_areas) {
-            OverhangCluster* cluster = find_and_insert_cluster(overhangClusters, overhang, layer_nr, extrusion_width_scaled);
-            if (overlaps({ overhang },layer->cantilevers))
-                cluster->is_cantilever = true;
-        }
-    }
 
     auto enforcers = m_object->slice_support_enforcers();
     auto blockers  = m_object->slice_support_blockers();
@@ -1052,6 +1038,18 @@ void TreeSupport::detect_overhangs(bool detect_first_sharp_tail_only)
     if (is_auto(stype) && config_remove_small_overhangs) {
         if (blockers.size() < m_object->layer_count())
             blockers.resize(m_object->layer_count());
+        // group overhang clusters
+        for (size_t layer_nr = 0; layer_nr < m_object->layer_count(); layer_nr++) {
+            if (m_object->print()->canceled())
+                break;
+            SupportLayer* ts_layer = m_object->get_support_layer(layer_nr + m_raft_layers);
+            Layer* layer = m_object->get_layer(layer_nr);
+            for (auto& overhang : ts_layer->overhang_areas) {
+                OverhangCluster* cluster = find_and_insert_cluster(overhangClusters, overhang, layer_nr, extrusion_width_scaled);
+                if (overlaps({ overhang },layer->cantilevers))
+                    cluster->is_cantilever = true;
+            }
+        }
         for (auto& cluster : overhangClusters) {
             // 3. check whether the small overhang is sharp tail
             cluster.is_sharp_tail = false;
@@ -1979,6 +1977,13 @@ coordf_t TreeSupport::calc_branch_radius(coordf_t base_radius, coordf_t mm_to_to
     return radius;
 }
 
+coordf_t TreeSupport::get_radius(const Node* node, coordf_t base_radius, double diameter_angle_scale_factor)
+{
+    if (node->radius == 0)
+        node->radius = calc_branch_radius(base_radius, node->dist_mm_to_top, diameter_angle_scale_factor);
+    return node->radius;
+}
+
 template<typename RegionType> // RegionType could be ExPolygons or Polygons
 ExPolygons avoid_object_remove_extra_small_parts(ExPolygons &expolys, const RegionType&avoid_region) {
     ExPolygons expolys_out;
@@ -2582,14 +2587,10 @@ void TreeSupport::drop_nodes(std::vector<std::vector<Node*>>& contact_nodes)
     const auto nozzle_diameter = m_object->print()->config().nozzle_diameter.get_at(m_object->config().support_interface_filament-1);
     const auto support_line_width = config.support_line_width.get_abs_value(nozzle_diameter);
 
-    auto get_branch_angle = [this,&config](coordf_t radius) {
-        if (config.tree_support_branch_angle.value < 30.0) return config.tree_support_branch_angle.value;
-        return (radius - MIN_BRANCH_RADIUS) / (MAX_BRANCH_RADIUS - MIN_BRANCH_RADIUS) * (config.tree_support_branch_angle.value - 30.0) + 30.0;
-    };
     auto get_max_move_dist = [this, &config, branch_radius, tip_layers, diameter_angle_scale_factor, wall_count, support_extrusion_width, support_line_width](const Node *node, int power = 1) {
         double move_dist = node->max_move_dist;
         if (node->max_move_dist == 0) {
-            if (node->radius == 0) node->radius = calc_branch_radius(branch_radius, node->dist_mm_to_top, diameter_angle_scale_factor);
+            node->radius = get_radius(node, branch_radius, diameter_angle_scale_factor);
             double angle = config.tree_support_branch_angle.value;
             if (angle > 30.0 && node->radius > MIN_BRANCH_RADIUS)
                 angle = (node->radius - MIN_BRANCH_RADIUS) / (MAX_BRANCH_RADIUS - MIN_BRANCH_RADIUS) * (config.tree_support_branch_angle.value - 30.0) + 30.0;
@@ -2607,30 +2608,25 @@ void TreeSupport::drop_nodes(std::vector<std::vector<Node*>>& contact_nodes)
     std::vector<LayerHeightData> &layer_heights = m_ts_data->layer_heights;
     if (layer_heights.empty()) return;
 
-    std::unordered_set<Node*> to_free_node_set;
-    m_spanning_trees.resize(contact_nodes.size());
-    //m_mst_line_x_layer_contour_caches.resize(contact_nodes.size());
-
-    if (0)
-    {// get outlines below and avoidance area using tbb
-     // This part only takes very little time, so we disable it.
+    // precalculate avoidance of all possible radii.
+    // This will cause computing more (radius, layer_nr) pairs, but it's worth to do so since we are doning this in parallel.
+    if (1) {
         typedef std::chrono::high_resolution_clock clock_;
         typedef std::chrono::duration<double, std::ratio<1> > second_;
         std::chrono::time_point<clock_> t0{ clock_::now() };
 
         // get all the possible radiis
-        std::vector<std::set<coordf_t> > all_layer_radius(m_highest_overhang_layer+1);
-        std::vector<std::set<coordf_t>> all_layer_node_dist(m_highest_overhang_layer + 1);
-        for (size_t layer_nr = m_highest_overhang_layer; layer_nr > 0; layer_nr--)
-        {
+        std::vector<std::set<coordf_t> > all_layer_radius(contact_nodes.size());
+        std::vector<std::set<coordf_t>> all_layer_node_dist(contact_nodes.size());
+        for (size_t layer_nr = contact_nodes.size() - 1; layer_nr > 0; layer_nr--) {
             if (layer_heights[layer_nr].height < EPSILON) continue;
             auto& layer_radius = all_layer_radius[layer_nr];
             auto& layer_node_dist = all_layer_node_dist[layer_nr];
-            for (Node *p_node : contact_nodes[layer_nr]) {
+            for (auto* p_node : contact_nodes[layer_nr]) {
                 layer_node_dist.emplace(p_node->dist_mm_to_top);
             }
             size_t layer_nr_next = layer_heights[layer_nr].next_layer_nr;
-            if (layer_nr_next <= m_highest_overhang_layer && layer_nr_next>0) {
+            if (layer_nr_next <= contact_nodes.size() - 1 && layer_nr_next > 0) {
                 for (auto node_dist : layer_node_dist)
                     all_layer_node_dist[layer_nr_next].emplace(node_dist + layer_heights[layer_nr].height);
             }
@@ -2639,21 +2635,23 @@ void TreeSupport::drop_nodes(std::vector<std::vector<Node*>>& contact_nodes)
             }
         }
         // parallel pre-compute avoidance
-        //tbb::parallel_for(tbb::blocked_range<size_t>(1, m_highest_overhang_layer), [&](const tbb::blocked_range<size_t> &range) {
-            //for (size_t layer_nr = range.begin(); layer_nr < range.end(); layer_nr++) {
-            for (size_t layer_nr = 0; layer_nr < all_layer_radius.size(); layer_nr++) {
-                BOOST_LOG_TRIVIAL(debug) << "pre calculate_avoidance layer=" << layer_nr;
-                for (auto node_radius : all_layer_radius[layer_nr]) {
-                    m_ts_data->get_avoidance(0, layer_nr);
-                    m_ts_data->get_avoidance(node_radius, layer_nr);
-                }
+        tbb::parallel_for(tbb::blocked_range<size_t>(0, contact_nodes.size() - 1), [&](const tbb::blocked_range<size_t> &range) {
+            for (size_t layer_nr = range.begin(); layer_nr < range.end(); layer_nr++) {
+            for (auto node_radius : all_layer_radius[layer_nr]) {
+                m_ts_data->get_avoidance(node_radius, layer_nr);
+                m_ts_data->get_collision(m_ts_data->m_xy_distance, layer_nr);
             }
-        //});
+        }
+        });
 
         double duration{ std::chrono::duration_cast<second_>(clock_::now() - t0).count() };
-        BOOST_LOG_TRIVIAL(debug) << "before m_avoidance_cache.size()=" << m_ts_data->m_avoidance_cache.size()
+        BOOST_LOG_TRIVIAL(debug) << "finish pre calculate_avoidance. before m_avoidance_cache.size()=" << m_ts_data->m_avoidance_cache.size()
             << ", takes " << duration << " secs.";
     }
+
+    std::unordered_set<Node*> to_free_node_set;
+    m_spanning_trees.resize(contact_nodes.size());
+    //m_mst_line_x_layer_contour_caches.resize(contact_nodes.size());
 
     for (size_t layer_nr = contact_nodes.size() - 1; layer_nr > 0; layer_nr--) // Skip layer 0, since we can't drop down the vertices there.
     {
@@ -2675,7 +2673,7 @@ void TreeSupport::drop_nodes(std::vector<std::vector<Node*>>& contact_nodes)
 
         Polygons layer_contours = m_ts_data->get_contours_with_holes(layer_nr);
         //std::unordered_map<Line, bool, LineHash>& mst_line_x_layer_contour_cache = m_mst_line_x_layer_contour_caches[layer_nr];
-        std::unordered_map<Line, bool, LineHash> mst_line_x_layer_contour_cache;
+        tbb::concurrent_unordered_map<Line, bool, LineHash> mst_line_x_layer_contour_cache;
         auto is_line_cut_by_contour = [&mst_line_x_layer_contour_cache,&layer_contours](Point a, Point b)
         {
             auto iter = mst_line_x_layer_contour_cache.find({ a, b });
@@ -2697,7 +2695,7 @@ void TreeSupport::drop_nodes(std::vector<std::vector<Node*>>& contact_nodes)
         };
 
         //Group together all nodes for each part.
-        const ExPolygons& parts = m_ts_data->get_avoidance(0, layer_nr);
+        const ExPolygons& parts = m_ts_data->m_layer_outlines_below[layer_nr];
         std::vector<std::unordered_map<Point, Node*, PointHash>> nodes_per_part(1 + parts.size()); //All nodes that aren't inside a part get grouped together in the 0th part.
         for (Node* p_node : layer_contact_nodes)
         {
