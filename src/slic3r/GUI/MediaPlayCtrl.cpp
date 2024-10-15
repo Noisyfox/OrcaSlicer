@@ -39,7 +39,7 @@ static std::map<int, std::string> error_messages = {
 namespace Slic3r {
 namespace GUI {
 
-MediaPlayCtrl::MediaPlayCtrl(wxWindow *parent, wxMediaCtrl2 *media_ctrl, const wxPoint &pos, const wxSize &size)
+MediaPlayCtrl::MediaPlayCtrl(wxWindow *parent, wxMediaCtrl3 *media_ctrl, const wxPoint &pos, const wxSize &size)
     : wxPanel(parent, wxID_ANY, pos, size)
     , m_media_ctrl(media_ctrl)
 {
@@ -181,13 +181,6 @@ void MediaPlayCtrl::SetMachineObject(MachineObject* obj)
     if (machine == m_machine) {
         if (m_last_state == MEDIASTATE_IDLE && IsEnabled())
             Play();
-        else if (m_last_state == MEDIASTATE_LOADING && m_tutk_state == "disable"
-                && m_last_user_play + wxTimeSpan::Seconds(3) < wxDateTime::Now()) {
-            // resend ttcode to printer
-            if (auto agent = wxGetApp().getAgent())
-                agent->get_camera_url(machine, [](auto) {}, wxGetApp().get_printer_cloud_provider());
-            m_last_user_play = wxDateTime::Now();
-        }
         return;
     }
     m_machine = machine;
