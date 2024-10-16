@@ -2,6 +2,8 @@
 #include "libslic3r/Time.hpp"
 #include "I18N.hpp"
 #include "libslic3r/Utils.hpp"
+#include <wx/log.h>
+#include <wx/msgdlg.h>
 #include "LinuxDisplayBackend.hpp"
 #include <boost/filesystem/operations.hpp>
 #include <string>
