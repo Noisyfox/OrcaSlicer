@@ -94,6 +94,8 @@ struct PlateData
     bool            toolpath_outside {false};
     bool            is_label_object_enabled {false};
     int             timelapse_warning_code = 0; // 1<<0 sprial vase, 1<<1 by object
+    using LayerFilaments = std::unordered_map<std::vector<unsigned int>, std::vector<std::pair<int, int>>, GCodeProcessorResult::FilamentSequenceHash>;
+    LayerFilaments layer_filaments;
 
     std::vector<GCodeProcessorResult::SliceWarning> warnings;
 
