@@ -1984,7 +1984,7 @@ void PrintObject::discover_vertical_shells()
     } // for each region
 } // void PrintObject::discover_vertical_shells()
 
-// #define DEBUG_BRIDGE_OVER_INFILL
+#define DEBUG_BRIDGE_OVER_INFILL
 #ifdef DEBUG_BRIDGE_OVER_INFILL
 template<typename T> void debug_draw(std::string name, const T& a, const T& b, const T& c, const T& d)
 {
@@ -1994,7 +1994,7 @@ template<typename T> void debug_draw(std::string name, const T& a, const T& b, c
     bbox.merge(get_extents(c));
     bbox.merge(get_extents(d));
     bbox.offset(scale_(1.));
-    ::Slic3r::SVG svg(debug_out_path(name.c_str()).c_str(), bbox);   
+    ::Slic3r::SVG svg(debug_out_path("%s.svg", name.c_str()).c_str(), bbox);   
     svg.draw(a, colors[0], scale_(0.3));
     svg.draw(b, colors[1], scale_(0.23));
     svg.draw(c, colors[2], scale_(0.16));
@@ -2039,9 +2039,15 @@ void PrintObject::bridge_over_infill()
     }
 
     // SECTION to gather and filter surfaces for expanding, and then cluster them by layer
+    // Orca:
+    // Don't filter small internal unsupported areas if the user has requested so.
+    double expansion_multiplier = 3;
+    if(this->config().dont_filter_internal_bridges.value != ibfDisabled){
+        expansion_multiplier = 1;
+    }
     {
         tbb::concurrent_vector<CandidateSurface> candidate_surfaces;
-        tbb::parallel_for(tbb::blocked_range<size_t>(0, this->layers().size()), [po = static_cast<const PrintObject *>(this), &candidate_surfaces, has_lightning_infill](tbb::blocked_range<size_t> r) {
+        tbb::parallel_for(tbb::blocked_range<size_t>(0, this->layers().size()), [po = static_cast<const PrintObject *>(this), &candidate_surfaces, has_lightning_infill, expansion_multiplier](tbb::blocked_range<size_t> r) {
             PRINT_OBJECT_TIME_LIMIT_MILLIS(PRINT_OBJECT_TIME_LIMIT_DEFAULT);
             for (size_t lidx = r.begin(); lidx < r.end(); lidx++) {
                 const Layer *layer = po->get_layer(lidx);
@@ -2065,12 +2071,6 @@ void PrintObject::bridge_over_infill()
                 }
                 unsupported_area = closing(unsupported_area, float(SCALED_EPSILON));
                 
-                // Orca:
-                // Don't filter small internal unsupported areas if the user has requested so.
-                double expansion_multiplier = 3;
-                if(po->config().dont_filter_internal_bridges.value !=ibfDisabled){
-                    expansion_multiplier = 1;
-                }
                 // By expanding the lower layer solids, we avoid making bridges from the tiny internal overhangs that are (very likely) supported by previous layer solids
                 // NOTE that we cannot filter out polygons worth bridging by their area, because sometimes there is a very small internal island that will grow into large hole
                 lower_layer_solids = shrink(lower_layer_solids, 1 * spacing); // first remove thin regions that will not support anything
@@ -2088,8 +2088,20 @@ void PrintObject::bridge_over_infill()
                         // skip the filtering
                         if (po->config().dont_filter_internal_bridges.value == ibfNofilter){
                             // expand the unsupported area by 4x spacing to trigger internal bridging
-                            unsupported = expand(unsupported, 4 * spacing);
-                            candidate_surfaces.push_back(CandidateSurface(s, lidx, unsupported, region, 0));
+                            Polygons worth_bridging = expand(unsupported, 4 * spacing);
+                            candidate_surfaces.push_back(CandidateSurface(s, lidx, worth_bridging, region, 0));
+                                
+#ifdef DEBUG_BRIDGE_OVER_INFILL
+                            debug_draw(std::to_string(lidx) + "_candidate_surface_" + std::to_string(area(s->expolygon)),
+                                       to_lines(region->layer()->lslices), to_lines(s->expolygon), to_lines(worth_bridging),
+                                       to_lines(unsupported_area));
+#endif
+#ifdef DEBUG_BRIDGE_OVER_INFILL
+                            debug_draw(std::to_string(lidx) + "_candidate_processing_" + std::to_string(area(unsupported)),
+                                       to_lines(unsupported), to_lines(expand(unsupported, 4 * spacing)),
+                                       {},
+                                       to_lines(unsupported_area));
+#endif
                         }else{
                             // The following flag marks those surfaces, which overlap with unuspported area, but at least part of them is supported.
                             // These regions can be filtered by area, because they for sure are touching solids on lower layers, and it does not make sense to bridge their tiny overhangs
@@ -2605,7 +2617,8 @@ void PrintObject::bridge_over_infill()
                                                                                            &clustered_layers_for_threads,
                                                                                            gather_areas_w_depth, &infill_lines,
                                                                                            determine_bridging_angle,
-                                                                                           construct_anchored_polygon](
+                                                                                           construct_anchored_polygon,
+                                                                                           expansion_multiplier](
                                                                                               tbb::blocked_range<size_t> r) {
         PRINT_OBJECT_TIME_LIMIT_MILLIS(PRINT_OBJECT_TIME_LIMIT_DEFAULT);
         for (size_t cluster_idx = r.begin(); cluster_idx < r.end(); cluster_idx++) {
@@ -2690,11 +2703,14 @@ void PrintObject::bridge_over_infill()
                 expansion_area    = closing(expansion_area, float(SCALED_EPSILON));
                 expansion_area    = intersection(expansion_area, deep_infill_area);
                 Polylines anchors = intersection_pl(infill_lines[lidx - 1], shrink(expansion_area, spacing));
-                Polygons internal_unsupported_area = shrink(deep_infill_area, spacing * 4.5);
+                Polygons internal_unsupported_area = shrink(deep_infill_area, spacing * (expansion_multiplier + 1.5));
 
 #ifdef DEBUG_BRIDGE_OVER_INFILL
                 debug_draw(std::to_string(lidx) + "_" + std::to_string(cluster_idx) + "_" + std::to_string(job_idx) + "_" + "_total_area",
                            to_lines(total_fill_area), to_lines(expansion_area), to_lines(deep_infill_area), to_lines(anchors));
+                debug_draw(std::to_string(lidx) + "_" + std::to_string(cluster_idx) + "_" + std::to_string(job_idx) + "_" + "_total_area_2",
+                           to_lines(deep_infill_area), to_lines(internal_unsupported_area),
+                           to_lines(shrink(deep_infill_area, spacing * 2.5)), to_lines(shrink(deep_infill_area, spacing * 1.5)));
 #endif
 
                 std::vector<CandidateSurface> expanded_surfaces;
@@ -2848,10 +2864,10 @@ void PrintObject::bridge_over_infill()
                 }
 
 #ifdef DEBUG_BRIDGE_OVER_INFILL
-                debug_draw("Aensuring_" + std::to_string(reinterpret_cast<uint64_t>(&region)), to_polylines(additional_ensuring),
+                debug_draw(std::to_string(lidx) + "_ensuring_" + std::to_string(reinterpret_cast<uint64_t>(&region)), to_polylines(additional_ensuring),
                            to_polylines(near_perimeters), to_polylines(to_polygons(internal_infills)),
                            to_polylines(to_polygons(internal_solids)));
-                debug_draw("Aensuring_" + std::to_string(reinterpret_cast<uint64_t>(&region)) + "_new", to_polylines(additional_ensuring),
+                debug_draw(std::to_string(lidx) + "_ensuring_" + std::to_string(reinterpret_cast<uint64_t>(&region)) + "_new", to_polylines(additional_ensuring),
                            to_polylines(near_perimeters), to_polylines(to_polygons(new_internal_infills)),
                            to_polylines(to_polygons(new_internal_solids)));
 #endif
