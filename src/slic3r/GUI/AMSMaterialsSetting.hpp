@@ -71,7 +71,7 @@ public:
     StaticBox* m_def_color_box;
     wxFlexGridSizer* m_ams_fg_sizer;
     wxColour m_def_col;
-    std::vector<wxColour> m_def_colors;
+    std::vector<std::pair<wxString, wxColour>> m_def_colors;
     std::vector<wxColour> m_ams_colors;
     std::vector<ColorPicker*> m_color_pickers;
     std::vector<ColorPicker*> m_ams_color_pickers;

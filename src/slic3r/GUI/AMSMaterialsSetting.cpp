@@ -1326,30 +1326,32 @@ ColorPickerPopup::ColorPickerPopup(wxWindow* parent)
     :PopupWindow(parent, wxBORDER_NONE)
 {
     m_def_colors.clear();
-    m_def_colors.push_back(wxColour(0xFFFFFF));
-    m_def_colors.push_back(wxColour(0xfff144));
-    m_def_colors.push_back(wxColour(0xDCF478));
-    m_def_colors.push_back(wxColour(0x0ACC38));
-    m_def_colors.push_back(wxColour(0x057748));
-    m_def_colors.push_back(wxColour(0x0d6284));
-    m_def_colors.push_back(wxColour(0x0EE2A0));
-    m_def_colors.push_back(wxColour(0x76D9F4));
-    m_def_colors.push_back(wxColour(0x46a8f9));
-    m_def_colors.push_back(wxColour(0x2850E0));
-    m_def_colors.push_back(wxColour(0x443089));
-    m_def_colors.push_back(wxColour(0xA03CF7));
-    m_def_colors.push_back(wxColour(0xF330F9));
-    m_def_colors.push_back(wxColour(0xD4B1DD));
-    m_def_colors.push_back(wxColour(0xf95d73));
-    m_def_colors.push_back(wxColour(0xf72323));
-    m_def_colors.push_back(wxColour(0x7c4b00));
-    m_def_colors.push_back(wxColour(0xf98c36));
-    m_def_colors.push_back(wxColour(0xfcecd6));
-    m_def_colors.push_back(wxColour(0xD3C5A3));
-    m_def_colors.push_back(wxColour(0xAF7933));
-    m_def_colors.push_back(wxColour(0x898989));
-    m_def_colors.push_back(wxColour(0xBCBCBC));
-    m_def_colors.push_back(wxColour(0x161616));
+    m_def_colors.emplace_back(_L("White"), wxColour("#FFFFFF"));
+    m_def_colors.emplace_back(_L("Yellow"), wxColour("#fff144"));
+    m_def_colors.emplace_back(_L(""), wxColour("#DCF478"));
+    m_def_colors.emplace_back(_L("Green"), wxColour("#0ACC38"));
+    m_def_colors.emplace_back(_L(""), wxColour("#057748"));
+    m_def_colors.emplace_back(_L(""), wxColour("#0d6284"));
+    m_def_colors.emplace_back(_L(""), wxColour("#0EE2A0"));
+    m_def_colors.emplace_back(_L(""), wxColour("#76D9F4"));
+
+    m_def_colors.emplace_back(_L(""), wxColour("#46a8f9"));
+    m_def_colors.emplace_back(_L("Blue"), wxColour("#2850E0"));
+    m_def_colors.emplace_back(_L("Indigo"), wxColour("#443089"));
+    m_def_colors.emplace_back(_L("Purple"), wxColour("#A03CF7"));
+    m_def_colors.emplace_back(_L("Magenta"), wxColour("#F330F9"));
+    m_def_colors.emplace_back(_L(""), wxColour("#D4B1DD"));
+    m_def_colors.emplace_back(_L(""), wxColour("#f95d73"));
+    m_def_colors.emplace_back(_L("Red"), wxColour("#f72323"));
+
+    m_def_colors.emplace_back(_L(""), wxColour("#7c4b00"));
+    m_def_colors.emplace_back(_L("Orange"), wxColour("#f98c36"));
+    m_def_colors.emplace_back(_L(""), wxColour("#fcecd6"));
+    m_def_colors.emplace_back(_L(""), wxColour("#D3C5A3"));
+    m_def_colors.emplace_back(_L(""), wxColour("#AF7933"));
+    m_def_colors.emplace_back(_L("Gray"), wxColour("#898989"));
+    m_def_colors.emplace_back(_L("Light Gray"), wxColour("#BCBCBC"));
+    m_def_colors.emplace_back(_L("Black"), wxColour("#161616"));
 
 
     SetBackgroundColour(wxColour(*wxWHITE));
@@ -1386,9 +1388,10 @@ ColorPickerPopup::ColorPickerPopup(wxWindow* parent)
     fg_sizer->SetNonFlexibleGrowMode(wxFLEX_GROWMODE_SPECIFIED);
 
 
-    for (wxColour col : m_def_colors) {
+    for (const auto& col : m_def_colors) {
         auto cp = new ColorPicker(m_def_color_box, wxID_ANY, wxDefaultPosition, wxDefaultSize);
-        cp->set_color(col);
+        cp->SetToolTip(col.first);
+        cp->set_color(col.second);
         cp->set_selected(false);
         cp->SetBackgroundColour(StateColor::darkModeColorFor(wxColour(238,238,238)));
         m_color_pickers.push_back(cp);
