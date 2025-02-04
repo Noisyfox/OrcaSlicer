@@ -19,9 +19,9 @@
     // #define BRIM_DEBUG_TO_SVG
 #endif
 
-#if defined(BRIM_DEBUG_TO_SVG)
+//#if defined(BRIM_DEBUG_TO_SVG)
     #include "SVG.hpp"
-#endif
+//#endif
 
 namespace Slic3r {
 
@@ -1607,9 +1607,54 @@ Polygons tryExPolygonOffset(const ExPolygons islandAreaEx, const Print& print)
 }
 //BBS: a function creates the ExtrusionEntityCollection from the brim area defined by ExPolygons
 ExtrusionEntityCollection makeBrimInfill(const ExPolygons& singleBrimArea, const Print& print, const Polygons& islands_area) {
+
+    {
+        BoundingBox bbox_svg;
+        bbox_svg.merge(get_extents(singleBrimArea));
+        {
+            SVG svg(debug_out_path("brim_0_input.svg"), bbox_svg);
+            svg.draw(to_polylines(singleBrimArea), "blue");
+            svg.Close();
+        }
+    }
+
     Polygons        loops = tryExPolygonOffset(singleBrimArea, print);
+    {
+        BoundingBox bbox_svg;
+        bbox_svg.merge(get_extents(singleBrimArea));
+        {
+            int i = 0;
+            for (const auto& loop : loops) {
+                SVG svg(debug_out_path("brim_1_loop_%d.svg", i), bbox_svg);
+                if (loop.is_counter_clockwise()) {
+                    svg.draw(to_polyline(loop), "blue");
+                } else {
+                    svg.draw(to_polyline(loop), "red");
+                }
+                svg.Close();
+                i++;
+            }
+        }
+    }
     Flow  flow = print.brim_flow();
     loops = union_pt_chained_outside_in(loops);
+    {
+        BoundingBox bbox_svg;
+        bbox_svg.merge(get_extents(singleBrimArea));
+        {
+            int i = 0;
+            for (const auto& loop : loops) {
+                SVG svg(debug_out_path("brim_2_chainedloop_%d.svg", i), bbox_svg);
+                if (loop.is_counter_clockwise()) {
+                    svg.draw(to_polyline(loop), "blue");
+                } else {
+                    svg.draw(to_polyline(loop), "red");
+                }
+                svg.Close();
+                i++;
+            }
+        }
+    }
 
     std::vector<Polylines> loops_pl_by_levels;
     {
