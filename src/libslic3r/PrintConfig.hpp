@@ -997,6 +997,8 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionInt, top_shell_layers))
     ((ConfigOptionFloat, top_shell_thickness))
     ((ConfigOptionFloat, top_surface_speed))
+    ((ConfigOptionInt, top_color_penetration_layers))
+    ((ConfigOptionInt, bottom_color_penetration_layers))
     //BBS
     ((ConfigOptionBool,                 enable_overhang_speed))
     ((ConfigOptionFloatOrPercent,       overhang_1_4_speed))
