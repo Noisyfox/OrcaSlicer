@@ -348,7 +348,7 @@ static ExPolygons outer_inner_brim_area(const Print& print,
         for (const auto& objectWithExtruder : objPrintVec) {
             const PrintObject* object = print.get_object(objectWithExtruder.first);
             const BrimType     brim_type = object->config().brim_type.value;
-            float              brim_offset = scale_(object->config().brim_object_gap.value);
+            const float        brim_offset = scale_(object->config().brim_object_gap.value);
             double             flowWidth = print.brim_flow().scaled_spacing() * SCALING_FACTOR;
             float              brim_width = scale_(floor(object->config().brim_width.value / flowWidth / 2) * flowWidth * 2);
             const float        scaled_flow_width = print.brim_flow().scaled_spacing();
@@ -361,6 +361,8 @@ static ExPolygons outer_inner_brim_area(const Print& print,
             const bool         has_outer_brim = brim_type == btOuterOnly || brim_type == btOuterAndInner || brim_type == btAutoBrim || use_auto_brim_ears || use_brim_ears;
             coord_t            ear_detection_length = scale_(object->config().brim_ears_detection_length.value);
             coordf_t           brim_ears_max_angle = object->config().brim_ears_max_angle.value;
+
+            const auto         objectIsland = offset_ex(object->layers().front()->lslices, brim_offset, jtRound, SCALED_RESOLUTION);
 
             ExPolygons         brim_area_object;
             ExPolygons         no_brim_area_object;
@@ -453,7 +455,6 @@ static ExPolygons outer_inner_brim_area(const Print& print,
                         // append(holes_object, ex_poly_holes_reversed);
                     }
                 }
-                auto objectIsland = offset_ex(object->layers().front()->lslices, brim_offset, jtRound, SCALED_RESOLUTION);
                 append(no_brim_area_object, objectIsland);
 
                 brimToWrite.at(object->id()).obj = false;
