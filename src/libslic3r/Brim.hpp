@@ -21,9 +21,6 @@ void make_brim(const Print& print, PrintTryCancel try_cancel,
     std::vector<std::pair<ObjectID, unsigned int>>& objPrintVec,
     std::vector<unsigned int>& printExtruders);
 
-// BBS: automatically make brim
-ExtrusionEntityCollection make_brim_auto(const Print &print, PrintTryCancel try_cancel, Polygons &islands_area);
-
 } // Slic3r
 
 #endif // slic3r_Brim_hpp_
