@@ -282,7 +282,7 @@ static ExPolygons make_brim_ears_auto(const ExPolygons& obj_expoly, coord_t size
     return mouse_ears_ex;
 }
 
-static ExPolygons make_brim_ears(const PrintObject* object, const double& flowWidth, float brim_offset, Flow &flow, bool is_outer_brim)
+static ExPolygons make_brim_ears(const Polygons& contour, const PrintObject* object, const double& flowWidth, float brim_offset, Flow &flow, bool is_outer_brim)
 {
     ExPolygons mouse_ears_ex;
     BrimPoints brim_ear_points = object->model_object()->brim_points;
@@ -296,6 +296,14 @@ static ExPolygons make_brim_ears(const PrintObject* object, const double& flowWi
     for (auto &pt : brim_ear_points) {
         Vec3f world_pos = pt.transform(trsf.get_matrix());
         if ( world_pos.z() > 0) continue;
+        const Vec3f pos = pt.transform(model_trsf);
+        const Point center(scale_(pos.x()), scale_(pos.y()));
+
+        const bool is_inner_brim = contains(contour, center, true);
+        if (is_inner_brim == is_outer_brim) {
+            continue;
+        }
+
         Polygon point_round;
         float brim_width = floor(scale_(pt.head_front_radius) / flowWidth / 2) * flowWidth * 2;
         if (is_outer_brim) {
@@ -309,10 +317,7 @@ static ExPolygons make_brim_ears(const PrintObject* object, const double& flowWi
         }
         mouse_ears_ex.emplace_back();
         mouse_ears_ex.back().contour = point_round;
-        Vec3f pos = pt.transform(model_trsf);
-        int32_t pt_x = scale_(pos.x());
-        int32_t pt_y = scale_(pos.y());
-        mouse_ears_ex.back().contour.translate(Point(pt_x, pt_y));
+        mouse_ears_ex.back().contour.translate(center);
     }
     return mouse_ears_ex;
 }
@@ -418,12 +423,17 @@ static ExPolygons outer_inner_brim_area(const Print& print,
                         Polygons ex_poly_holes_reversed = ex_poly.holes;
                         polygons_reverse(ex_poly_holes_reversed);
 
+                        // Polygon to determine which brim ear point is part of inner brim or not
+                        Polygons ex_poly_contour_filter;
+                        if (use_brim_ears) {
+                            ex_poly_contour_filter = offset(ex_poly.contour, -no_brim_offset);
+                        }
                         if (has_outer_brim) {
                             // BBS: inner and outer boundary are offset from the same polygon incase of round off error.
                             auto innerExpoly = offset_ex(ex_poly.contour, brim_offset, jtRound, SCALED_RESOLUTION);
                             ExPolygons outerExpoly;
                             if (use_brim_ears) {
-                                outerExpoly = make_brim_ears(object, flowWidth, brim_offset, flow, true);
+                                outerExpoly = make_brim_ears(ex_poly_contour_filter, object, flowWidth, brim_offset, flow, true);
                                 //outerExpoly = offset_ex(outerExpoly, brim_width_mod, jtRound, SCALED_RESOLUTION);
                             } else if (use_auto_brim_ears) {
                                 coord_t size_ear = (brim_width_mod - brim_offset - flow.scaled_spacing());
@@ -437,7 +447,7 @@ static ExPolygons outer_inner_brim_area(const Print& print,
                             ExPolygons outerExpoly;
                             auto innerExpoly = offset_ex(ex_poly_holes_reversed, -brim_width - brim_offset);
                             if (use_brim_ears) {
-                                outerExpoly = make_brim_ears(object, flowWidth, brim_offset, flow, false);
+                                outerExpoly = make_brim_ears(ex_poly_contour_filter, object, flowWidth, brim_offset, flow, false);
                             } else if (use_auto_brim_ears) {
                                 coord_t size_ear = (brim_width - brim_offset - flow.scaled_spacing());
                                 outerExpoly = make_brim_ears_auto(offset_ex(ex_poly_holes_reversed, -brim_offset), size_ear, ear_detection_length, brim_ears_max_angle, false);
