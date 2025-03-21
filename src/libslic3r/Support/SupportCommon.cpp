@@ -1507,10 +1507,11 @@ void generate_support_toolpaths(
     // Insert the raft base layers.
     auto n_raft_layers = std::min<size_t>(support_layers.size(), std::max(0, int(slicing_params.raft_layers()) - 1));
 
-    tbb::parallel_for(tbb::blocked_range<size_t>(0, n_raft_layers),
+    /*tbb::parallel_for(tbb::blocked_range<size_t>(0, n_raft_layers),
         [&support_layers, &raft_layers, &intermediate_layers, &config, &support_params, &slicing_params,
             &bbox_object, link_max_length_factor]
-            (const tbb::blocked_range<size_t>& range) {
+            (const tbb::blocked_range<size_t>& range)*/ {
+    tbb::blocked_range<size_t> range(0, n_raft_layers);
         for (size_t support_layer_id = range.begin(); support_layer_id < range.end(); ++ support_layer_id)
         {
             assert(support_layer_id < raft_layers.size());
@@ -1590,7 +1591,7 @@ void generate_support_toolpaths(
                 // sheath at first layer
                 support_params, support_layer_id == 0, support_layer_id == 0);
         }
-    });
+    }//);
 
     struct LayerCacheItem {
         LayerCacheItem(SupportGeneratorLayerExtruded *layer_extruded = nullptr) : layer_extruded(layer_extruded) {}
@@ -1615,10 +1616,11 @@ void generate_support_toolpaths(
     };
     std::vector<LayerCache>             layer_caches(support_layers.size());
 
-    tbb::parallel_for(tbb::blocked_range<size_t>(n_raft_layers, support_layers.size()),
+    /*tbb::parallel_for(tbb::blocked_range<size_t>(n_raft_layers, support_layers.size()),
         [&config, &slicing_params, &support_params, &support_layers, &bottom_contacts, &top_contacts, &intermediate_layers, &interface_layers, &base_interface_layers, &layer_caches, &loop_interface_processor,
             &bbox_object, &angles, n_raft_layers, link_max_length_factor]
-            (const tbb::blocked_range<size_t>& range) {
+            (const tbb::blocked_range<size_t>& range) */{
+        tbb::blocked_range<size_t> range(n_raft_layers, support_layers.size());
         // Indices of the 1st layer in their respective container at the support layer height.
         size_t idx_layer_bottom_contact   = size_t(-1);
         size_t idx_layer_top_contact      = size_t(-1);
@@ -1882,7 +1884,7 @@ void generate_support_toolpaths(
                 //     support_layer.support_islands_bboxes.emplace_back(get_extents(expoly).inflated(SCALED_EPSILON));
             }
         } // for each support_layer_id
-    });
+    }//);
 
     // Now modulate the support layer height in parallel.
     tbb::parallel_for(tbb::blocked_range<size_t>(n_raft_layers, support_layers.size()),

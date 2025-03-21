@@ -31,8 +31,8 @@
     #include "EdgeGrid.hpp"
 #endif // SUPPORT_USE_AGG_RASTERIZER
 
-// #define SLIC3R_DEBUG
-// #define SUPPORT_TREE_DEBUG_TO_SVG
+#define SLIC3R_DEBUG
+#define SUPPORT_TREE_DEBUG_TO_SVG
 // Make assert active if SLIC3R_DEBUG
 #if defined(SLIC3R_DEBUG) || defined(SUPPORT_TREE_DEBUG_TO_SVG)
     #define DEBUG
