@@ -1583,6 +1583,7 @@ void GUI_App::init_networking_callbacks()
                     m_server_error_dialog->Destroy();
                     m_server_error_dialog = nullptr;*/
                     m_server_error_dialog = new NetworkErrorDialog(mainframe);
+                    m_server_error_dialog->m_show_again = wxGetApp().app_config->get_bool("bbl_server_error_no_warn");
                 }
 
                 if(plater()->get_select_machine_dialog() && plater()->get_select_machine_dialog()->IsShown()){
@@ -1598,6 +1599,9 @@ void GUI_App::init_networking_callbacks()
                 }
 
                 m_server_error_dialog->ShowModal();
+                if (m_server_error_dialog->m_show_again) {
+                    wxGetApp().app_config->set_bool("bbl_server_error_no_warn", true);
+                }
             });
         });
 
