@@ -522,7 +522,7 @@
       "sub_path": "filament/Generic ABS @Flashforge AD4.json"
     },
     {
-      "name": "Generic ASA @AD4",
+      "name": "Generic ASA @Flashforge AD4",
       "sub_path": "filament/Generic ASA @Flashforge AD4.json"
     },
     {
@@ -570,7 +570,7 @@
 		"sub_path": "filament/SUNLU/SUNLU Silk PLA+ @base.json"
 	},
 	{
-		"name": "SUNLU Marble PLA @base",
+		"name": "SUNLU PLA Marble @base",
 		"sub_path": "filament/SUNLU/SUNLU PLA Marble @base.json"
 	},
 	{
@@ -586,11 +586,11 @@
 		"sub_path": "filament/SUNLU/SUNLU PETG @FF AD5M.json"
 	},
 	{
-		"name": "SUNLU PETG @FF AD5M 0.25 nozzle",
+		"name": "SUNLU PETG @FF AD5M 0.25 Nozzle",
 		"sub_path": "filament/SUNLU/SUNLU PETG @FF AD5M 0.25 nozzle.json"
 	},
 	{
-		"name": "SUNLU PETG @FF AD5M 0.8 nozzle",
+		"name": "SUNLU PETG @FF AD5M 0.8 Nozzle",
 		"sub_path": "filament/SUNLU/SUNLU PETG @FF AD5M 0.8 nozzle.json"
 	},
 	{
@@ -610,7 +610,7 @@
 		"sub_path": "filament/SUNLU/SUNLU PLA Matte @FF AD5M.json"
 	},
 	{
-		"name": "SUNLU PLA Matte @FF AD5M 0.25 nozzle",
+		"name": "SUNLU PLA Matte @FF AD5M 0.25 Nozzle",
 		"sub_path": "filament/SUNLU/SUNLU PLA Matte @FF AD5M 0.25 nozzle.json"
 	},
 	{
@@ -622,7 +622,7 @@
 		"sub_path": "filament/SUNLU/SUNLU PLA+ @FF AD5M.json"
 	},
 	{
-		"name": "SUNLU PLA+ @FF AD5M 0.25 nozzle",
+		"name": "SUNLU PLA+ @FF AD5M 0.25 Nozzle",
 		"sub_path": "filament/SUNLU/SUNLU PLA+ @FF AD5M 0.25 nozzle.json"
 	},
 	{
@@ -634,7 +634,7 @@
 		"sub_path": "filament/SUNLU/SUNLU PLA+ 2.0 @FF AD5M.json"
 	},
 	{
-		"name": "SUNLU PLA+ 2.0 @FF AD5M 0.25 nozzle",
+		"name": "SUNLU PLA+ 2.0 @FF AD5M 0.25 Nozzle",
 		"sub_path": "filament/SUNLU/SUNLU PLA+ 2.0 @FF AD5M 0.25 nozzle.json"
 	},
 	{
@@ -646,7 +646,7 @@
 		"sub_path": "filament/SUNLU/SUNLU Silk PLA+ @FF AD5M.json"
 	},
 	{
-		"name": "SUNLU Silk PLA+ @FF AD5M 0.25 nozzle",
+		"name": "SUNLU Silk PLA+ @FF AD5M 0.25 Nozzle",
 		"sub_path": "filament/SUNLU/SUNLU Silk PLA+ @FF AD5M 0.25 nozzle.json"
 	},
 	{
