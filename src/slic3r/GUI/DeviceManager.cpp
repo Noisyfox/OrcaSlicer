@@ -4030,6 +4030,23 @@ int MachineObject::parse_json(std::string payload, bool key_field_only)
                                 }
 
                                 json j_ams = jj["ams"]["ams"];
+
+                                /*j_ams[1] = json::parse(R"(
+                                    {
+                    "dry_time": 0,
+                    "humidity": "1",
+                    "humidity_raw": "40",
+                    "id": "128",
+                    "info": "2004",
+                    "temp": "39.7",
+                    "tray": [
+                        {
+                            "id": "0"
+                        }
+                    ]
+                }
+                                    )");*/
+
                                 std::set<std::string> ams_id_set;
 
                                 for (auto it = amsList.begin(); it != amsList.end(); it++) {
