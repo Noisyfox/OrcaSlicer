@@ -987,6 +987,8 @@ void GUI_App::post_init()
               // this->check_privacy_version(0);
               request_user_handle(0);
             }
+
+            this->check_cert();
         });
     }
 
@@ -1685,6 +1687,8 @@ void GUI_App::init_networking_callbacks()
                     obj->command_get_version();
                     obj->erase_user_access_code();
                     obj->command_get_access_code();
+                    if (m_agent)
+                        m_agent->install_device_cert(obj->dev_id, obj->is_lan_mode_printer());
                     if (!is_enable_multi_machine()) {
                         GUI::wxGetApp().sidebar().load_ams_list(obj->dev_id, obj);
                     }
@@ -4477,10 +4481,47 @@ void GUI_App::check_new_version_sf(bool show_tips, int by_user)
         .perform();
 }
 
+void GUI_App::check_cert()
+{
+    m_check_cert_thread = Slic3r::create_thread(
+        [this]{
+            if (m_agent)
+                m_agent->check_cert();
+        });
+    BOOST_LOG_TRIVIAL(info) << "check_cert";
+}
+
 void GUI_App::process_network_msg(std::string dev_id, std::string msg)
 {
     if (dev_id.empty()) {
         BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << msg;
+        if (msg == "wait_info") {
+            BOOST_LOG_TRIVIAL(info) << "process_network_msg, wait_info";
+            Slic3r::DeviceManager* dev = Slic3r::GUI::wxGetApp().getDeviceManager();
+            if (!dev)
+                return;
+            MachineObject* obj = dev->get_selected_machine();
+            if (obj)
+                m_agent->install_device_cert(obj->dev_id, obj->is_lan_mode_printer());
+        }
+        else if (msg == "update_studio") {
+            BOOST_LOG_TRIVIAL(info) << "process_network_msg, update_studio";
+        }
+        else if (msg == "update_fixed_studio") {
+            BOOST_LOG_TRIVIAL(info) << "process_network_msg, update_fixed_studio";
+        }
+        else if (msg == "cert_expired") {
+            BOOST_LOG_TRIVIAL(info) << "process_network_msg, cert_expired";
+        }
+        else if (msg == "cert_revoked") {
+            BOOST_LOG_TRIVIAL(info) << "process_network_msg, cert_revoked";
+        }
+        else if (msg == "update_firmware_studio") {
+            BOOST_LOG_TRIVIAL(info) << "process_network_msg, firmware internal error";
+        }
+        else if (msg == "unsigned_studio") {
+            BOOST_LOG_TRIVIAL(info) << "process_network_msg, unsigned_studio";
+        }
     }
 }
 

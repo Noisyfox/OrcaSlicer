@@ -313,7 +313,8 @@ private:
     wxString         m_info_dialog_content;
     HttpServer       m_http_server;
     bool             m_show_gcode_window{true};
-    boost::thread    m_check_network_thread;
+
+    boost::thread    m_check_cert_thread;
 public:
     //try again when subscription fails
     void            on_start_subscribe_again(std::string dev_id);
@@ -477,6 +478,7 @@ public:
     void            check_update(bool show_tips, int by_user);
     void            check_new_version(bool show_tips = false, int by_user = 0);
     void            check_new_version_sf(bool show_tips = false, int by_user = 0);
+    void            check_cert();
     void            process_network_msg(std::string dev_id, std::string msg);
     void            request_new_version(int by_user);
     void            enter_force_upgrade();
