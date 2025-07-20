@@ -3476,6 +3476,13 @@ void PrintConfigDef::init_fff_params()
     def->mode     = comAdvanced;
     def->set_default_value(new ConfigOptionFloat(-1));
 
+    def           = this->add("ironing_concentric_inside_out", coBool);
+    def->label    = L("Ironing from inside out");
+    def->category = L("Quality");
+    def->tooltip  = L("Ironing from inside out to avoid pushing material into the center.");
+    def->mode     = comAdvanced;
+    def->set_default_value(new ConfigOptionBool(false));
+
     def = this->add("layer_change_gcode", coString);
     def->label = L("Layer change G-code");
     def->tooltip = L("This G-code is inserted at every layer change after the Z lift.");

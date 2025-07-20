@@ -1333,6 +1333,7 @@ void Layer::make_ironing()
     FillParams 			fill_params;
     fill_params.density 	 = 1.;
     fill_params.monotonic    = true;
+    fill_params.extrusion_role      = erIroning;
     InfillPattern         f_pattern = ipRectilinear;
     std::unique_ptr<Fill> f         = std::unique_ptr<Fill>(Fill::new_from_type(f_pattern));
     f->set_bounding_box(this->object()->bounding_box());
@@ -1419,6 +1420,7 @@ void Layer::make_ironing()
         f->spacing = ironing_params.line_spacing;
         f->angle = float(ironing_params.angle);
         f->link_max_length = (coord_t) scale_(3. * f->spacing);
+        fill_params.config = &ironing_params.layerm->region().config();
 		double  extrusion_height = ironing_params.height * f->spacing / nozzle_dmr;
 		float  extrusion_width  = Flow::rounded_rectangle_extrusion_width_from_spacing(float(nozzle_dmr), float(extrusion_height));
 		double flow_mm3_per_mm = nozzle_dmr * extrusion_height;

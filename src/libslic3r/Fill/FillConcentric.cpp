@@ -53,9 +53,14 @@ void FillConcentric::_fill_surface_single(
         append(loops, to_polygons(last));
     }
 
-    // generate paths from the outermost to the innermost, to avoid
-    // adhesion problems of the first central tiny loops
-    loops = union_pt_chained_outside_in(loops);
+    if (params.extrusion_role == erIroning && params.config->ironing_concentric_inside_out) {
+        std::reverse(loops.begin(), loops.end());
+    } else {
+        // generate paths from the outermost to the innermost, to avoid
+        // adhesion problems of the first central tiny loops
+        loops = union_pt_chained_outside_in(loops);
+    }
+
     
     // split paths using a nearest neighbor search
     size_t iPathFirst = polylines_out.size();

@@ -721,8 +721,12 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig *config, co
     bool has_ironing = (config->opt_enum<IroningType>("ironing_type") != IroningType::NoIroning);
     for (auto el : { "ironing_pattern", "ironing_flow", "ironing_spacing", "ironing_angle", "ironing_inset"})
         toggle_line(el, has_ironing);
+
+    InfillPattern ironing_pattern = config->opt_enum<InfillPattern>("ironing_pattern");
+    toggle_line("ironing_concentric_inside_out", has_ironing && ironing_pattern == InfillPattern::ipConcentric);
     
     toggle_line("ironing_speed", has_ironing || has_support_ironing);
+
 
     bool have_sequential_printing = (config->opt_enum<PrintSequence>("print_sequence") == PrintSequence::ByObject);
     // for (auto el : { "extruder_clearance_radius", "extruder_clearance_height_to_rod", "extruder_clearance_height_to_lid" })
