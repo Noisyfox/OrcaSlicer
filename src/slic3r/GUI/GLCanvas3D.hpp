@@ -1129,7 +1129,7 @@ public:
 
     // Convert the screen space coordinate to an object space coordinate.
     // If the Z screen space coordinate is not provided, a depth buffer value is substituted.
-    Vec3d _mouse_to_3d(const Point& mouse_pos, float* z = nullptr);
+    Vec3d _mouse_to_3d(const Point& mouse_pos, const float* z = nullptr, bool use_ortho = false);
 
     bool make_current_for_postinit();
 
