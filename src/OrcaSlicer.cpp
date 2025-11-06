@@ -1849,7 +1849,7 @@ int CLI::run(int argc, char **argv)
         ConfigSubstitutions config_substitutions;
         try {
             BOOST_LOG_TRIVIAL(info) << __FUNCTION__<< ":load setting file "<< file << ", with rule "<< config_substitution_rule << std::endl;
-            std::map<std::string, std::string> key_values;
+            std::unordered_map<std::string, std::string> key_values;
             std::string reason;
 
             config_substitutions = config.load_from_json(file, config_substitution_rule, key_values, reason);
@@ -2637,12 +2637,12 @@ int CLI::run(int argc, char **argv)
     };
 
     //update seperate configs into full config
-    auto update_full_config = [](DynamicPrintConfig& full_config, const DynamicPrintConfig& config, std::set<std::string>& diff_key_sets, bool variant_count_changed, std::set<std::string>& key_set_1, std::set<std::string>& key_set_2, std::vector<int> variant_index, bool update_all = false, bool skip_gcodes = false) {
+    auto update_full_config = [](DynamicPrintConfig& full_config, const DynamicPrintConfig& config, std::unordered_set<std::string>& diff_key_sets, bool variant_count_changed, std::unordered_set<std::string>& key_set_1, std::unordered_set<std::string>& key_set_2, std::vector<int> variant_index, bool update_all = false, bool skip_gcodes = false) {
         const t_config_option_keys& config_keys = config.keys();
         BOOST_LOG_TRIVIAL(info) << boost::format("update_full_config: config keys count %1%")%config_keys.size();
         for (const t_config_option_key &opt_key : config_keys) {
             if (!update_all && !diff_key_sets.empty()) {
-                std::set<std::string>::iterator iter = diff_key_sets.find(opt_key);
+                std::unordered_set<std::string>::iterator iter = diff_key_sets.find(opt_key);
                 if ( iter != diff_key_sets.end()) {
                     if (skip_gcodes && (gcodes_key_set.find(opt_key) != gcodes_key_set.end()))
                     {
@@ -2732,7 +2732,7 @@ int CLI::run(int argc, char **argv)
                 inherits_group[filament_count+1] = new_printer_system_name;
         }
 
-        std::set<std::string> different_keys_set(different_keys.begin(), different_keys.end());
+        std::unordered_set<std::string> different_keys_set(different_keys.begin(), different_keys.end());
         BOOST_LOG_TRIVIAL(info) << boost::format("update printer config to newest, different size %1%, different_settings: %2%")%different_keys_set.size() %different_settings[filament_count+1];
 
         int ret;
@@ -2747,7 +2747,7 @@ int CLI::run(int argc, char **argv)
                 BOOST_LOG_TRIVIAL(info) << boost::format("new different key size %1%")%different_keys_set.size();
                 different_keys.clear();
 
-                for (std::set<std::string>::iterator iter=different_keys_set.begin(); iter !=different_keys_set.end(); ++iter)
+                for (std::unordered_set<std::string>::iterator iter=different_keys_set.begin(); iter !=different_keys_set.end(); ++iter)
                     different_keys.emplace_back(*iter);
                 different_settings[filament_count+1] = Slic3r::escape_strings_cstyle(different_keys);
             }
@@ -2876,7 +2876,7 @@ int CLI::run(int argc, char **argv)
             print_compatible_printers = std::move(new_print_compatible_printers);
         }
 
-        std::set<std::string> different_keys_set(different_keys.begin(), different_keys.end());
+        std::unordered_set<std::string> different_keys_set(different_keys.begin(), different_keys.end());
         BOOST_LOG_TRIVIAL(info) << boost::format("update process config to newest, different size %1%, different_settings: %2%")%different_keys_set.size() %different_settings[0];
 
         int ret;
@@ -2891,7 +2891,7 @@ int CLI::run(int argc, char **argv)
                 BOOST_LOG_TRIVIAL(info) << boost::format("new different key size %1%")%different_keys_set.size();
                 different_keys.clear();
 
-                for (std::set<std::string>::iterator iter=different_keys_set.begin(); iter !=different_keys_set.end(); ++iter)
+                for (std::unordered_set<std::string>::iterator iter=different_keys_set.begin(); iter !=different_keys_set.end(); ++iter)
                     different_keys.emplace_back(*iter);
                 different_settings[0] = Slic3r::escape_strings_cstyle(different_keys);
             }
@@ -3095,7 +3095,7 @@ int CLI::run(int argc, char **argv)
 
             //parse the filament value to index th
             //loop through options and apply them
-            std::set<std::string> different_keys_set(different_keys.begin(), different_keys.end());
+            std::unordered_set<std::string> different_keys_set(different_keys.begin(), different_keys.end());
             int diff_keys_size = different_keys_set.size();
             BOOST_LOG_TRIVIAL(info) << boost::format("update filament %1%'s config to newest, different size %2%, name %3%, different_settings %4%")
                 %filament_index%different_keys_set.size()%load_filaments_name[index] % different_settings[filament_index];
@@ -3113,7 +3113,7 @@ int CLI::run(int argc, char **argv)
 
                 if ((load_filament_count == 0) && !different_keys_set.empty())
                 {
-                    std::set<std::string>::iterator iter = different_keys_set.find(opt_key);
+                    std::unordered_set<std::string>::iterator iter = different_keys_set.find(opt_key);
                     if ( iter != different_keys_set.end()) {
                         if (skip_modified_gcodes && (gcodes_key_set.find(opt_key) != gcodes_key_set.end()))
                         {
@@ -3206,7 +3206,7 @@ int CLI::run(int argc, char **argv)
                 //changed
                 different_keys.clear();
 
-                for (std::set<std::string>::iterator iter=different_keys_set.begin(); iter !=different_keys_set.end(); ++iter)
+                for (std::unordered_set<std::string>::iterator iter=different_keys_set.begin(); iter !=different_keys_set.end(); ++iter)
                     different_keys.emplace_back(*iter);
                 different_settings[filament_index] = Slic3r::escape_strings_cstyle(different_keys);
                 BOOST_LOG_TRIVIAL(info) << boost::format("filament %1% new different key size %2%, different_settings %3%")%filament_index %different_keys_set.size() %different_settings[filament_index];

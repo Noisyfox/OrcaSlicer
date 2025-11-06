@@ -1228,7 +1228,7 @@ Updates PresetUpdater::priv::get_config_updates(const Semver &old_slic3r_version
                 || fs::exists(machine_in_cache)) {
                 Semver vendor_ver = get_version_from_json(path_in_vendor.string());
 
-                std::map<std::string, std::string> key_values;
+                std::unordered_map<std::string, std::string> key_values;
                 std::vector<std::string> keys(3);
 				Semver cache_ver;
                 keys[0] = BBL_JSON_KEY_VERSION;

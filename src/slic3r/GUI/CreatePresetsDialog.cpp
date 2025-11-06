@@ -491,9 +491,9 @@ static std::string get_filament_id(std::string vendor_typr_serial)
         filament_id_to_filament_name[preset.filament_id].insert(filament_name);
     }
     // global filament presets
-    PresetBundle *                                     preset_bundle               = wxGetApp().preset_bundle;
-    std::map<std::string, std::vector<Preset const *>> temp_filament_id_to_presets = preset_bundle->filaments.get_filament_presets();
-    for (std::pair<std::string, std::vector<Preset const *>> filament_id_to_presets : temp_filament_id_to_presets) {
+    PresetBundle* preset_bundle               = wxGetApp().preset_bundle;
+    const auto    temp_filament_id_to_presets = preset_bundle->filaments.get_filament_presets();
+    for (const auto& filament_id_to_presets : temp_filament_id_to_presets) {
         if (filament_id_to_presets.first.empty()) continue;
         for (const Preset *preset : filament_id_to_presets.second) {
             std::string preset_name = preset->name;
@@ -3307,7 +3307,9 @@ bool CreatePrinterPresetDialog::validate_input_valid()
     } else {
         nozzle_diameter = into_u8(m_nozzle_diameter->GetStringSelection());
         size_t index_mm = nozzle_diameter.find(" mm");
-        if (std::string::npos != index_mm) { nozzle_diameter.substr(0, index_mm); }
+        if (std::string::npos != index_mm) {
+            nozzle_diameter = nozzle_diameter.substr(0, index_mm);
+        }
     }
     float nozzle_dia = 0;
     try {

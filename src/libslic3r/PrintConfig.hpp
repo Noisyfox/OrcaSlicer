@@ -615,32 +615,32 @@ public:
     bool is_using_different_extruders();
     bool support_different_extruders(int& extruder_count);
     int get_index_for_extruder(int extruder_or_filament_id, std::string id_name, ExtruderType extruder_type, NozzleVolumeType nozzle_volume_type, std::string variant_name, unsigned int stride = 1) const;
-    void update_values_to_printer_extruders(DynamicPrintConfig& printer_config, std::set<std::string>& key_set, std::string id_name, std::string variant_name, unsigned int stride = 1, unsigned int extruder_id = 0);
-    void update_values_to_printer_extruders_for_multiple_filaments(DynamicPrintConfig& printer_config, std::set<std::string>& key_set, std::string id_name, std::string variant_name);
+    void update_values_to_printer_extruders(DynamicPrintConfig& printer_config, std::unordered_set<std::string>& key_set, std::string id_name, std::string variant_name, unsigned int stride = 1, unsigned int extruder_id = 0);
+    void update_values_to_printer_extruders_for_multiple_filaments(DynamicPrintConfig& printer_config, std::unordered_set<std::string>& key_set, std::string id_name, std::string variant_name);
 
-    void update_non_diff_values_to_base_config(DynamicPrintConfig& new_config, const t_config_option_keys& keys, const std::set<std::string>& different_keys, std::string extruder_id_name, std::string extruder_variant_name,
-        std::set<std::string>& key_set1, std::set<std::string>& key_set2);
-    void update_diff_values_to_child_config(DynamicPrintConfig& new_config, std::string extruder_id_name, std::string extruder_variant_name, std::set<std::string>& key_set1, std::set<std::string>& key_set2);
+    void update_non_diff_values_to_base_config(DynamicPrintConfig& new_config, const t_config_option_keys& keys, const std::unordered_set<std::string>& different_keys, std::string extruder_id_name, std::string extruder_variant_name,
+        std::unordered_set<std::string>& key_set1, std::unordered_set<std::string>& key_set2);
+    void update_diff_values_to_child_config(DynamicPrintConfig& new_config, std::string extruder_id_name, std::string extruder_variant_name, std::unordered_set<std::string>& key_set1, std::unordered_set<std::string>& key_set2);
 
-    int update_values_from_single_to_multi(DynamicPrintConfig& multi_config, std::set<std::string>& key_set, std::string id_name, std::string variant_name);
-    int update_values_from_multi_to_multi(DynamicPrintConfig& new_config, std::set<std::string>& key_set, std::string id_name, std::string variant_name, std::vector<std::string>& extruder_variants);
+    int update_values_from_single_to_multi(DynamicPrintConfig& multi_config, std::unordered_set<std::string>& key_set, std::string id_name, std::string variant_name);
+    int update_values_from_multi_to_multi(DynamicPrintConfig& new_config, std::unordered_set<std::string>& key_set, std::string id_name, std::string variant_name, std::vector<std::string>& extruder_variants);
 
     //int update_values_from_single_to_multi_2(DynamicPrintConfig& multi_config, std::set<std::string>& key_set);
     //int update_values_from_multi_to_single_2(std::set<std::string>& key_set);
 
-    int update_values_from_multi_to_multi_2(const std::vector<std::string>& src_extruder_variants, const std::vector<std::string>& dst_extruder_variants, const DynamicPrintConfig& dst_config, const std::set<std::string>& key_sets);
+    int update_values_from_multi_to_multi_2(const std::vector<std::string>& src_extruder_variants, const std::vector<std::string>& dst_extruder_variants, const DynamicPrintConfig& dst_config, const std::unordered_set<std::string>& key_sets);
 
 public:
     // query filament
     std::string get_filament_vendor() const;
     std::string get_filament_type() const;
 };
-extern std::set<std::string> printer_extruder_options;
-extern std::set<std::string> print_options_with_variant;
-extern std::set<std::string> filament_options_with_variant;
-extern std::set<std::string> printer_options_with_variant_1;
-extern std::set<std::string> printer_options_with_variant_2;
-extern std::set<std::string> empty_options;
+extern std::unordered_set<std::string> printer_extruder_options;
+extern std::unordered_set<std::string> print_options_with_variant;
+extern std::unordered_set<std::string> filament_options_with_variant;
+extern std::unordered_set<std::string> printer_options_with_variant_1;
+extern std::unordered_set<std::string> printer_options_with_variant_2;
+extern std::unordered_set<std::string> empty_options;
 
 extern void compute_filament_override_value(const std::string& opt_key, const ConfigOption *opt_old_machine, const ConfigOption *opt_new_machine, const ConfigOption *opt_new_filament, const DynamicPrintConfig& new_full_config,
     t_config_option_keys& diff_keys, DynamicPrintConfig& filament_overrides, std::vector<int>& f_maps);
@@ -679,7 +679,7 @@ protected:
         }
 
     protected:
-        std::map<std::string, ptrdiff_t>    m_map_name_to_offset;
+        std::unordered_map<std::string, ptrdiff_t>    m_map_name_to_offset;
     };
 
     // Parametrized by the type of the topmost class owning the options.
@@ -1796,7 +1796,7 @@ public:
 
 typedef std::string t_custom_gcode_key;
 // This map containes list of specific placeholders for each custom G-code, if any exist
-const std::map<t_custom_gcode_key, t_config_option_keys>& custom_gcode_specific_placeholders();
+const std::unordered_map<t_custom_gcode_key, t_config_option_keys>& custom_gcode_specific_placeholders();
 
 // Next classes define placeholders used by GUI::EditGCodeDialog.
 

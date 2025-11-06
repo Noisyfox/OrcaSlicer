@@ -90,7 +90,7 @@ enum ConfigFileType
 //BBS: add a function to load the version from xxx.json
 extern Semver get_version_from_json(std::string file_path);
 //BBS: add a function to load the key-values from xxx.json
-extern int get_values_from_json(std::string file_path, std::vector<std::string>& keys, std::map<std::string, std::string>& key_values);
+extern int get_values_from_json(std::string file_path, std::vector<std::string>& keys, std::unordered_map<std::string, std::string>& key_values);
 
 extern ConfigFileType guess_config_file_type(const boost::property_tree::ptree &tree);
 
@@ -141,8 +141,8 @@ public:
     };
     std::vector<PrinterModel>          models;
 
-    std::set<std::string>              default_filaments;
-    std::set<std::string>              default_sla_materials;
+    std::unordered_set<std::string>              default_filaments;
+    std::unordered_set<std::string>              default_sla_materials;
 
     VendorProfile() {}
     VendorProfile(std::string id) : id(std::move(id)) {}
@@ -176,7 +176,7 @@ struct PresetWithVendorProfile {
 // because we need iterators to not be invalidated,
 // because Preset and the ConfigWizard hold pointers to VendorProfiles.
 // XXX: maybe set is enough (cf. changes in Wizard)
-typedef std::map<std::string, VendorProfile> VendorMap;
+typedef std::unordered_map<std::string, VendorProfile> VendorMap;
 
 class Preset
 {
@@ -249,7 +249,7 @@ public:
     // Orca: maintain a list of printer models that are excluded from this preset, designed for filaments without compatible_printer defined
     // (hence they are visible to all printer models by default) in Orca Filament Library. However, we might have speciliazed filament for
     // certain printer models defined in the vendor profile as well, in this case we want to hide this generic preset for these printer models.
-    std::set<std::string> m_excluded_from;
+    std::unordered_set<std::string> m_excluded_from;
 
     // Orca: flag to indicate if this preset is from Orca Filament Library
     bool m_from_orca_filament_lib = false;
@@ -264,7 +264,7 @@ public:
     std::string         sync_info;       // enum: "delete", "create", "update", ""
     std::string         description;     //
     long long           updated_time{0};    //last updated time
-    std::map<std::string, std::string> key_values;
+    std::unordered_map<std::string, std::string> key_values;
 
     static std::string  get_type_string(Preset::Type type);
     // get string type for iot
@@ -334,7 +334,7 @@ public:
     std::string get_printer_type(PresetBundle *preset_bundle); // get edited preset type
     std::string get_current_printer_type(PresetBundle *preset_bundle); // get current preset type
 
-    static void get_extruder_names_and_keysets(Type type, std::string& extruder_id_name, std::string& extruder_variant_name, std::set<std::string>** p_key_set1, std::set<std::string>** p_key_set2);
+    static void get_extruder_names_and_keysets(Type type, std::string& extruder_id_name, std::string& extruder_variant_name, std::unordered_set<std::string>** p_key_set1, std::unordered_set<std::string>** p_key_set2);
     std::string get_printer_id() const { return vendor ? vendor->id : ""; }
 
     bool has_lidar(PresetBundle *preset_bundle);
@@ -503,7 +503,7 @@ public:
                                     const std::string &       compatible_printers,
                                     bool                      force_rewritten = false);
 
-    std::map<std::string, std::vector<Preset const *>> get_filament_presets() const;
+    std::unordered_map<std::string, std::vector<Preset const *>> get_filament_presets() const;
 
     // Returns a loaded preset, returns true if an existing preset was selected AND modified from config.
     // In that case the successive filament loaded for a multi material printer should not be modified, but
@@ -526,7 +526,7 @@ public:
         // Config to initialize the preset from.
         const DynamicPrintConfig    &config,
         //different settings list
-        const std::set<std::string> &different_settings_list,
+        const std::unordered_set<std::string> &different_settings_list,
         // Select the preset after loading?
         LoadAndSelect                select = LoadAndSelect::Always,
         const Semver                file_version = Semver(),
@@ -795,7 +795,7 @@ public:
     static bool                     is_dirty(const Preset *edited, const Preset *reference);
     static std::vector<std::string> dirty_options(const Preset *edited, const Preset *reference, const bool deep_compare = false);
     //BBS: add function for dirty_options_without_option_list
-    static std::vector<std::string> dirty_options_without_option_list(const Preset *edited, const Preset *reference, const std::set<std::string>& option_ignore_list, const bool deep_compare = false);
+    static std::vector<std::string> dirty_options_without_option_list(const Preset *edited, const Preset *reference, const std::unordered_set<std::string>& option_ignore_list, const bool deep_compare = false);
 private:
     // Type of this PresetCollection: TYPE_PRINT, TYPE_FILAMENT or TYPE_PRINTER.
     Preset::Type            m_type;
@@ -804,10 +804,10 @@ private:
     // so that the addresses of the presets don't change during resizing of the container.
     std::deque<Preset>      m_presets;
     // System profiles may have aliases. Map to the full profile name.
-    std::map<std::string, std::vector<std::string>> m_map_alias_to_profile_name;
+    std::unordered_map<std::string, std::vector<std::string>> m_map_alias_to_profile_name;
     std::unordered_map<std::string, std::unordered_set<std::string>> m_printer_hold_alias;
     // Map from old system profile name to a current system profile name.
-    std::map<std::string, std::string> m_map_system_profile_renamed;
+    std::unordered_map<std::string, std::string> m_map_system_profile_renamed;
     // Initially this preset contains a copy of the selected preset. Later on, this copy may be modified by the user.
     Preset                  m_edited_preset;
     // Contains a copy of the last saved selected preset.
@@ -879,7 +879,7 @@ public:
     // Configuration data, loaded from a file, or set from the defaults.
     DynamicPrintConfig  config;
     // set of presets used with this physical printer
-    std::set<std::string> preset_names;
+    std::unordered_set<std::string> preset_names;
 
     // Has this profile been loaded?
     bool                loaded = false;
@@ -890,7 +890,7 @@ public:
     static std::vector<std::string>         presets_with_print_host_information(const PrinterPresetCollection& printer_presets);
     static bool has_print_host_information(const DynamicPrintConfig& config);
 
-    const std::set<std::string>&            get_preset_names() const;
+    const std::unordered_set<std::string>&            get_preset_names() const;
 
     void                update_preset_names_in_config();
 

@@ -76,7 +76,7 @@ Semver get_version_from_json(std::string file_path)
 }
 
 //BBS: add a function to load the key-values from xxx.json
-int get_values_from_json(std::string file_path, std::vector<std::string>& keys, std::map<std::string, std::string>& key_values)
+int get_values_from_json(std::string file_path, std::vector<std::string>& keys, std::unordered_map<std::string, std::string>& key_values)
 {
     try {
         boost::nowide::ifstream ifs(file_path);
@@ -576,7 +576,7 @@ void Preset::save(DynamicPrintConfig* parent_config)
         std::vector<std::string> dirty_options = config.diff(*parent_config);
 
         std::string extruder_id_name, extruder_variant_name;
-        std::set<std::string> *key_set1 = nullptr, *key_set2 = nullptr;
+        std::unordered_set<std::string> *key_set1 = nullptr, *key_set2 = nullptr;
         Preset::get_extruder_names_and_keysets(type, extruder_id_name, extruder_variant_name, &key_set1, &key_set2);
 
         if (!extruder_id_name.empty()) {
@@ -628,7 +628,7 @@ void Preset::reload(Preset const &parent)
     DynamicPrintConfig config;
     // BBS: change to json format
     // ConfigSubstitutions config_substitutions = config.load_from_ini(preset.file, substitution_rule);
-    std::map<std::string, std::string> key_values;
+    std::unordered_map<std::string, std::string> key_values;
     std::string                        reason;
     ForwardCompatibilitySubstitutionRule substitution_rule    = ForwardCompatibilitySubstitutionRule::Disable;
     try {
@@ -745,7 +745,7 @@ void Preset::set_visible_from_appconfig(const AppConfig &app_config)
     	if (app_config.has_section(section_name)) {
             // Check whether this profile is marked as "installed" in PrusaSlicer.ini,
     		// or whether a profile is marked as "installed", which this profile may have been renamed from.
-	    	const std::map<std::string, std::string> &installed = app_config.get_section(section_name);
+	    	const auto &installed = app_config.get_section(section_name);
 	    	auto has = [&installed](const std::string &name) {
 	    		auto it = installed.find(name);
 				return it != installed.end() && ! it->second.empty();
@@ -797,7 +797,7 @@ std::string Preset::get_current_printer_type(PresetBundle *preset_bundle)
     return "";
 }
 
-void Preset::get_extruder_names_and_keysets(Type type, std::string& extruder_id_name, std::string& extruder_variant_name, std::set<std::string>** p_key_set1, std::set<std::string>** p_key_set2)
+void Preset::get_extruder_names_and_keysets(Type type, std::string& extruder_id_name, std::string& extruder_variant_name, std::unordered_set<std::string>** p_key_set1, std::unordered_set<std::string>** p_key_set2)
 {
     if (type == Preset::TYPE_PRINT) {
         extruder_id_name = "print_extruder_id";
@@ -1222,7 +1222,7 @@ void PresetCollection::load_presets(
 
     //BBS: get the extruder related info for this preset collection
     std::string extruder_id_name, extruder_variant_name;
-    std::set<std::string> *key_set1 = nullptr, *key_set2 = nullptr;
+    std::unordered_set<std::string> *key_set1 = nullptr, *key_set2 = nullptr;
     Preset::get_extruder_names_and_keysets(m_type, extruder_id_name, extruder_variant_name, &key_set1, &key_set2);
 
     //BBS: change to json format
@@ -1252,7 +1252,7 @@ void PresetCollection::load_presets(
                     DynamicPrintConfig config;
                     //BBS: change to json format
                     //ConfigSubstitutions config_substitutions = config.load_from_ini(preset.file, substitution_rule);
-                    std::map<std::string, std::string> key_values;
+                    std::unordered_map<std::string, std::string> key_values;
                     std::string reason;
                     ConfigSubstitutions config_substitutions = config.load_from_json(preset.file, substitution_rule, key_values, reason);
                     if (! config_substitutions.empty())
@@ -1396,7 +1396,7 @@ Preset* PresetCollection::get_preset_differed_for_save(Preset& preset)
         std::vector<std::string> dirty_options = preset.config.diff(parent_preset->config);
 
         std::string extruder_id_name, extruder_variant_name;
-        std::set<std::string> *key_set1 = nullptr, *key_set2 = nullptr;
+        std::unordered_set<std::string> *key_set1 = nullptr, *key_set2 = nullptr;
         Preset::get_extruder_names_and_keysets(m_type, extruder_id_name, extruder_variant_name, &key_set1, &key_set2);
 
         if (!extruder_id_name.empty()) {
@@ -1496,7 +1496,7 @@ void PresetCollection::load_project_embedded_presets(std::vector<Preset*>& proje
 
     BOOST_LOG_TRIVIAL(debug) << __FUNCTION__ << boost::format(" enter, type %1% , total preset counts %2%")%Preset::get_type_string(m_type) %project_presets.size();
     std::string extruder_id_name, extruder_variant_name;
-    std::set<std::string> *key_set1 = nullptr, *key_set2 = nullptr;
+    std::unordered_set<std::string> *key_set1 = nullptr, *key_set2 = nullptr;
     Preset::get_extruder_names_and_keysets(m_type, extruder_id_name, extruder_variant_name, &key_set1, &key_set2);
 
     lock();
@@ -1705,7 +1705,7 @@ void PresetCollection::save_user_presets(const std::string& dir_path, const std:
     m_dir_path = dir.string();
 
     std::vector<std::string> delete_name_list;
-    //std::map<std::string, Preset*>::iterator it;
+    //std::unordered_map<std::string, Preset*>::iterator it;
     //for (it = my_presets.begin(); it != my_presets.end(); it++) {
     for (auto it = m_presets.begin(); it != m_presets.end(); it++) {
         Preset* preset = &m_presets[it - m_presets.begin()];
@@ -1876,7 +1876,7 @@ bool PresetCollection::load_user_preset(std::string name, std::map<std::string, 
 
         if (inherit_preset) {
             std::string extruder_id_name, extruder_variant_name;
-            std::set<std::string> *key_set1 = nullptr, *key_set2 = nullptr;
+            std::unordered_set<std::string> *key_set1 = nullptr, *key_set2 = nullptr;
             Preset::get_extruder_names_and_keysets(m_type, extruder_id_name, extruder_variant_name, &key_set1, &key_set2);
 
             new_config.update_diff_values_to_child_config(cloud_config, extruder_id_name, extruder_variant_name, *key_set1, *key_set2);
@@ -2032,7 +2032,7 @@ std::pair<Preset*, bool> PresetCollection::load_external_preset(
     // Config to initialize the preset from. It may contain configs of all presets merged in a single dictionary!
     const DynamicPrintConfig    &combined_config,
     //different settings list
-    const std::set<std::string> &different_settings_list,
+    const std::unordered_set<std::string> &different_settings_list,
     // Select the preset after loading?
     LoadAndSelect                select,
     const Semver                file_version,
@@ -2061,7 +2061,7 @@ std::pair<Preset*, bool> PresetCollection::load_external_preset(
     }
 
     std::string extruder_id_name, extruder_variant_name;
-    std::set<std::string> *key_set1 = nullptr, *key_set2 = nullptr;
+    std::unordered_set<std::string> *key_set1 = nullptr, *key_set2 = nullptr;
     Preset::get_extruder_names_and_keysets(m_type, extruder_id_name, extruder_variant_name, &key_set1, &key_set2);
 
     if (!inherits.empty() && (different_settings_list.size() > 0)) {
@@ -2386,9 +2386,9 @@ bool PresetCollection::clone_presets_for_filament(Preset const *const &     pres
         force_rewritten);
 }
 
-std::map<std::string, std::vector<Preset const *>> PresetCollection::get_filament_presets() const
+std::unordered_map<std::string, std::vector<Preset const *>> PresetCollection::get_filament_presets() const
 {
-    std::map<std::string, std::vector<Preset const *>> filament_presets;
+    std::unordered_map<std::string, std::vector<Preset const *>> filament_presets;
     for (auto &preset : m_presets) {
         if (preset.is_user()) {
             if (preset.inherits() == "") { filament_presets[preset.filament_id].push_back(&preset); }
@@ -2772,7 +2772,7 @@ size_t PresetCollection::first_visible_idx() const
 
 std::vector<std::string> PresetCollection::diameters_of_selected_printer()
 {
-    std::set<std::string> diameters;
+    std::unordered_set<std::string> diameters;
     auto printer_model = m_edited_preset.config.opt_string("printer_model");
     for (auto &preset : m_presets) {
         if (preset.config.opt_string("printer_model") == printer_model)
@@ -2953,7 +2953,7 @@ inline t_config_option_keys deep_diff(const ConfigBase &config_this, const Confi
 
 static constexpr const std::initializer_list<const char*> optional_keys { "compatible_prints", "compatible_printers" };
 //BBS: skip these keys for dirty check
-static std::set<std::string> skipped_in_dirty = {"printer_settings_id", "print_settings_id", "filament_settings_id"};
+static std::unordered_set<std::string> skipped_in_dirty = {"printer_settings_id", "print_settings_id", "filament_settings_id"};
 
 bool PresetCollection::is_dirty(const Preset *edited, const Preset *reference)
 {
@@ -2990,7 +2990,7 @@ std::vector<std::string> PresetCollection::dirty_options(const Preset *edited, c
 }
 
 //BBS: add function for dirty_options_without_option_list
-std::vector<std::string> PresetCollection::dirty_options_without_option_list(const Preset *edited, const Preset *reference, const std::set<std::string>& option_ignore_list, const bool deep_compare)
+std::vector<std::string> PresetCollection::dirty_options_without_option_list(const Preset *edited, const Preset *reference, const std::unordered_set<std::string>& option_ignore_list, const bool deep_compare)
 {
     std::vector<std::string> changed;
     if (edited != nullptr && reference != nullptr) {
@@ -3154,7 +3154,7 @@ void PresetCollection::update_map_alias_to_profile_name()
 void PresetCollection::update_library_profile_excluded_from()
 {
     // Orca: Collect all filament presets that has empty compatible_printers and belongs to the Orca Filament Library.
-    std::map<std::string, std::set<std::string>*> excluded_froms;
+    std::unordered_map<std::string, std::unordered_set<std::string>*> excluded_froms;
     for (Preset& preset : m_presets) {
         if (preset.vendor != nullptr && preset.vendor->name == PresetBundle::ORCA_FILAMENT_LIBRARY) {
             // check if the preset has empty compatible_printers
@@ -3412,13 +3412,13 @@ bool PhysicalPrinter::has_print_host_information(const DynamicPrintConfig& confi
     return false;
 }
 
-const std::set<std::string>& PhysicalPrinter::get_preset_names() const
+const std::unordered_set<std::string>& PhysicalPrinter::get_preset_names() const
 {
     return preset_names;
 }
 
 // temporary workaround for compatibility with older Slicer
-static void update_preset_name_option(const std::set<std::string>& preset_names, DynamicPrintConfig& config)
+static void update_preset_name_option(const std::unordered_set<std::string>& preset_names, DynamicPrintConfig& config)
 {
     std::string name;
     for (auto el : preset_names)
@@ -3579,7 +3579,7 @@ void PhysicalPrinterCollection::load_printers(
                 try {
                     DynamicPrintConfig config;
                     //ConfigSubstitutions config_substitutions = config.load_from_ini(printer.file, substitution_rule);
-                    std::map<std::string, std::string> key_values;
+                    std::unordered_map<std::string, std::string> key_values;
                     std::string reason;
                     ConfigSubstitutions config_substitutions = config.load_from_json(printer.file, substitution_rule, key_values, reason);
                     if (! config_substitutions.empty())

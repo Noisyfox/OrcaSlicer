@@ -11,6 +11,8 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
+#include <unordered_set>
+#include <unordered_map>
 #include "libslic3r.h"
 #include "clonable_ptr.hpp"
 #include "Exception.hpp"
@@ -1945,7 +1947,7 @@ using ConfigOptionBoolsNullable = ConfigOptionBoolsTempl<true>;
 // Map from an enum integer value to an enum name.
 typedef std::vector<std::string>  t_config_enum_names;
 // Map from an enum name to an enum integer value.
-typedef std::map<std::string,int> t_config_enum_values;
+typedef std::unordered_map<std::string,int> t_config_enum_values;
 
 template <class T>
 class ConfigOptionEnum : public ConfigOptionSingle<T>
@@ -2386,7 +2388,7 @@ inline bool operator==(const ConfigSubstitution &lhs, const ConfigSubstitution &
 // Map from a config option name to its definition.
 // The definition does not carry an actual value of the config option, only its constant default value.
 // t_config_option_key is std::string
-typedef std::map<t_config_option_key, ConfigOptionDef> t_optiondef_map;
+typedef std::unordered_map<t_config_option_key, ConfigOptionDef> t_optiondef_map;
 
 // Definition of configuration values for the purpose of GUI presentation, editing, value mapping and config file handling.
 // The configuration definition is static: It does not carry the actual configuration values,
@@ -2395,7 +2397,7 @@ class ConfigDef
 {
 public:
     t_optiondef_map         					options;
-    std::map<size_t, const ConfigOptionDef*>	by_serialization_key_ordinal;
+    std::unordered_map<size_t, const ConfigOptionDef*>	by_serialization_key_ordinal;
 
     bool                    has(const t_config_option_key &opt_key) const { return this->options.count(opt_key) > 0; }
     const ConfigOptionDef*  get(const t_config_option_key &opt_key) const {
@@ -2539,7 +2541,7 @@ public:
 
     // Are the two configs equal? Ignoring options not present in both configs.
     //BBS: add skipped_keys logic
-    bool equals(const ConfigBase &other, const std::set<std::string>* skipped_keys = nullptr) const;
+    bool equals(const ConfigBase &other, const std::unordered_set<std::string>* skipped_keys = nullptr) const;
     // Returns options differing in the two configs, ignoring options not present in both configs.
     t_config_option_keys diff(const ConfigBase &other) const;
     // Returns options being equal in the two configs, ignoring options not present in both configs.
@@ -2591,8 +2593,8 @@ public:
     //BBS support load from ini string
     ConfigSubstitutions load_string_map(std::map<std::string, std::string> &key_values, ForwardCompatibilitySubstitutionRule compatibility_rule);
     //BBS: add json support
-    int load_from_json(const std::string &file, ConfigSubstitutionContext& substitutions, bool load_inherits_in_config, std::map<std::string, std::string>& key_values, std::string& reason);
-    ConfigSubstitutions load_from_json(const std::string &file, ForwardCompatibilitySubstitutionRule compatibility_rule, std::map<std::string, std::string>& key_values, std::string& reason);
+    int load_from_json(const std::string &file, ConfigSubstitutionContext& substitutions, bool load_inherits_in_config, std::unordered_map<std::string, std::string>& key_values, std::string& reason);
+    ConfigSubstitutions load_from_json(const std::string &file, ForwardCompatibilitySubstitutionRule compatibility_rule, std::unordered_map<std::string, std::string>& key_values, std::string& reason);
 
     ConfigSubstitutions load_from_ini(const std::string &file, ForwardCompatibilitySubstitutionRule compatibility_rule);
     ConfigSubstitutions load_from_ini_string(const std::string &data, ForwardCompatibilitySubstitutionRule compatibility_rule);
@@ -2745,7 +2747,7 @@ public:
 
     // Are the two configs equal? Ignoring options not present in both configs.
     //BBS: add skipped_keys logic
-    bool equals(const DynamicConfig &other, const std::set<std::string>* skipped_keys = nullptr) const;
+    bool equals(const DynamicConfig &other, const std::unordered_set<std::string>* skipped_keys = nullptr) const;
     // Returns options differing in the two configs, ignoring options not present in both configs.
     t_config_option_keys diff(const DynamicConfig &other) const;
     // Returns options being equal in the two configs, ignoring options not present in both configs.
@@ -2779,12 +2781,12 @@ public:
     // Command line processing
     bool                read_cli(int argc, const char* const argv[], t_config_option_keys* extra, t_config_option_keys* keys = nullptr);
 
-    std::map<t_config_option_key, std::unique_ptr<ConfigOption>>::const_iterator cbegin() const { return options.cbegin(); }
-    std::map<t_config_option_key, std::unique_ptr<ConfigOption>>::const_iterator cend()   const { return options.cend(); }
-    size_t                        												 size()   const { return options.size(); }
+    std::unordered_map<t_config_option_key, std::unique_ptr<ConfigOption>>::const_iterator cbegin() const { return options.cbegin(); }
+    std::unordered_map<t_config_option_key, std::unique_ptr<ConfigOption>>::const_iterator cend()   const { return options.cend(); }
+    size_t                        												           size()   const { return options.size(); }
 
 private:
-    std::map<t_config_option_key, std::unique_ptr<ConfigOption>> options;
+    std::unordered_map<t_config_option_key, std::unique_ptr<ConfigOption>> options;
 
 	friend class cereal::access;
 	template<class Archive> void serialize(Archive &ar) { ar(options); }

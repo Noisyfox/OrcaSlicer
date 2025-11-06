@@ -362,7 +362,7 @@ std::ostream& ConfigDef::print_cli_help(std::ostream& out, bool show_defaults, s
     };
 
     // get the unique categories
-    std::set<std::string> categories;
+    std::unordered_set<std::string> categories;
     for (const auto& opt : this->options) {
         const ConfigOptionDef& def = opt.second;
         if (filter(def))
@@ -483,7 +483,7 @@ void ConfigBase::apply_only(const ConfigBase &other, const t_config_option_keys 
 
 // Are the two configs equal? Ignoring options not present in both configs.
 //BBS: add skipped keys logic
-bool ConfigBase::equals(const ConfigBase &other, const std::set<std::string>* skipped_keys) const
+bool ConfigBase::equals(const ConfigBase &other, const std::unordered_set<std::string>* skipped_keys) const
 {
     for (const t_config_option_key &opt_key : this->keys()) {
         if (skipped_keys && (skipped_keys->count(opt_key) != 0))
@@ -775,7 +775,7 @@ ConfigSubstitutions ConfigBase::load_string_map(std::map<std::string, std::strin
 //BBS: add json support
 ConfigSubstitutions ConfigBase::load(const std::string &file, ForwardCompatibilitySubstitutionRule compatibility_rule)
 {
-    std::map<std::string, std::string> key_values;
+    std::unordered_map<std::string, std::string> key_values;
     if (is_gcode_file(file))
         return this->load_from_gcode_file(file, compatibility_rule);
     else if (is_json_file(file)) {
@@ -790,7 +790,7 @@ ConfigSubstitutions ConfigBase::load(const std::string &file, ForwardCompatibili
 }
 
 //BBS: add json support
-ConfigSubstitutions ConfigBase::load_from_json(const std::string &file, ForwardCompatibilitySubstitutionRule compatibility_rule, std::map<std::string, std::string>& key_values, std::string& reason)
+ConfigSubstitutions ConfigBase::load_from_json(const std::string &file, ForwardCompatibilitySubstitutionRule compatibility_rule, std::unordered_map<std::string, std::string>& key_values, std::string& reason)
 {
     int ret = 0;
     ConfigSubstitutionContext substitutions_ctxt(compatibility_rule);
@@ -799,7 +799,7 @@ ConfigSubstitutions ConfigBase::load_from_json(const std::string &file, ForwardC
     return std::move(substitutions_ctxt.substitutions);
 }
 
-int ConfigBase::load_from_json(const std::string &file, ConfigSubstitutionContext& substitution_context, bool load_inherits_to_config, std::map<std::string, std::string>& key_values, std::string& reason)
+int ConfigBase::load_from_json(const std::string &file, ConfigSubstitutionContext& substitution_context, bool load_inherits_to_config, std::unordered_map<std::string, std::string>& key_values, std::string& reason)
 {
     json j;
     std::list<std::string> different_settings_append;
@@ -1573,7 +1573,7 @@ const ConfigOption* DynamicConfig::optptr(const t_config_option_key &opt_key) co
 bool DynamicConfig::read_cli(int argc, const char* const argv[], t_config_option_keys* extra, t_config_option_keys* keys)
 {
     // cache the CLI option => opt_key mapping
-    std::map<std::string,std::string> opts;
+    std::unordered_map<std::string,std::string> opts;
     for (const auto &oit : this->def()->options)
         for (const std::string &t : oit.second.cli_args(oit.first))
             opts[t] = oit.first;
@@ -1731,10 +1731,10 @@ t_config_option_keys StaticConfig::keys() const
 // Returns true on early exit by fn().
 //BBS: add skipped key logic
 template<typename Fn>
-static inline bool dynamic_config_iterate(const DynamicConfig &lhs, const DynamicConfig &rhs, Fn fn, const std::set<std::string>* skipped_keys = nullptr)
+static inline bool dynamic_config_iterate(const DynamicConfig &lhs, const DynamicConfig &rhs, Fn fn, const std::unordered_set<std::string>* skipped_keys = nullptr)
 {
-    std::map<t_config_option_key, std::unique_ptr<ConfigOption>>::const_iterator i = lhs.cbegin();
-    std::map<t_config_option_key, std::unique_ptr<ConfigOption>>::const_iterator j = rhs.cbegin();
+    std::unordered_map<t_config_option_key, std::unique_ptr<ConfigOption>>::const_iterator i = lhs.cbegin();
+    std::unordered_map<t_config_option_key, std::unique_ptr<ConfigOption>>::const_iterator j = rhs.cbegin();
     while (i != lhs.cend() && j != rhs.cend())
         if (i->first < j->first)
             ++ i;
@@ -1758,7 +1758,7 @@ static inline bool dynamic_config_iterate(const DynamicConfig &lhs, const Dynami
 
 // Are the two configs equal? Ignoring options not present in both configs.
 //BBS: add skipped keys logic
-bool DynamicConfig::equals(const DynamicConfig &other, const std::set<std::string>* skipped_keys) const
+bool DynamicConfig::equals(const DynamicConfig &other, const std::unordered_set<std::string>* skipped_keys) const
 {
     return ! dynamic_config_iterate(*this, other,
         [](const t_config_option_key & /* key */, const ConfigOption *l, const ConfigOption *r) { return *l != *r; },

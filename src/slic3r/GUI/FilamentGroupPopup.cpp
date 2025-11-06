@@ -25,7 +25,7 @@ static bool should_pop_up()
 
 static FilamentMapMode get_prefered_map_mode()
 {
-    const static std::map<std::string, int> enum_keys_map = ConfigOptionEnum<FilamentMapMode>::get_enum_values();
+    const static std::unordered_map<std::string, int> enum_keys_map = ConfigOptionEnum<FilamentMapMode>::get_enum_values();
     auto                                   &app_config    = wxGetApp().app_config;
     std::string                             mode_str      = app_config->get("prefered_filament_map_mode");
     auto                                    iter          = enum_keys_map.find(mode_str);

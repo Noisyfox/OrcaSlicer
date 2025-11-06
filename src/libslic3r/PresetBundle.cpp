@@ -1050,7 +1050,7 @@ bool PresetBundle::import_json_presets(PresetsConfigSubstitutions &            s
         DynamicPrintConfig config;
         // BBS: change to json format
         // ConfigSubstitutions config_substitutions = config.load_from_ini(preset.file, substitution_rule);
-        std::map<std::string, std::string> key_values;
+        std::unordered_map<std::string, std::string> key_values;
         std::string                        reason;
         ConfigSubstitutions                config_substitutions = config.load_from_json(file, rule, key_values, reason);
         std::string                        name                 = key_values[BBL_JSON_KEY_NAME];
@@ -1203,14 +1203,14 @@ void PresetBundle::remove_user_presets_directory(const std::string preset_folder
     }
 }
 
-void PresetBundle::update_system_preset_setting_ids(std::map<std::string, std::map<std::string, std::string>>& system_presets)
+void PresetBundle::update_system_preset_setting_ids(std::unordered_map<std::string, std::unordered_map<std::string, std::string>>& system_presets)
 {
     for (auto iterator: system_presets)
     {
         std::string name = iterator.first;
-        std::map<std::string, std::string>& value_map = iterator.second;
+        std::unordered_map<std::string, std::string>& value_map = iterator.second;
         //get the type first
-        std::map<std::string, std::string>::iterator type_iter = value_map.find(BBL_JSON_KEY_TYPE);
+        std::unordered_map<std::string, std::string>::iterator type_iter = value_map.find(BBL_JSON_KEY_TYPE);
         if (type_iter == value_map.end()) {
             BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << boost::format(" can not find type for setting %1%")%name;
             continue;
@@ -2686,7 +2686,7 @@ bool PresetBundle::check_filament_temp_equation_by_printer_type_and_nozzle_for_m
 {
     bool is_equation = true;
 
-    std::map<std::string, std::vector<Preset const *>> filament_list = filaments.get_filament_presets();
+    std::unordered_map<std::string, std::vector<Preset const *>> filament_list = filaments.get_filament_presets();
     std::set<std::string> printer_names       = get_printer_names_by_printer_type_and_nozzle(printer_type, nozzle_diameter_str);
 
     for (const Preset *preset : filament_list.find(setting_id)->second) {
@@ -2747,7 +2747,7 @@ Preset *PresetBundle::get_similar_printer_preset(std::string printer_model, std:
     if (printer_model.empty())
         printer_model = printers.get_selected_preset().config.opt_string("printer_model");
     auto printer_variant_old = printers.get_selected_preset().config.opt_string("printer_variant");
-    std::map<std::string, Preset*> printer_presets;
+    std::unordered_map<std::string, Preset*> printer_presets;
     for (auto &preset : printers.m_presets) {
         if (printer_variant.empty() && !preset.is_system)
             continue;
@@ -2846,7 +2846,7 @@ DynamicPrintConfig PresetBundle::full_config_secure(std::optional<std::vector<in
     return config;
 }
 
-const std::set<std::string> ignore_settings_list ={
+const std::unordered_set<std::string> ignore_settings_list ={
     "inherits",
     "print_settings_id", "filament_settings_id", "printer_settings_id"
 };
@@ -3351,7 +3351,7 @@ void PresetBundle::load_config_file_config(const std::string &name_or_path, bool
          &compatible_printers_condition, &compatible_printers_condition_values,
          &compatible_prints_condition, &compatible_prints_condition_values,
          is_external, &name, &name_or_path, file_version, selected]
-		(PresetCollection &presets, size_t idx, const std::string &key, const std::set<std::string> &different_keys, std::string filament_id) {
+		(PresetCollection &presets, size_t idx, const std::string &key, const std::unordered_set<std::string> &different_keys, std::string filament_id) {
 		// Split the "compatible_printers_condition" and "inherits" values one by one from a single vector to the print & printer profiles.
 		inherits = inherits_values[idx];
 		compatible_printers_condition = compatible_printers_condition_values[idx];
@@ -3373,7 +3373,7 @@ void PresetBundle::load_config_file_config(const std::string &name_or_path, bool
         std::vector<std::string> print_different_keys_vector;
         std::string print_different_settings = different_values[0];
         Slic3r::unescape_strings_cstyle(print_different_settings, print_different_keys_vector);
-        std::set<std::string> print_different_keys_set(print_different_keys_vector.begin(), print_different_keys_vector.end());
+        std::unordered_set<std::string> print_different_keys_set(print_different_keys_vector.begin(), print_different_keys_vector.end());
         //if (!has_different_settings_to_system) {
         //    print_different_keys_set.clear();
         //}
@@ -3392,7 +3392,7 @@ void PresetBundle::load_config_file_config(const std::string &name_or_path, bool
         std::vector<std::string> printer_different_keys_vector;
         std::string printer_different_settings = different_values[num_filaments + 1];
         Slic3r::unescape_strings_cstyle(printer_different_settings, printer_different_keys_vector);
-        std::set<std::string> printer_different_keys_set(printer_different_keys_vector.begin(), printer_different_keys_vector.end());
+        std::unordered_set<std::string> printer_different_keys_set(printer_different_keys_vector.begin(), printer_different_keys_vector.end());
         //if (!has_different_settings_to_system) {
         //    printer_different_keys_set.clear();
         //}
@@ -3419,7 +3419,7 @@ void PresetBundle::load_config_file_config(const std::string &name_or_path, bool
             std::vector<std::string> filament_different_keys_vector;
             std::string filament_different_settings = different_values[1];
             Slic3r::unescape_strings_cstyle(filament_different_settings, filament_different_keys_vector);
-            std::set<std::string> filament_different_keys_set(filament_different_keys_vector.begin(), filament_different_keys_vector.end());
+            std::unordered_set<std::string> filament_different_keys_set(filament_different_keys_vector.begin(), filament_different_keys_vector.end());
             //if (!has_different_settings_to_system) {
             //    filament_different_keys_set.clear();
             //}
@@ -3490,7 +3490,7 @@ void PresetBundle::load_config_file_config(const std::string &name_or_path, bool
                 std::vector<std::string> filament_different_keys_vector;
                 std::string filament_different_settings = different_values[i+1];
                 Slic3r::unescape_strings_cstyle(filament_different_settings, filament_different_keys_vector);
-                std::set<std::string> filament_different_keys_set(filament_different_keys_vector.begin(), filament_different_keys_vector.end());
+                std::unordered_set<std::string> filament_different_keys_set(filament_different_keys_vector.begin(), filament_different_keys_vector.end());
                 //if (!has_different_settings_to_system) {
                 //    filament_different_keys_set.clear();
                 //}
@@ -3528,7 +3528,7 @@ void PresetBundle::load_config_file_config(const std::string &name_or_path, bool
     }
     case ptSLA:
     {
-        /*std::set<std::string> different_keys_set;
+        /*std::unordered_set<std::string> different_keys_set;
         load_preset(this->sla_prints, 0, "sla_print_settings_id", different_keys_set);
         load_preset(this->sla_materials, 1, "sla_material_settings_id", different_keys_set);
         load_preset(this->printers, 2, "printer_settings_id", different_keys_set);*/
@@ -3795,8 +3795,8 @@ std::pair<PresetsConfigSubstitutions, size_t> PresetBundle::load_vendor_configs_
         PresetsConfigSubstitutions& substitutions,
         LoadConfigBundleAttributes& flags,
         std::pair<std::string, std::string>& subfile_iter,
-        std::map<std::string, DynamicPrintConfig>& config_maps,
-        std::map<std::string, std::string>& filament_id_maps,
+        std::unordered_map<std::string, DynamicPrintConfig>& config_maps,
+        std::unordered_map<std::string, std::string>& filament_id_maps,
         PresetCollection* presets_collection,
         size_t& count, bool is_from_lib = false) -> std::string {
 
@@ -3809,7 +3809,7 @@ std::pair<PresetsConfigSubstitutions, size_t> PresetBundle::load_vendor_configs_
         const DynamicPrintConfig* default_config = nullptr;
         std::string               reason;
         try {
-            std::map<std::string, std::string> key_values;
+            std::unordered_map<std::string, std::string> key_values;
             substitution_context.substitutions.clear();
 
             //parse the json elements
@@ -4020,8 +4020,8 @@ std::pair<PresetsConfigSubstitutions, size_t> PresetBundle::load_vendor_configs_
         return reason;
     };
 
-    std::map<std::string, DynamicPrintConfig> configs;
-    std::map<std::string, std::string> filament_id_maps;
+    std::unordered_map<std::string, DynamicPrintConfig> configs;
+    std::unordered_map<std::string, std::string> filament_id_maps;
     //3.1) paste the process
     presets = &this->prints;
     configs.clear();

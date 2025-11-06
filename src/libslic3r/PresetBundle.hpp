@@ -125,7 +125,7 @@ public:
     void remove_users_preset(AppConfig &config, std::map<std::string, std::map<std::string, std::string>> * my_presets = nullptr);
     void update_user_presets_directory(const std::string preset_folder);
     void remove_user_presets_directory(const std::string preset_folder);
-    void update_system_preset_setting_ids(std::map<std::string, std::map<std::string, std::string>>& system_presets);
+    void update_system_preset_setting_ids(std::unordered_map<std::string, std::unordered_map<std::string, std::string>>& system_presets);
 
     //BBS: add API to get previous machine
     int validate_presets(const std::string &file_name, DynamicPrintConfig& config, std::set<std::string>& different_gcodes);
@@ -230,8 +230,8 @@ public:
     VendorMap                   vendors;
 
     // Orca: for OrcaFilamentLibrary
-    std::map<std::string, DynamicPrintConfig> m_config_maps;
-    std::map<std::string, std::string> m_filament_id_maps;
+    std::unordered_map<std::string, DynamicPrintConfig> m_config_maps;
+    std::unordered_map<std::string, std::string> m_filament_id_maps;
 
         struct ObsoletePresets
     {

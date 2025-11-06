@@ -42,12 +42,12 @@ json m_ProfileJson;
 
 static wxString update_custom_filaments()
 {
-    json m_Res                                                                     = json::object();
-    m_Res["command"]                                                               = "update_custom_filaments";
-    m_Res["sequence_id"]                                                           = "2000";
-    json                                               m_CustomFilaments           = json::array();
-    PresetBundle *                                     preset_bundle               = wxGetApp().preset_bundle;
-    std::map<std::string, std::vector<Preset const *>> temp_filament_id_to_presets = preset_bundle->filaments.get_filament_presets();
+    json m_Res                                = json::object();
+    m_Res["command"]                          = "update_custom_filaments";
+    m_Res["sequence_id"]                      = "2000";
+    json          m_CustomFilaments           = json::array();
+    PresetBundle *preset_bundle               = wxGetApp().preset_bundle;
+    auto          temp_filament_id_to_presets = preset_bundle->filaments.get_filament_presets();
 
     std::vector<std::pair<std::string, std::string>>   need_sort;
     bool                                             need_delete_some_filament = false;

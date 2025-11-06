@@ -2512,7 +2512,7 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
                 add_error("Error while extract project config file to file");
                 return;
             }
-            std::map<std::string, std::string> key_values;
+            std::unordered_map<std::string, std::string> key_values;
             std::string reason;
             int ret = config.load_from_json(dest_file, config_substitutions, true, key_values, reason);
             if (ret) {
@@ -2544,7 +2544,7 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
             //load presets
             DynamicPrintConfig config;
             //ConfigSubstitutions config_substitutions = config.load_from_ini(dest_file, Enable);
-            std::map<std::string, std::string> key_values;
+            std::unordered_map<std::string, std::string> key_values;
             std::string reason;
             ConfigSubstitutions config_substitutions = use_json? config.load_from_json(dest_file, Enable, key_values, reason) : config.load_from_ini(dest_file, Enable);
             if (!reason.empty()) {
