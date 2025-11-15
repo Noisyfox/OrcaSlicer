@@ -803,7 +803,7 @@ void PrintObject::estimate_curled_extrusions()
 {
     if (this->set_started(posEstimateCurledExtrusions)) {
         if ( std::any_of(this->print()->m_print_regions.begin(), this->print()->m_print_regions.end(),
-                        [](const PrintRegion *region) { return region->config().enable_overhang_speed.getBool(); })) {
+                        [](const PrintRegion *region) { return region->config().enable_overhang_speed.getBool() && region->config().slowdown_for_curled_perimeters.getBool(); })) {
 
             // Estimate curling of support material and add it to the malformaition lines of each layer
             float support_flow_width = support_material_flow(this, this->config().layer_height).width();
