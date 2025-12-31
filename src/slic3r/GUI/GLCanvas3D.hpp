@@ -395,6 +395,7 @@ class GLCanvas3D
         PrimeTowerOutside,
         NozzleFilamentIncompatible,
         MixtureFilamentIncompatible,
+        FlushingVolumeZero
     };
 
     class RenderStats
@@ -542,7 +543,7 @@ private:
     mutable IMToolbar m_sel_plate_toolbar;
     mutable GLToolbar m_assemble_view_toolbar;
     mutable IMReturnToolbar m_return_toolbar;
-    mutable Vec2i32 m_axis_button_pos = {128, 5};
+    mutable Vec2i32 m_canvas_toolbar_pos = {140, 5};
     mutable float m_sc{1};
     mutable float m_paint_toolbar_width;
 
@@ -1245,7 +1246,7 @@ private:
     void _render_imgui_select_plate_toolbar();
     void _render_assemble_view_toolbar() const;
     void _render_return_toolbar() const;
-    void _render_camera_toolbar();
+    void _render_canvas_toolbar();
     void _render_separator_toolbar_right() const;
     void _render_separator_toolbar_left() const;
     void _render_collapse_toolbar() const;
@@ -1295,6 +1296,7 @@ private:
     // generates a warning notification containing the given message
     void _set_warning_notification(EWarning warning, bool state);
 
+    bool is_flushing_matrix_error();
     bool _is_any_volume_outside() const;
 
     // updates the selection from the content of m_hover_volume_idxs

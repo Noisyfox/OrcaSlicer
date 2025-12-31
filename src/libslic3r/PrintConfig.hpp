@@ -102,6 +102,13 @@ enum class BedTempFormula {
     count,
 };
 
+// Orca
+enum class PowerLossRecoveryMode {
+    PrinterConfiguration,
+    Enable,
+    Disable,
+};
+
 // BBS
 enum class WallSequence {
     InnerOuter,
@@ -221,7 +228,7 @@ enum GapFillTarget {
 enum LiftType {
     NormalLift,
     SpiralLift,
-    LazyLift
+    SlopeLift
 };
 
 enum SLAMaterial {
@@ -315,7 +322,8 @@ static std::unordered_map<NozzleType, std::string>NozzleTypeEumnToStr = {
     {NozzleType::ntHardenedSteel,   "hardened_steel"},
     {NozzleType::ntStainlessSteel,  "stainless_steel"},
     {NozzleType::ntTungstenCarbide, "tungsten_carbide"},
-    {NozzleType::ntBrass,           "brass"}
+    {NozzleType::ntBrass,           "brass"},
+    {NozzleType::ntE3D,             "E3D"}
 };
 
 static std::unordered_map<std::string, NozzleType>NozzleTypeStrToEumn = {
@@ -323,7 +331,8 @@ static std::unordered_map<std::string, NozzleType>NozzleTypeStrToEumn = {
     {"hardened_steel", NozzleType::ntHardenedSteel},
     {"stainless_steel", NozzleType::ntStainlessSteel},
     {"tungsten_carbide", NozzleType::ntTungstenCarbide},
-    {"brass", NozzleType::ntBrass}
+    {"brass", NozzleType::ntBrass},
+    {"E3D", NozzleType::ntE3D}
 };
 
 // BBS
@@ -505,12 +514,13 @@ CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(PrintHostType)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(AuthorizationType)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(WipeTowerWallType)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(PerimeterGeneratorType)
+CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(PowerLossRecoveryMode)
 
 #undef CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS
 
 class DynamicPrintConfig;
 
-// Defines each and every confiuration option of Slic3r, including the properties of the GUI dialogs.
+// Defines each and every configuration option of Slic3r, including the properties of the GUI dialogs.
 // Does not store the actual values, but defines default values.
 class PrintConfigDef : public ConfigDef
 {
@@ -561,7 +571,6 @@ double min_object_distance(const ConfigBase &cfg);
 // The dynamic configuration is also used to store user modifications of the print global parameters,
 // so the modified configuration values may be diffed against the active configuration
 // to invalidate the proper slicing resp. g-code generation processing steps.
-// This object is mapped to Perl as Slic3r::Config.
 class DynamicPrintConfig : public DynamicConfig
 {
 public:
@@ -873,6 +882,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     PrintObjectConfig,
 
     ((ConfigOptionFloat,               brim_object_gap))
+    ((ConfigOptionBool,                brim_use_efc_outline))
     ((ConfigOptionEnum<BrimType>,      brim_type))
     ((ConfigOptionFloat,               brim_width))
     ((ConfigOptionFloat,               brim_ears_detection_length))
@@ -1262,6 +1272,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionInts,                filament_map))
     //((ConfigOptionInts,                filament_extruder_id))
     ((ConfigOptionStrings,             filament_extruder_variant))
+    ((ConfigOptionBool,                support_object_skip_flush))
     ((ConfigOptionEnum<BedTempFormula>, bed_temperature_formula))
     ((ConfigOptionInts,                physical_extruder_map))
     ((ConfigOptionIntsNullable,        nozzle_flush_dataset))
@@ -1269,6 +1280,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionIntsNullable,        filament_flush_temp))
     // BBS
     ((ConfigOptionBool,                scan_first_layer))
+    ((ConfigOptionEnum<PowerLossRecoveryMode>, enable_power_loss_recovery))
     ((ConfigOptionBool,                enable_wrapping_detection))
     ((ConfigOptionInt,                 wrapping_detection_layers))
     ((ConfigOptionPoints,              wrapping_exclude_area))
