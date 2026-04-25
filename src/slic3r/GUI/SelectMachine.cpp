@@ -1681,6 +1681,9 @@ void SelectMachineDialog::show_status(PrintDialogStatus status, std::vector<wxSt
     } else if (status == PrintDialogStatus::PrintStatusFilamentWarningHighChamberTempSoft || status == PrintDialogStatus::PrintStatusFilamentWarningUnknownHighChamberTempSoft) {
         Enable_Refresh_Button(true);
         Enable_Send_Button(true);
+    } else if (status == PrintStatusWarningExtFilamentNotMatch) {
+        Enable_Refresh_Button(true);
+        Enable_Send_Button(true);
     }
 
     /*enter perpare mode*/
@@ -3447,7 +3450,7 @@ void SelectMachineDialog::update_show_status(MachineObject* obj_)
         std::string filament_type = boost::to_upper_copy(m_ams_mapping_result[i].type);
         std::string filament_brand;
 
-        for (auto fs : m_filaments) {
+        for (auto& fs : m_filaments) {
             if (fs.id == m_ams_mapping_result[i].id) { filament_brand = m_filaments[i].brand; }
         }
 
@@ -3508,6 +3511,19 @@ void SelectMachineDialog::update_show_status(MachineObject* obj_)
             }
         }
     }
+
+    // Orca: show warning if external filament does not match
+    for (auto& m : m_ams_mapping_result) {
+        if (devPrinterUtil::IsVirtualSlot(m.ams_id)) {
+            for (auto& fs : m_filaments) {
+                if (fs.id == m.id && m.type != fs.type) {
+                    show_status(PrintDialogStatus::PrintStatusWarningExtFilamentNotMatch);
+                    goto ext_mismatch;
+                }
+            }
+        }
+    }
+    ext_mismatch:
 
     /*STUDIO-10970 check the k value and flow cali option*/
     if (m_checkbox_list["flow_cali"]->IsShown() && m_checkbox_list["flow_cali"]->getValue() == "auto") {
