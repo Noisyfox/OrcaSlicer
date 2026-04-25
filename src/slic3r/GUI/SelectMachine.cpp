@@ -1092,23 +1092,13 @@ bool SelectMachineDialog::do_ams_mapping(MachineObject *obj_,bool use_ams)
 
     //single nozzle
     else {
-        if (obj_->is_support_amx_ext_mix_mapping()){
-            map_opt = { false, true, false, false }; //four values: use_left_ams, use_right_ams, use_left_ext, use_right_ext
-            if (!use_ams) {
-                map_opt[1] = false;
-                map_opt[3] = true;
-            }
-            filament_result = DevMappingUtil::ams_filament_mapping(obj_, m_filaments, m_ams_mapping_result, map_opt);
-            //auto_supply_with_ext(obj_->vt_slot);
+        map_opt = { false, true, false, false }; //four values: use_left_ams, use_right_ams, use_left_ext, use_right_ext
+        if (!use_ams) {
+            map_opt[1] = false;
+            map_opt[3] = true;
         }
-        else {
-            map_opt = { false, true, false, false };
-            if (!use_ams) {
-                map_opt[1] = false;
-                map_opt[3] = true;
-            }
-            filament_result = DevMappingUtil::ams_filament_mapping(obj_, m_filaments, m_ams_mapping_result, map_opt);
-        }
+        filament_result = DevMappingUtil::ams_filament_mapping(obj_, m_filaments, m_ams_mapping_result, map_opt);
+        //auto_supply_with_ext(obj_->vt_slot);
     }
 
     if (filament_result == 0) {
@@ -1147,7 +1137,7 @@ bool SelectMachineDialog::do_ams_mapping(MachineObject *obj_,bool use_ams)
     return true;
 }
 
-bool SelectMachineDialog::get_ams_mapping_result(std::string &mapping_array_str, std::string& mapping_array_str2, std::string &ams_mapping_info)
+bool SelectMachineDialog::get_ams_mapping_result(std::string &mapping_array_str, std::string& mapping_array_str2, std::string &ams_mapping_info) const
 {
     if (m_ams_mapping_result.empty())
         return false;
@@ -1438,7 +1428,7 @@ bool SelectMachineDialog::is_nozzle_type_match(DevExtderSystem data, wxString& e
     return true;
 }
 
-int SelectMachineDialog::convert_filament_map_nozzle_id_to_task_nozzle_id(int nozzle_id)
+int SelectMachineDialog::convert_filament_map_nozzle_id_to_task_nozzle_id(int nozzle_id) const
 {
     if (nozzle_id == (int)FilamentMapNozzleId::NOZZLE_LEFT) {
         return (int)CloudTaskNozzleId::NOZZLE_LEFT;
