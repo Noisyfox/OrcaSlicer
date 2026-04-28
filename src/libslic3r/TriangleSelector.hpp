@@ -391,6 +391,9 @@ public:
         const indexed_triangle_set& target_its,
         const Transform3d& target_transform,
         const std::optional<std::reference_wrapper<const TriangleSplittingData>>& existing_painting);
+    // Shift all non-NONE leaf triangle states >= threshold by delta.
+    // Used to renumber painted filament IDs after a filament slot is inserted or removed.
+    void shift_states_above(EnforcerBlockerType threshold, int delta);
 
 protected:
     // Triangle and info about how it's split.
