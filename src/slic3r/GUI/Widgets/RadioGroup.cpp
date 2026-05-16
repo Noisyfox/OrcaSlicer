@@ -106,6 +106,11 @@ void RadioGroup::Create(
     }
     SetSelection(m_selectedIndex);
     SetSizer(f_sizer);
+
+    parent->Bind(wxEVT_DPI_CHANGED, [this](wxDPIChangedEvent e) {
+        for (size_t i = 0; i < m_item_count; ++i)
+            m_labelButtons[i]->Rescale();
+    });
 }
 
 void RadioGroup::SetSelection(int index, bool focus)
