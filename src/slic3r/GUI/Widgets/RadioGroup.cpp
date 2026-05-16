@@ -107,10 +107,6 @@ void RadioGroup::Create(
     SetSelection(m_selectedIndex);
     SetSizer(f_sizer);
 
-    parent->Bind(wxEVT_DPI_CHANGED, [this](wxDPIChangedEvent e) {
-        for (size_t i = 0; i < m_item_count; ++i)
-            m_labelButtons[i]->Rescale();
-    });
 }
 
 void RadioGroup::SetSelection(int index, bool focus)
@@ -172,6 +168,25 @@ bool RadioGroup::Enable(bool enable)
     }
 
     return result;
+};
+
+void RadioGroup::Rescale()
+{
+    m_on.msw_rescale();
+    m_off.msw_rescale();
+    m_on_hover.msw_rescale();
+    m_off_hover.msw_rescale();
+    m_disabled.msw_rescale();
+    for (size_t i = 0; i < m_item_count; ++i)
+        SetRadioIcon(i, i == m_selectedIndex);
+    for (size_t i = 0; i < m_item_count; ++i){
+        auto tx =  m_labelButtons[i];
+        tx->SetPaddingSize(FromDIP(wxSize(5,2)));
+        tx->SetBorderWidth(FromDIP(1));
+        tx->Rescale();
+    }
+    Layout();
+    Refresh();
 };
 
 // is focused
