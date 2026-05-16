@@ -1568,6 +1568,7 @@ FlowRateCalibrationDialog::FlowRateCalibrationDialog(wxWindow* parent, wxWindowI
 
     Layout();
     Fit();
+    v_sizer->SetSizeHints(this);
 }
 
 FlowRateCalibrationDialog::~FlowRateCalibrationDialog() {
@@ -1594,7 +1595,6 @@ void FlowRateCalibrationDialog::on_dpi_changed(const wxRect& suggested_rect) {
 
     Layout();
     this->Refresh();
-    Fit();
 }
 
 }} // namespace Slic3r::GUI
