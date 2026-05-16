@@ -315,17 +315,13 @@ void Tab::create_preset_tab()
 
     //StateColor::darkModeColorFor(wxColour(238, 238, 238)), wxDefaultPosition, wxSize(m_top_panel->GetSize().GetWidth(), 3 * wxGetApp().em_unit()), 8);
     auto search_sizer = new wxBoxSizer(wxHORIZONTAL);
-    m_search_input = new TextInput(m_search_item, wxEmptyString, wxEmptyString, wxEmptyString, wxDefaultPosition, wxDefaultSize, 0 | wxBORDER_NONE);
+    m_search_input = new TextInput(m_search_item, wxEmptyString, wxEmptyString, "search", wxDefaultPosition, wxDefaultSize, 0 | wxBORDER_NONE);
     m_search_input->SetBackgroundColour(wxColour(238, 238, 238));
     m_search_input->SetForegroundColour(wxColour(43, 52, 54));
     m_search_input->SetFont(wxGetApp().bold_font());
-    m_search_input->SetIcon(*BitmapCache().load_svg("search", FromDIP(16), FromDIP(16)));
     m_search_input->GetTextCtrl()->SetHint(_L("Search in preset") + dots);
-    search_sizer->Add(new wxWindow(m_search_item, wxID_ANY, wxDefaultPosition, wxSize(0, 0)), 0, wxEXPAND|wxLEFT|wxRIGHT, FromDIP(2));
+    m_search_input->GetTextCtrl()->SetSize(wxSize(-1, FromDIP(16))); // Centers text vertically
     search_sizer->Add(m_search_input, 1, wxEXPAND | wxALL, FromDIP(2));
-    //bbl for linux
-    //search_sizer->Add(new wxWindow(m_search_input, wxID_ANY, wxDefaultPosition, wxSize(0, 0)), 0, wxEXPAND | wxLEFT, 16);
-
 
      m_search_item->Bind(wxEVT_LEFT_DOWN, [this](wxMouseEvent &e) {
         m_search_input->SetFocus();
@@ -1319,6 +1315,11 @@ void Tab::msw_rescale()
 
     if (m_detach_preset_btn)
         m_detach_preset_btn->msw_rescale();
+
+    if (m_search_input){
+        m_search_input->Rescale();
+        m_search_input->GetTextCtrl()->SetSize(wxSize(-1, FromDIP(16)));
+    }
 
     // rescale icons for tree_ctrl
     for (ScalableBitmap& bmp : m_scaled_icons_list)
