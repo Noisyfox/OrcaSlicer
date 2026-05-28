@@ -369,7 +369,15 @@ void ModeSwitchButton::doRender(wxDC& dc)
 
         wxFontMetrics fm = dc.GetFontMetrics();
         int lineHeight   = fm.ascent + fm.descent + fm.internalLeading;
-        wxCoord y = std::floor(v_center - lineHeight * 0.50 - scale);
+
+#if   defined(__WXGTK__)
+	    double y_offset = 0;
+#elif defined(__WXMSW__)
+	    double y_offset = scale;
+#elif defined(__WXOSX_)
+        double y_offset = scale;
+#endif
+        wxCoord y = std::floor(v_center - lineHeight * 0.50 - y_offset);
 
         for (char c : str) {
             wxString ch(c);
