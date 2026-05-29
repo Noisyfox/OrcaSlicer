@@ -1861,8 +1861,6 @@ Print::ApplyStatus Print::apply(const Model &model, DynamicPrintConfig new_full_
             std::array<bool, static_cast<size_t>(EnforcerBlockerType::ExtruderMax) + 1> used_facet_states{};
             for (const ModelVolume *volume : volumes) {
                 const std::vector<bool> &volume_used_facet_states = volume->mmu_segmentation_facets.get_data().used_states;
-
-                assert(volume_used_facet_states.size() == used_facet_states.size());
                 for (size_t state_idx = 0; state_idx < std::min(volume_used_facet_states.size(), used_facet_states.size()); ++state_idx)
                     used_facet_states[state_idx] |= volume_used_facet_states[state_idx];
             }
