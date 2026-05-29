@@ -104,7 +104,16 @@ bool internal_solid_infill_uses_sparse_filament(const PrintRegion &region, Extru
 bool use_base_infill_filament_impl(const LayerTools &layer_tools, const PrintRegion &region)
 {
     const PrintRegionConfig &config = region.config();
-    if (!config.enable_infill_filament_override.value)
+
+    // Keep legacy "Filament for Features" behavior: an explicit sparse infill
+    // filament choice (different from wall filament) is an override even if the
+    // dedicated toggle is missing or false in the loaded config.
+    const bool explicit_sparse_override =
+        config.sparse_infill_filament.value > 0 &&
+        config.wall_filament.value > 0 &&
+        config.sparse_infill_filament.value != config.wall_filament.value;
+
+    if (!config.enable_infill_filament_override.value && !explicit_sparse_override)
         return true;
     if (layer_tools.object_layer_count <= 0)
         return false;
