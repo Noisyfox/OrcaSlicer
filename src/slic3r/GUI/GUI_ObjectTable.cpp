@@ -2804,13 +2804,28 @@ int ObjectTablePanel::init_bitmap()
     m_undo_bitmap = create_scaled_bitmap("lock_normal", nullptr, 18);
     m_color_bitmaps = get_extruder_color_icons();
 
+    const std::vector<std::string> all_colors = wxGetApp().plater()->get_extruder_colors_from_plater_config(nullptr, true);
+    if (all_colors.size() > m_color_bitmaps.size()) {
+        const double em = wxGetApp().em_unit();
+        const int    icon_width  = int(4.4 * em + 0.5);
+        const int    icon_height = int(2.0 * em + 0.5);
+        for (size_t idx = m_color_bitmaps.size(); idx < all_colors.size(); ++idx) {
+            if (all_colors[idx].empty()) {
+                m_color_bitmaps.push_back(nullptr);
+                continue;
+            }
+
+            m_color_bitmaps.push_back(get_extruder_color_icon(all_colors[idx], std::to_string(idx + 1), icon_width, icon_height));
+        }
+    }
+
     return 0;
 }
 
 int ObjectTablePanel::init_filaments_and_colors()
 {
     const std::vector<std::string> filament_presets = wxGetApp().preset_bundle->filament_presets;
-    const std::vector<std::string> filament_colors  = wxGetApp().plater()->get_extruder_colors_from_plater_config();
+    const std::vector<std::string> filament_colors  = wxGetApp().plater()->get_extruder_colors_from_plater_config(nullptr, true);
     m_filaments_count = filament_colors.size();
     if (m_filaments_count <= 0) {
         BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << boost::format(", can not get filaments, count: %1%, set to default") % m_filaments_count;
@@ -2844,9 +2859,9 @@ int ObjectTablePanel::init_filaments_and_colors()
                 continue;
             }
 
-            m_filaments_name[i] = wxString::Format("%d: Mixed Filament %d (F%u + F%u)",
-                                                   i + 1, i + 1,
-                                                   unsigned(mf.component_a), unsigned(mf.component_b));
+            m_filaments_name[i] = wxString::Format("%d: %s",
+                                                   i + 1,
+                                                   from_u8(mixed_filament_standardized_name(mf, physical_count)));
             break;
         }
 

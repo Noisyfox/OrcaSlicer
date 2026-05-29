@@ -1479,6 +1479,60 @@ std::string compute_mixed_filament_display_color(const MixedFilament &entry, con
         mix_b);
 }
 
+std::string mixed_filament_standardized_name(const MixedFilament &entry, size_t num_physical)
+{
+    const std::string normalized_pattern = MixedFilamentManager::normalize_manual_pattern(entry.manual_pattern);
+    if (!normalized_pattern.empty()) {
+        const std::string flattened = flatten_manual_pattern_groups(normalized_pattern);
+        return std::string("Pattern ") + (flattened.empty() ? normalized_pattern : flattened);
+    }
+
+    std::vector<std::pair<unsigned int, int>> parts;
+    parts.reserve(4);
+    auto append_part = [&parts](unsigned int component_id, int percent) {
+        if (component_id == 0 || percent <= 0)
+            return;
+        for (auto &part : parts) {
+            if (part.first == component_id) {
+                part.second += percent;
+                return;
+            }
+        }
+        parts.emplace_back(component_id, percent);
+    };
+
+    const std::vector<unsigned int> gradient_ids = decode_gradient_component_ids(entry.gradient_component_ids, num_physical);
+    if (gradient_ids.size() >= 3) {
+        std::vector<int> weights = decode_gradient_component_weights(entry.gradient_component_weights, gradient_ids.size());
+        if (weights.empty())
+            weights.assign(gradient_ids.size(), 1);
+        const std::vector<int> percentages = normalize_weight_vector_to_percent(weights);
+        for (size_t idx = 0; idx < gradient_ids.size() && idx < percentages.size(); ++idx)
+            append_part(gradient_ids[idx], percentages[idx]);
+    } else {
+        const unsigned int component_a = (entry.component_a >= 1 && entry.component_a <= num_physical)
+            ? entry.component_a
+            : 1;
+        const unsigned int component_b = (entry.component_b >= 1 && entry.component_b <= num_physical)
+            ? entry.component_b
+            : component_a;
+        const int pct_b = clamp_int(entry.mix_b_percent, 0, 100);
+        append_part(component_a, 100 - pct_b);
+        append_part(component_b, pct_b);
+    }
+
+    if (parts.empty())
+        return "1:100%";
+
+    std::ostringstream out;
+    for (size_t idx = 0; idx < parts.size(); ++idx) {
+        if (idx > 0)
+            out << " + ";
+        out << parts[idx].first << ':' << parts[idx].second << '%';
+    }
+    return out.str();
+}
+
 // ---------------------------------------------------------------------------
 // MixedFilamentManager
 // ---------------------------------------------------------------------------

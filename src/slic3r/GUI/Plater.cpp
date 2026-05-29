@@ -963,9 +963,17 @@ struct DynamicFilamentList : DynamicList
         return wxString::Format(_L("Filament %d"), int(filament_id_1based));
     }
 
-    static wxString mixed_filament_label()
+    static wxString mixed_filament_label(unsigned int filament_id_1based, size_t num_physical)
     {
-        return _L("Mixed Filament");
+        if (wxGetApp().preset_bundle == nullptr)
+            return _L("Mixed Filament");
+
+        const auto &mgr = wxGetApp().preset_bundle->mixed_filaments;
+        const MixedFilament *mixed = mgr.mixed_filament_from_id(filament_id_1based, num_physical);
+        if (mixed == nullptr)
+            return _L("Mixed Filament");
+
+        return from_u8(mixed_filament_standardized_name(*mixed, num_physical));
     }
 
     static wxBitmap *fallback_icon_from_color(unsigned int                    filament_id_1based,
@@ -994,7 +1002,7 @@ struct DynamicFilamentList : DynamicList
 
         wxString label = filament_id_1based <= num_physical
             ? physical_filament_label(filament_id_1based)
-            : mixed_filament_label();
+            : mixed_filament_label(filament_id_1based, num_physical);
 
         items.push_back({label, icon});
         filament_ids.push_back(int(filament_id_1based));
@@ -4430,14 +4438,14 @@ void Sidebar::update_mixed_filament_panel(bool sync_manager)
     for (const std::string &hex : physical_colors)
         palette.emplace_back(parse_mixed_color(hex));
 
-    auto mixed_summary_text = [&mixed](size_t mixed_id) -> wxString {
+    auto mixed_display_name = [&mixed, num_physical](size_t mixed_id) -> wxString {
         if (mixed_id >= mixed.size()) return wxString();
         const MixedFilament &entry = mixed[mixed_id];
-        if (!entry.custom)
-            return wxString::Format("(Filament %u + Filament %u)", unsigned(entry.component_a), unsigned(entry.component_b));
-        const std::string normalized = MixedFilamentManager::normalize_manual_pattern(entry.manual_pattern);
-        if (!normalized.empty()) return _L("(Pattern)");
-        return wxString::Format("(F%u + F%u)", unsigned(entry.component_a), unsigned(entry.component_b));
+        return from_u8(mixed_filament_standardized_name(entry, num_physical));
+    };
+
+    auto mixed_summary_text = [](size_t) -> wxString {
+        return wxString();
     };
 
     auto apply_mixed_entry_changes = [this, preset_bundle, print_cfg, num_physical]
@@ -4545,9 +4553,7 @@ void Sidebar::update_mixed_filament_panel(bool sync_manager)
         swatch->SetMinSize(wxSize(FromDIP(12), FromDIP(12)));
         header_sizer->Add(swatch, 0, wxALIGN_CENTER_VERTICAL | wxLEFT, compact_gap_x);
 
-        const int virtual_filament_id = int(num_physical + display_idx + 1);
-        auto *name_label    = new wxStaticText(header_panel, wxID_ANY,
-                                                wxString::Format("Mixed Filament %d", virtual_filament_id));
+        auto *name_label    = new wxStaticText(header_panel, wxID_ANY, mixed_display_name(mixed_id));
         name_label->SetForegroundColour(mixed_text_fg);
         header_sizer->Add(name_label, 0, wxALIGN_CENTER_VERTICAL | wxLEFT, compact_gap_x);
 
@@ -4642,9 +4648,9 @@ void Sidebar::update_mixed_filament_panel(bool sync_manager)
         };
 
         auto ensure_editor = [this, mixed_id, num_physical, physical_colors, nozzle_diameters, palette,
-                              preview_settings, component_bias_enabled, preset_bundle,
-                              editor_host, editor_sizer, swatch, summary_label, header_panel, row,
-                              rows_scroller, mixed_summary_text, apply_mixed_entry_changes, &mixed]() {
+                      preview_settings, component_bias_enabled, preset_bundle,
+                      editor_host, editor_sizer, swatch, name_label, summary_label, header_panel, row,
+                      rows_scroller, mixed_display_name, mixed_summary_text, apply_mixed_entry_changes, &mixed]() {
             if (!preset_bundle || !editor_sizer || editor_sizer->GetItemCount() > 0) return;
             auto &mgr2 = preset_bundle->mixed_filaments;
             auto &mfs2 = mgr2.mixed_filaments();
@@ -4653,14 +4659,16 @@ void Sidebar::update_mixed_filament_panel(bool sync_manager)
                 editor_host, mixed_id, mfs2[mixed_id], num_physical,
                 physical_colors, nozzle_diameters, palette, preview_settings,
                 component_bias_enabled,
-                [this, mixed_id, swatch, summary_label, header_panel, row, rows_scroller,
-                 mixed_summary_text, apply_mixed_entry_changes]
+                [this, mixed_id, swatch, name_label, summary_label, header_panel, row, rows_scroller,
+                 mixed_display_name, mixed_summary_text, apply_mixed_entry_changes]
                 (const MixedFilament &updated_mf) {
                     apply_mixed_entry_changes(mixed_id, updated_mf, true);
                     if (swatch) {
                         swatch->SetBackgroundColour(parse_mixed_color(updated_mf.display_color));
                         swatch->Refresh();
                     }
+                    if (name_label)
+                        name_label->SetLabel(mixed_display_name(mixed_id));
                     if (summary_label)
                         summary_label->SetLabel(mixed_summary_text(mixed_id));
                     if (header_panel) header_panel->Layout();

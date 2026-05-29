@@ -144,6 +144,11 @@ std::pair<int, int> mixed_filament_apparent_pair_percentages(const MixedFilament
                                                              bool                                bias_mode_enabled);
 std::string compute_mixed_filament_display_color(const MixedFilament &entry, const MixedFilamentDisplayContext &context);
 
+// Build a standardized user-facing mixed filament name.
+// - Pattern rows: "Pattern <flattened pattern>" (for example "Pattern 1212354").
+// - Mix rows: "<id>:<pct>% + <id>:<pct>% ..." (for example "1:30% + 2:20% + 3:50%").
+std::string mixed_filament_standardized_name(const MixedFilament &entry, size_t num_physical);
+
 // ---------------------------------------------------------------------------
 // MixedFilamentManager
 //
