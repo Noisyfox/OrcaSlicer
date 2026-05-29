@@ -4154,20 +4154,22 @@ DynamicPrintConfig PresetBundle::full_fff_config(bool apply_extruder, std::optio
     //BBS: add logic for settings check between different system presets
     out.erase("different_settings_to_system");
 
-    static const char* keys[] = {"support_filament", "support_interface_filament", "wipe_tower_filament"};
-    for (size_t i = 0; i < sizeof(keys) / sizeof(keys[0]); ++ i) {
-        std::string key = std::string(keys[i]);
+    const size_t num_total_filaments = this->mixed_filaments.total_filaments(num_filaments);
+
+    static const char* support_keys[] = {"support_filament", "support_interface_filament"};
+    for (size_t i = 0; i < sizeof(support_keys) / sizeof(support_keys[0]); ++ i) {
+        std::string key = std::string(support_keys[i]);
         auto *opt = dynamic_cast<ConfigOptionInt*>(out.option(key, false));
         assert(opt != nullptr);
         opt->value = boost::algorithm::clamp<int>(opt->value, 0, int(num_filaments));
     }
 
-    static const char* keys_with_default[] = {"wall_filament", "sparse_infill_filament", "solid_infill_filament"};
-    for (size_t i = 0; i < sizeof(keys_with_default) / sizeof(keys_with_default[0]); ++ i) {
-        std::string key = std::string(keys_with_default[i]);
+    static const char* feature_keys[] = {"wall_filament", "sparse_infill_filament", "solid_infill_filament", "wipe_tower_filament"};
+    for (size_t i = 0; i < sizeof(feature_keys) / sizeof(feature_keys[0]); ++ i) {
+        std::string key = std::string(feature_keys[i]);
         auto *opt = dynamic_cast<ConfigOptionInt*>(out.option(key, false));
         assert(opt != nullptr);
-        if(opt->value < 0 || opt->value > int(num_filaments))
+        if (opt->value < 0 || opt->value > int(num_total_filaments))
             opt->value = 0;
     }
     out.option<ConfigOptionString >("print_settings_id",    true)->value  = this->prints.get_selected_preset_name();

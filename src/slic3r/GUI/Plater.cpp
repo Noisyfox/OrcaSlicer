@@ -932,19 +932,116 @@ std::vector<int> get_min_flush_volumes(const DynamicPrintConfig &full_config, si
 
 struct DynamicFilamentList : DynamicList
 {
+    explicit DynamicFilamentList(bool include_mixed = false)
+        : m_include_mixed(include_mixed)
+    {}
+
     std::vector<std::pair<wxString, wxBitmap *>> items;
+    std::vector<int>                              filament_ids;
+    bool                                          m_include_mixed = false;
+
+    static wxString physical_filament_label(unsigned int filament_id_1based)
+    {
+        if (filament_id_1based == 0)
+            return _L("Default");
+
+        if (wxGetApp().preset_bundle == nullptr)
+            return wxString::Format(_L("Filament %d"), int(filament_id_1based));
+
+        const auto &filament_presets = wxGetApp().preset_bundle->filament_presets;
+        const size_t preset_idx = size_t(filament_id_1based - 1);
+        if (preset_idx < filament_presets.size()) {
+            auto *preset = wxGetApp().preset_bundle->filaments.find_preset(filament_presets[preset_idx]);
+            if (preset != nullptr) {
+                std::string type;
+                preset->get_filament_type(type);
+                if (!type.empty())
+                    return from_u8(type);
+            }
+        }
+
+        return wxString::Format(_L("Filament %d"), int(filament_id_1based));
+    }
+
+    static wxString mixed_filament_label()
+    {
+        return _L("Mixed Filament");
+    }
+
+    static wxBitmap *fallback_icon_from_color(unsigned int                    filament_id_1based,
+                                              unsigned int                    display_filament_id_1based,
+                                              const std::vector<std::string> &all_colors)
+    {
+        if (filament_id_1based == 0 || size_t(filament_id_1based) > all_colors.size())
+            return nullptr;
+
+        const std::string &color = all_colors[size_t(filament_id_1based - 1)];
+        if (color.empty())
+            return nullptr;
+
+        const double em = wxGetApp().em_unit();
+        const int    icon_width  = lround(2.0 * em);
+        const int    icon_height = lround(2.0 * em);
+        return get_extruder_color_icon(color, std::to_string(display_filament_id_1based), icon_width, icon_height);
+    }
+
+    void append_filament_item(unsigned int filament_id_1based,
+                              size_t       num_physical,
+                              wxBitmap    *icon)
+    {
+        if (filament_id_1based == 0)
+            return;
+
+        wxString label = filament_id_1based <= num_physical
+            ? physical_filament_label(filament_id_1based)
+            : mixed_filament_label();
+
+        items.push_back({label, icon});
+        filament_ids.push_back(int(filament_id_1based));
+    }
+
+    std::vector<unsigned int> ordered_filament_ids() const
+    {
+        std::vector<unsigned int> ids;
+        if (wxGetApp().preset_bundle == nullptr)
+            return ids;
+
+        const size_t num_physical = wxGetApp().preset_bundle->filament_presets.size();
+        ids.reserve(num_physical);
+
+        if (m_include_mixed && wxGetApp().plater() != nullptr) {
+            ids = wxGetApp().plater()->sidebar().get_ui_ordered_filament_ids();
+            return ids;
+        }
+
+        for (size_t idx = 0; idx < num_physical; ++idx)
+            ids.emplace_back(unsigned(idx + 1));
+        return ids;
+    }
 
     void apply_on(Choice *c) override
     {
         if (items.empty())
             update(true);
         auto cb = dynamic_cast<ComboBox *>(c->window);
+        const int old_index = cb->GetSelection();
+        long old_filament_id = 0;
+        if (old_index >= 0) {
+            wxString old_value = get_value(old_index);
+            old_value.ToLong(&old_filament_id);
+        }
+
         wxString old_selection = cb->GetStringSelection();
-        int old_index  = cb->GetSelection();
         cb->Clear();
         cb->Append(_L("Default"));
         for (auto i : items) {
             cb->Append(i.first, i.second ? *i.second : wxNullBitmap);
+        }
+
+        const int mapped_index = old_index >= 0 ? index_of(wxString::Format("%ld", old_filament_id)) : -1;
+        if (mapped_index >= 0 && (unsigned int)mapped_index < cb->GetCount()) {
+            cb->SetSelection(mapped_index);
+            return;
         }
 
         if (old_index >= 0 && (unsigned int) old_index < cb->GetCount()) {
@@ -963,29 +1060,67 @@ struct DynamicFilamentList : DynamicList
     }
     wxString get_value(int index) override
     {
-        wxString str;
-        str << index;
-        return str;
+        if (index <= 0)
+            return wxString("0");
+        if (size_t(index) <= filament_ids.size())
+            return wxString::Format("%d", filament_ids[size_t(index - 1)]);
+        return wxString("0");
     }
+
     int index_of(wxString value) override
     {
         long n = 0;
-        return (value.ToLong(&n) && n <= items.size()) ? int(n) : -1;
+        if (!value.ToLong(&n))
+            return -1;
+        if (n == 0)
+            return 0;
+
+        auto it = std::find(filament_ids.begin(), filament_ids.end(), int(n));
+        if (it == filament_ids.end())
+            return -1;
+        return int(std::distance(filament_ids.begin(), it)) + 1;
     }
+
     void update(bool force = false)
     {
         items.clear();
+        filament_ids.clear();
         if (!force && m_choices.empty())
             return;
-        auto icons = get_extruder_color_icons(true);
-        auto presets = wxGetApp().preset_bundle->filament_presets;
-        for (int i = 0; i < presets.size(); ++i) {
-            wxString str;
-            std::string type;
-            wxGetApp().preset_bundle->filaments.find_preset(presets[i])->get_filament_type(type);
-            str << type;
-            items.push_back({str, i < icons.size() ? icons[i] : nullptr});
+
+        if (wxGetApp().preset_bundle == nullptr) {
+            DynamicList::update();
+            return;
         }
+
+        const std::vector<unsigned int> ids = ordered_filament_ids();
+        const size_t num_physical = wxGetApp().preset_bundle->filament_presets.size();
+        const auto icons = get_extruder_color_icons(true);
+        std::vector<std::string> all_colors;
+        if (wxGetApp().plater() != nullptr)
+            all_colors = wxGetApp().plater()->get_extruder_colors_from_plater_config(nullptr, true);
+
+        for (size_t display_idx = 0; display_idx < ids.size(); ++display_idx) {
+            const unsigned int filament_id = ids[display_idx];
+            wxBitmap *icon = nullptr;
+            if (filament_id >= 1 && size_t(filament_id) <= icons.size())
+                icon = icons[size_t(filament_id - 1)];
+            if (icon == nullptr)
+                icon = fallback_icon_from_color(filament_id, unsigned(display_idx + 1), all_colors);
+
+            append_filament_item(filament_id, num_physical, icon);
+        }
+
+        if (items.empty()) {
+            for (size_t idx = 0; idx < num_physical; ++idx) {
+                const unsigned int filament_id = unsigned(idx + 1);
+                wxBitmap *icon = (filament_id >= 1 && size_t(filament_id) <= icons.size())
+                    ? icons[size_t(filament_id - 1)]
+                    : fallback_icon_from_color(filament_id, filament_id, all_colors);
+                append_filament_item(filament_id, num_physical, icon);
+            }
+        }
+
         DynamicList::update();
     }
 };
@@ -1005,7 +1140,8 @@ static bool has_junction_deviation(const DynamicPrintConfig* printer_config)
            junction_dev->values.front() > 0.0;
 }
 
-static DynamicFilamentList dynamic_filament_list;
+static DynamicFilamentList dynamic_feature_filament_list(true);
+static DynamicFilamentList dynamic_support_filament_list(false);
 
 class AMSCountPopupWindow : public PopupWindow
 {
@@ -1710,12 +1846,13 @@ void Sidebar::update_sync_ams_btn_enable(wxUpdateUIEvent &e)
 Sidebar::Sidebar(Plater *parent)
     : wxPanel(parent, wxID_ANY, wxDefaultPosition, wxSize(39 * wxGetApp().em_unit(), -1)), p(new priv(parent))
 {
-    Choice::register_dynamic_list("support_filament", &dynamic_filament_list);
-    Choice::register_dynamic_list("support_interface_filament", &dynamic_filament_list);
-    Choice::register_dynamic_list("wall_filament", &dynamic_filament_list);
-    Choice::register_dynamic_list("sparse_infill_filament", &dynamic_filament_list);
-    Choice::register_dynamic_list("solid_infill_filament", &dynamic_filament_list);
-    Choice::register_dynamic_list("wipe_tower_filament", &dynamic_filament_list);
+    Choice::register_dynamic_list("support_filament", &dynamic_support_filament_list);
+    Choice::register_dynamic_list("support_interface_filament", &dynamic_support_filament_list);
+    Choice::register_dynamic_list("wall_filament", &dynamic_feature_filament_list);
+    Choice::register_dynamic_list("sparse_infill_filament", &dynamic_feature_filament_list);
+    Choice::register_dynamic_list("solid_infill_filament", &dynamic_feature_filament_list);
+    Choice::register_dynamic_list("wipe_tower_filament", &dynamic_feature_filament_list);
+    Choice::register_dynamic_list("extruder", &dynamic_feature_filament_list);
 
     p->scrolled = new wxPanel(this);
     //    p->scrolled->SetScrollbars(0, 100, 1, 2); // ys_DELETE_after_testing. pixelsPerUnitY = 100
@@ -3377,7 +3514,7 @@ void Sidebar::on_filaments_delete(size_t filament_id)
     Layout();
     p->m_panel_filament_title->Refresh();
     update_ui_from_settings();
-    dynamic_filament_list.update();
+    update_dynamic_filament_list();
     update_mixed_filament_panel();
 }
 
@@ -3754,7 +3891,7 @@ void Sidebar::sync_ams_list(bool is_from_big_sync_btn)
         if (m_sync_dlg->is_dirty_filament()) {
             wxGetApp().get_tab(Preset::TYPE_FILAMENT)->select_preset(wxGetApp().preset_bundle->filament_presets[0], false, "", false, true);
             wxGetApp().preset_bundle->export_selections(*wxGetApp().app_config);
-            dynamic_filament_list.update();
+            update_dynamic_filament_list();
         }
         m_sync_dlg->set_check_dirty_fialment(false);
         dlg_res = m_sync_dlg->ShowModal();
@@ -3980,7 +4117,8 @@ void Sidebar::show_SEMM_buttons()
 
 void Sidebar::update_dynamic_filament_list()
 {
-    dynamic_filament_list.update();
+    dynamic_feature_filament_list.update();
+    dynamic_support_filament_list.update();
 }
 
 // ---------------------------------------------------------------------------

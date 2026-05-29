@@ -479,22 +479,41 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
         }
     }
 
-    // BBS: Rule 1 — reject out-of-range AND mixed filament IDs in support/wall/infill slots.
-    // Mixed filaments (virtual IDs > num_phys) cannot be used in these roles; reset to 0.
+    // Rule 1:
+    // - support slots stay physical-only
+    // - feature slots (wall/infill/wipe tower) may use mixed virtual IDs
+    // Any out-of-range value is reset to 0.
     {
-        static const char* filament_slot_keys[] = {
-            "support_filament", "support_interface_filament",
-            "wall_filament", "sparse_infill_filament", "solid_infill_filament"
+        static const char* support_slot_keys[] = {
+            "support_filament", "support_interface_filament"
         };
-        size_t total    = wxGetApp().preset_bundle->total_filament_count();
-        size_t num_phys = wxGetApp().preset_bundle->filament_presets.size();
-        for (auto key : filament_slot_keys) {
+        static const char* feature_slot_keys[] = {
+            "wall_filament", "sparse_infill_filament", "solid_infill_filament", "wipe_tower_filament"
+        };
+
+        const size_t total    = wxGetApp().preset_bundle->total_filament_count();
+        const size_t num_phys = wxGetApp().preset_bundle->filament_presets.size();
+
+        for (auto key : support_slot_keys) {
             auto* opt = dynamic_cast<ConfigOptionInt*>(config->option(key, false));
-            if (!opt) continue;
-            int val = opt->getInt();
-            bool out_of_range = val > (int)total;
-            bool is_mixed     = (val > (int)num_phys && val <= (int)total);
+            if (!opt)
+                continue;
+            const int val = opt->getInt();
+            const bool out_of_range = val < 0 || val > int(total);
+            const bool is_mixed     = val > int(num_phys) && val <= int(total);
             if (out_of_range || is_mixed) {
+                DynamicPrintConfig new_conf = *config;
+                new_conf.set_key_value(key, new ConfigOptionInt(0));
+                apply(config, &new_conf);
+            }
+        }
+
+        for (auto key : feature_slot_keys) {
+            auto* opt = dynamic_cast<ConfigOptionInt*>(config->option(key, false));
+            if (!opt)
+                continue;
+            const int val = opt->getInt();
+            if (val < 0 || val > int(total)) {
                 DynamicPrintConfig new_conf = *config;
                 new_conf.set_key_value(key, new ConfigOptionInt(0));
                 apply(config, &new_conf);
