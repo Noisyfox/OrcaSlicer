@@ -5,6 +5,7 @@
 #include "libslic3r/MixedFilament.hpp"
 #include "libslic3r/PresetBundle.hpp"
 #include "libslic3r/Print.hpp"
+#include "libslic3r/TriangleSelector.hpp"
 #include "libslic3r/GCode/ToolOrdering.hpp"
 
 #include <algorithm>
@@ -124,6 +125,21 @@ TEST_CASE("Mixed filament remap follows stable row ids when same-pair rows reord
     REQUIRE(new_second_custom_virtual_id != 0);
     CHECK(remap[3] == new_first_custom_virtual_id);
     CHECK(remap[4] == new_second_custom_virtual_id);
+}
+
+TEST_CASE("TriangleSelector round-trips paint states above 16", "[MixedFilament][TriangleSelector]")
+{
+    TriangleMesh mesh = make_cube(20., 20., 20.);
+
+    TriangleSelector source(mesh);
+    source.set_facet(0, EnforcerBlockerType::Extruder32);
+    const TriangleSelector::TriangleSplittingData serialized = source.serialize();
+
+    REQUIRE(TriangleSelector::has_facets(serialized, EnforcerBlockerType::Extruder32));
+
+    TriangleSelector restored(mesh);
+    restored.deserialize(serialized, true, EnforcerBlockerType::ExtruderMax);
+    CHECK(restored.has_facets(EnforcerBlockerType::Extruder32));
 }
 
 TEST_CASE("Mixed filament remap keeps later painted colors stable when an earlier mixed row is deleted", "[MixedFilament]")
