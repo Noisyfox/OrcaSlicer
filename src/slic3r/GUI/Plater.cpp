@@ -2471,7 +2471,7 @@ Sidebar::Sidebar(Plater *parent)
         mgr.add_custom_filament(1, 2, 50, colors);
         auto &mfs = mgr.mixed_filaments();
         if (!mfs.empty()) {
-            mfs.back().manual_pattern = "1,2";
+            mfs.back().manual_pattern = "12";
             mfs.back().custom = true;
         }
         if (ConfigOptionString *opt = wxGetApp().preset_bundle->project_config.option<ConfigOptionString>("mixed_filament_definitions"))

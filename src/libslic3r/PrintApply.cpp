@@ -4,8 +4,6 @@
 
 #include <boost/log/trivial.hpp>
 #include <cfloat>
-#include <limits>
-#include <sstream>
 
 namespace Slic3r {
 
@@ -1142,23 +1140,16 @@ static void append_mixed_component_extruders(const MixedFilamentManager &mixed_m
         append_unique_painted_extruder(painting_extruders, unsigned(token - '0'), num_physical_extruders);
     }
 
-    const std::string normalized_pattern = MixedFilamentManager::normalize_manual_pattern(mixed_row->manual_pattern);
-    if (!normalized_pattern.empty()) {
-        std::stringstream ss(normalized_pattern);
-        std::string token;
-        while (std::getline(ss, token, ',')) {
-            if (token.empty())
-                continue;
-            try {
-                size_t consumed = 0;
-                const unsigned long value = std::stoul(token, &consumed);
-                if (consumed != token.size() || value == 0 || value > std::numeric_limits<unsigned int>::max())
-                    continue;
-                append_unique_painted_extruder(painting_extruders, static_cast<unsigned int>(value), num_physical_extruders);
-            } catch (...) {
-                continue;
-            }
-        }
+    for (char token : mixed_row->manual_pattern) {
+        unsigned int extruder_id = 0;
+        if (token == '1')
+            extruder_id = mixed_row->component_a;
+        else if (token == '2')
+            extruder_id = mixed_row->component_b;
+        else if (token >= '3' && token <= '9')
+            extruder_id = unsigned(token - '0');
+
+        append_unique_painted_extruder(painting_extruders, extruder_id, num_physical_extruders);
     }
 }
 

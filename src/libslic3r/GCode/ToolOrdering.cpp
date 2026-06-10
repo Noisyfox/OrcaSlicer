@@ -81,10 +81,13 @@ bool has_grouped_manual_pattern(const MixedFilamentManager *mixed_mgr,
                                 size_t                      num_physical,
                                 unsigned int                filament_id_1based)
 {
-    (void)mixed_mgr;
-    (void)num_physical;
-    (void)filament_id_1based;
-    return false;
+    if (!(mixed_mgr && mixed_mgr->is_mixed(filament_id_1based, num_physical)))
+        return false;
+    const MixedFilament *mixed_row = mixed_mgr->mixed_filament_from_id(filament_id_1based, num_physical);
+    if (mixed_row == nullptr)
+        return false;
+    const std::string normalized = MixedFilamentManager::normalize_manual_pattern(mixed_row->manual_pattern);
+    return normalized.find(',') != std::string::npos;
 }
 
 void append_unique_preserve_order(std::vector<unsigned int> &dst, unsigned int value)

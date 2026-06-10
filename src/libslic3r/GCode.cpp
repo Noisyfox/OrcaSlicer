@@ -31,7 +31,6 @@
 #include <chrono>
 #include <iostream>
 #include <iterator>
-#include <limits>
 #include <numeric>
 #include <math.h>
 #include <stdlib.h>
@@ -3797,35 +3796,25 @@ size_t GCode::get_extruder_id(unsigned int filament_id) const
 // ---------------------------------------------------------------------------
 namespace {
 
-// Decode a manual pattern string (e.g. "1,2,12,11") into a sequence of
-// 1-based physical extruder IDs.
+// Decode a manual pattern string (e.g. "121212") into a sequence of
+// 1-based physical extruder IDs, honouring component_a / component_b aliases.
 static std::vector<unsigned int> decode_manual_pattern_sequence_for_gcode(
     const MixedFilament& mf, size_t num_physical)
 {
     std::vector<unsigned int> sequence;
-    if (mf.manual_pattern.empty() || num_physical == 0)
+    if (mf.manual_pattern.empty())
         return sequence;
-
-    const std::string normalized = MixedFilamentManager::normalize_manual_pattern(mf.manual_pattern);
-    if (normalized.empty())
-        return sequence;
-
-    std::stringstream ss(normalized);
-    std::string token;
-    while (std::getline(ss, token, ',')) {
-        if (token.empty())
-            continue;
-        try {
-            size_t consumed = 0;
-            const unsigned long value = std::stoul(token, &consumed);
-            if (consumed != token.size() || value == 0 || value > std::numeric_limits<unsigned int>::max())
-                continue;
-            const unsigned int extruder_id = static_cast<unsigned int>(value);
-            if (extruder_id >= 1 && extruder_id <= num_physical)
-                sequence.emplace_back(extruder_id);
-        } catch (...) {
-            continue;
-        }
+    sequence.reserve(mf.manual_pattern.size());
+    for (const char token : mf.manual_pattern) {
+        unsigned int extruder_id = 0;
+        if (token == '1')
+            extruder_id = mf.component_a;
+        else if (token == '2')
+            extruder_id = mf.component_b;
+        else if (token >= '3' && token <= '9')
+            extruder_id = unsigned(token - '0');
+        if (extruder_id >= 1 && extruder_id <= num_physical)
+            sequence.emplace_back(extruder_id);
     }
     return sequence;
 }
@@ -5834,16 +5823,32 @@ LayerResult GCode::process_layer(
         return inserted.first->second.empty() ? nullptr : &inserted.first->second;
     };
 
-    // Legacy grouped-perimeter pattern split is disabled for numeric comma-delimited
-    // manual patterns; commas now delimit physical filament IDs.
+    // Lambda: if `entity_type == PERIMETERS` and the configured filament has a grouped
+    // (comma-containing) manual pattern, return that filament's virtual 1-based ID so
+    // that split_extrusion_collection_for_multi_perimeter_pattern() can be used.
+    // Returns 0 when no grouped pattern applies.
     auto grouped_manual_pattern_mixed_filament_id =
         [&](const GCode::ObjectByExtruder::Island::Region::Type entity_type,
             const ExtrusionEntityCollection&                    entities,
             const PrintRegion&                                  region) -> unsigned int {
-        (void)entity_type;
         (void)entities;
-        (void)region;
-        return 0;
+        if (layer_tools.mixed_mgr == nullptr || layer_tools.num_physical == 0)
+            return 0;
+        if (entity_type != ObjectByExtruder::Island::Region::PERIMETERS)
+            return 0;
+        unsigned int filament_id_1based =
+            layer_tools.extruder_override != 0 ?
+                layer_tools.extruder_override :
+                unsigned(region.config().wall_filament.value);
+        if (!layer_tools.mixed_mgr->is_mixed(filament_id_1based, layer_tools.num_physical))
+            return 0;
+        const MixedFilament* mixed_row = layer_tools.mixed_mgr->mixed_filament_from_id(
+            filament_id_1based, layer_tools.num_physical);
+        if (mixed_row == nullptr)
+            return 0;
+        const std::string normalized_pattern =
+            MixedFilamentManager::normalize_manual_pattern(mixed_row->manual_pattern);
+        return normalized_pattern.find(',') != std::string::npos ? filament_id_1based : 0;
     };
 
     // Storage for dynamically-created split collections that must outlive the
@@ -6112,7 +6117,7 @@ LayerResult GCode::process_layer(
                             correct_extruder_id >= 0) {
 
                             // 1. Uniform-segment pointillism (SameLayerPointillisme with a
-                            //    simple ratio or a numeric manual pattern sequence).
+                            //    simple ratio or a non-comma manual pattern).
                             const unsigned int cfg_filament_id_1based =
                                 layer_tools.extruder_override != 0 ?
                                     layer_tools.extruder_override :
@@ -6180,8 +6185,8 @@ LayerResult GCode::process_layer(
                                 ++pointillism_path_split_fallbacks;
                             }
 
-                            // 2. Legacy grouped per-perimeter-index pattern path.
-                            //    Kept for compatibility plumbing; currently disabled.
+                            // 2. Grouped per-perimeter-index pattern (comma-separated manual
+                            //    pattern, e.g. "12,21").  Uses resolve_perimeter() via inset_idx.
                             if (entity_type == ObjectByExtruder::Island::Region::PERIMETERS) {
                                 const unsigned int grouped_id =
                                     grouped_manual_pattern_mixed_filament_id(

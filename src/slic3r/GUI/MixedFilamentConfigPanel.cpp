@@ -33,7 +33,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <limits>
 #include <numeric>
 #include <sstream>
 #include <string>
@@ -51,21 +50,39 @@ namespace Slic3r { namespace GUI {
 namespace {
 
 // -- Plater.cpp:4849 --------------------------------------------------------
-static bool parse_manual_pattern_preview_id_token(const std::string &token, unsigned int &out)
+static std::vector<std::string> split_manual_pattern_preview_groups(const std::string &pattern)
 {
-    if (token.empty())
-        return false;
+    std::vector<std::string> groups;
+    if (pattern.empty())
+        return groups;
 
-    try {
-        size_t consumed = 0;
-        const unsigned long value = std::stoul(token, &consumed);
-        if (consumed != token.size() || value == 0 || value > std::numeric_limits<unsigned int>::max())
-            return false;
-        out = static_cast<unsigned int>(value);
-        return true;
-    } catch (...) {
-        return false;
+    std::string current;
+    for (const char c : pattern) {
+        if (c == ',') {
+            if (!current.empty()) {
+                groups.emplace_back(std::move(current));
+                current.clear();
+            }
+            continue;
+        }
+        current.push_back(c);
     }
+    if (!current.empty())
+        groups.emplace_back(std::move(current));
+    return groups;
+}
+
+static unsigned int decode_manual_pattern_preview_token(char token, unsigned int component_a, unsigned int component_b, size_t num_physical)
+{
+    unsigned int extruder_id = 0;
+    if (token == '1')
+        extruder_id = component_a;
+    else if (token == '2')
+        extruder_id = component_b;
+    else if (token >= '3' && token <= '9')
+        extruder_id = unsigned(token - '0');
+
+    return (extruder_id >= 1 && extruder_id <= num_physical) ? extruder_id : 0;
 }
 
 static std::vector<unsigned int> build_grouped_manual_pattern_preview_sequence(const std::string &pattern,
@@ -74,10 +91,6 @@ static std::vector<unsigned int> build_grouped_manual_pattern_preview_sequence(c
                                                                                size_t             num_physical,
                                                                                size_t             wall_loops)
 {
-    (void)component_a;
-    (void)component_b;
-    (void)wall_loops;
-
     std::vector<unsigned int> sequence;
     if (num_physical == 0)
         return sequence;
@@ -86,14 +99,46 @@ static std::vector<unsigned int> build_grouped_manual_pattern_preview_sequence(c
     if (normalized.empty())
         return sequence;
 
-    std::stringstream ss(normalized);
-    std::string token;
-    while (std::getline(ss, token, ',')) {
-        unsigned int id = 0;
-        if (!parse_manual_pattern_preview_id_token(token, id))
+    const std::vector<std::string> groups = split_manual_pattern_preview_groups(normalized);
+    if (groups.empty())
+        return sequence;
+
+    if (groups.size() == 1) {
+        sequence.reserve(normalized.size());
+        for (const char token : normalized) {
+            const unsigned int extruder_id =
+                decode_manual_pattern_preview_token(token, component_a, component_b, num_physical);
+            if (extruder_id != 0)
+                sequence.emplace_back(extruder_id);
+        }
+        return sequence;
+    }
+
+    constexpr size_t k_max_preview_cycle = 48;
+    size_t cycle = 1;
+    for (const std::string &group : groups) {
+        if (group.empty())
             continue;
-        if (id >= 1 && id <= num_physical)
-            sequence.emplace_back(id);
+        cycle = std::lcm(cycle, group.size());
+        if (cycle >= k_max_preview_cycle) {
+            cycle = k_max_preview_cycle;
+            break;
+        }
+    }
+
+    const size_t preview_wall_loops = std::max<size_t>(1, wall_loops == 0 ? groups.size() : wall_loops);
+    sequence.reserve(preview_wall_loops * cycle);
+    for (size_t layer_idx = 0; layer_idx < cycle; ++layer_idx) {
+        for (size_t wall_idx = 0; wall_idx < preview_wall_loops; ++wall_idx) {
+            const std::string &group = groups[std::min(wall_idx, groups.size() - 1)];
+            if (group.empty())
+                continue;
+            const char token = group[layer_idx % group.size()];
+            const unsigned int extruder_id =
+                decode_manual_pattern_preview_token(token, component_a, component_b, num_physical);
+            if (extruder_id != 0)
+                sequence.emplace_back(extruder_id);
+        }
     }
 
     return sequence;
@@ -1171,9 +1216,10 @@ void MixedFilamentConfigPanel::build_ui()
         pattern_row->Add(pattern_label, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, gap);
         m_pattern_ctrl = new wxTextCtrl(this, wxID_ANY, from_u8(normalized_pattern), wxDefaultPosition,
                                         wxSize(FromDIP(200), -1), wxTE_PROCESS_ENTER);
-        m_pattern_ctrl->SetToolTip(_L("Manual repeating pattern. Enter physical filament IDs as comma-separated numbers. "
-                          "Values greater than 9 are supported. "
-                          "Example: 1,2,12,11."));
+        m_pattern_ctrl->SetToolTip(_L("Manual repeating pattern. Use 1/2 or A/B for component A/B, "
+                                      "and 3..9 for direct physical filament IDs. "
+                                      "Use commas to define deeper perimeter patterns, for example 12,21. "
+                                      "Example: 1/1/1/1/2/2/2/2, 12,21, or 1/2/3/4."));
         pattern_row->Add(m_pattern_ctrl, 1, wxALIGN_CENTER_VERTICAL);
         root->Add(pattern_row, 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, gap);
 
@@ -1237,7 +1283,7 @@ void MixedFilamentConfigPanel::build_ui()
     const wxString bias_tooltip =
         _L("Positive bias recesses the second filament in the pair; negative bias recesses the first filament.\n\n"
            "The color chip shows which filament the current value affects.\n\n"
-           "Manual patterns and Local-Z dithering ignore it.");
+           "Grouped wall patterns and Local-Z dithering ignore it.");
 
     auto *surface_offset_label = new wxStaticText(this, wxID_ANY, _L("Bias"));
     surface_offset_label->SetForegroundColour(is_dark ? wxColour(236, 236, 236) : wxColour(20, 20, 20));
@@ -1379,7 +1425,7 @@ void MixedFilamentConfigPanel::build_ui()
         if (m_pattern_ctrl) {
             m_mf.distribution_mode = int(MixedFilament::Simple);
             std::string normalized = MixedFilamentManager::normalize_manual_pattern(into_u8(m_pattern_ctrl->GetValue()));
-            if (normalized.empty()) normalized = "1,2";
+            if (normalized.empty()) normalized = "12";
             if (into_u8(m_pattern_ctrl->GetValue()) != normalized)
                 m_pattern_ctrl->ChangeValue(from_u8(normalized));
             m_mf.manual_pattern = normalized;
@@ -1639,8 +1685,8 @@ void MixedFilamentConfigPanel::build_ui()
             std::string pattern = into_u8(m_pattern_ctrl->GetValue());
             if (!pattern.empty()) {
                 const char last = pattern.back();
-                if (last != ',')
-                    pattern.push_back(',');
+                const bool has_sep = last == '/' || last == '-' || last == '_' || last == '|' || last == ':' || last == ';' || last == ',' || last == ' ';
+                if (!has_sep) pattern.push_back('/');
             }
             pattern += std::to_string(filament_id);
             m_pattern_ctrl->ChangeValue(from_u8(pattern));

@@ -40,9 +40,9 @@ struct MixedFilament
     // Blend percentage of component B in [0..100].
     int mix_b_percent = 50;
 
-    // Optional manual pattern for this mixed filament.
-    // Canonical format: comma-separated 1-based physical filament IDs
-    // (for example "1,2,12,11").
+    // Optional manual pattern for this mixed filament. Tokens:
+    // '1' => component_a, '2' => component_b, '3'..'9' => direct physical
+    // filament IDs (1-based). Example: "11112222" => AAAABBBB repeating.
     std::string manual_pattern;
 
     // Optional explicit gradient multi-color component list, encoded as
@@ -145,7 +145,7 @@ std::pair<int, int> mixed_filament_apparent_pair_percentages(const MixedFilament
 std::string compute_mixed_filament_display_color(const MixedFilament &entry, const MixedFilamentDisplayContext &context);
 
 // Build a standardized user-facing mixed filament name.
-// - Pattern rows: "Pattern <normalized pattern>" (for example "Pattern 1,2,12,11").
+// - Pattern rows: "Pattern <flattened pattern>" (for example "Pattern 1212354").
 // - Mix rows: "<id>:<pct>% + <id>:<pct>% ..." (for example "1:30% + 2:20% + 3:50%").
 std::string mixed_filament_standardized_name(const MixedFilament &entry, size_t num_physical);
 
@@ -197,9 +197,8 @@ public:
     std::string serialize_custom_entries();
     void load_custom_entries(const std::string &serialized, const std::vector<std::string> &filament_colours);
 
-    // Normalize a manual mixed-pattern string into comma-separated numeric IDs.
-    // Legacy compact patterns are still accepted for backward compatibility.
-    // Returns empty string if invalid.
+    // Normalize a manual mixed-pattern string into compact token form.
+    // Accepts separators and A/B aliases. Returns empty string if invalid.
     static std::string normalize_manual_pattern(const std::string &pattern);
     static int         mix_percent_from_manual_pattern(const std::string &pattern);
 
