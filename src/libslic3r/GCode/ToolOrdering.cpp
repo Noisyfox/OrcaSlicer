@@ -237,6 +237,15 @@ unsigned int LayerTools::wall_extruder_id(const PrintRegion &region) const
 	return resolve_mixed_1based(id_1based) - 1;
 }
 
+unsigned int LayerTools::inner_wall_filament_id(const PrintRegion &region) const
+{
+	assert(region.config().inner_wall_filament_id.value > 0);
+	unsigned int id_1based = (this->extruder_override == 0)
+        ? region.config().inner_wall_filament_id.value
+        : this->extruder_override;
+	return resolve_mixed_1based(id_1based) - 1;
+}
+
 unsigned int LayerTools::sparse_infill_filament_id(const PrintRegion &region) const
 {
 	assert(region.config().sparse_infill_filament_id.value > 0);
@@ -261,30 +270,22 @@ unsigned int LayerTools::internal_solid_filament_id(const PrintRegion &region) c
 unsigned int LayerTools::extruder(const ExtrusionEntityCollection &extrusions, const PrintRegion &region) const
 {
 	assert(region.config().outer_wall_filament_id.value > 0);
+	assert(region.config().inner_wall_filament_id.value > 0);
 	assert(region.config().sparse_infill_filament_id.value > 0);
 	assert(region.config().internal_solid_filament_id.value > 0);
 	assert(region.config().top_surface_filament_id.value > 0);
 	assert(region.config().bottom_surface_filament_id.value > 0);
+    const ExtrusionRole role = extrusions.role();
     if (extrusions.has_infill()) {
-        const ExtrusionRole role = extrusions.entities.empty() ? erNone : extrusions.entities.front()->role();
-            if (extrusions.has_solid_infill())
-                ExtrusionRole role = extrusions.role();
-                if (role == erTopSolidInfill || role == erIroning)
-                extruder = region.config().solid_infill_filament;
-        return is_solid_infill(role) ? solid_infill_filament(region) : sparse_infill_filament(region);
+        if (internal_solid_infill_uses_sparse_filament(region, role))
+            return sparse_infill_filament_id(region);
+        if (role == erTopSolidInfill || role == erIroning)
+            return top_surface_filament_id(region);
+        else if (role == erBottomSurface)
+            return bottom_surface_filament_id(region);
+        return is_solid_infill(role) ? internal_solid_filament_id(region) : sparse_infill_filament_id(region);
     }
-                    extruder = region.config().bottom_surface_filament_id;
-                    extruder = region.config().internal_solid_filament_id;
-            } else {
-                extruder = region.config().sparse_infill_filament;
-            }
-        } else
-            const ExtrusionRole role = extrusions.role();
-            if (role == erPerimeter)
-            extruder = region.config().wall_filament.value;
-            else
-                extruder = region.config().outer_wall_filament_id.value;
-        }
+    return role == erPerimeter ? inner_wall_filament_id(region) : wall_extruder_id(region);
 }
 
 unsigned int LayerTools::sparse_infill_filament_id_1based(const PrintRegion &region) const
