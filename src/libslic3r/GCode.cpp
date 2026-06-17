@@ -2337,7 +2337,7 @@ void GCode::do_export(Print* print, const char* path, GCodeProcessorResult* resu
     BOOST_LOG_TRIVIAL(info) << "Exporting G-code finished" << log_memory_info();
     print->set_done(psGCodeExport);
     
-    if(is_BBL_Printer())
+    if(is_BBL_Printer() && result != nullptr)
         result->label_object_enabled = m_enable_exclude_object;
     // Write the profiler measurements to file
     PROFILE_UPDATE();
@@ -5560,6 +5560,7 @@ LayerResult GCode::process_layer(
 
     // Group extrusions by an extruder, then by an object, an island and a region.
     std::map<unsigned int, std::vector<ObjectByExtruder>> by_extruder;
+    std::vector<std::unique_ptr<ExtrusionEntityCollection>> split_perimeter_storage;
     bool is_anything_overridden = const_cast<LayerTools&>(layer_tools).wiping_extrusions().is_anything_overridden();
 
     // -------------------------------------------------------------------------
@@ -6038,265 +6039,293 @@ LayerResult GCode::process_layer(
                         if (extrusions->entities.empty()) // This shouldn't happen but first_point() would fail.
                             continue;
 
-                        // ---- Local-Z phase-b: clip perimeters into per-extruder sub-layer buckets ----
-                        if (entity_type == ObjectByExtruder::Island::Region::PERIMETERS &&
-                            local_z_ctx != nullptr && !local_z_ctx->mixed_masks_union.empty()) {
-                            for (LocalZPassBucket& pass_bucket : local_z_ctx->pass_buckets) {
-                                if (pass_bucket.plan == nullptr)
-                                    continue;
-                                for (size_t pass_extruder_id = 0; pass_extruder_id < pass_bucket.plan->painted_masks_by_extruder.size();
-                                     ++pass_extruder_id) {
-                                    const ExPolygons& pass_masks = pass_bucket.compensated_masks_by_extruder.empty()
-                                        ? pass_bucket.plan->painted_masks_by_extruder[pass_extruder_id]
-                                        : pass_bucket.compensated_masks_by_extruder[pass_extruder_id];
-                                    if (pass_masks.empty())
+                        auto process_extrusions = [&](const ExtrusionEntityCollection *current_extrusions,
+                                                       const ExtrusionEntityCollection *overrides_key,
+                                                       bool                             use_overrides) {
+                            // ---- Local-Z phase-b: clip perimeters into per-extruder sub-layer buckets ----
+                            if (entity_type == ObjectByExtruder::Island::Region::PERIMETERS &&
+                                local_z_ctx != nullptr && !local_z_ctx->mixed_masks_union.empty()) {
+                                for (LocalZPassBucket& pass_bucket : local_z_ctx->pass_buckets) {
+                                    if (pass_bucket.plan == nullptr)
                                         continue;
-                                    auto clipped_local = clip_extrusion_collection_for_local_z(*extrusions, &pass_masks, nullptr, pass_bucket.plan->flow_height);
-                                    if (!clipped_local)
-                                        continue;
-
-                                    const ExtrusionEntityCollection* clipped_ptr = clipped_local.get();
-                                    ++local_z_ctx->local_clipped_collections;
-                                    local_z_clipped_collections.emplace_back(std::move(clipped_local));
-                                    std::vector<ObjectByExtruder::Island>& islands = object_islands_by_extruder(
-                                        pass_bucket.by_extruder, unsigned(pass_extruder_id), layer_to_print_idx2, layers.size(), n_slices + 1);
-
-                                    for (size_t i = 0; i <= n_slices; ++i) {
-                                        const bool   last       = i == n_slices;
-                                        const size_t island_idx = last ? n_slices : slices_test_order[i];
-                                        if (last || entity_matches_surface(island_idx, *clipped_ptr)) {
-                                            if (islands[island_idx].by_region.empty())
-                                                islands[island_idx].by_region.assign(print.num_print_regions(), ObjectByExtruder::Island::Region());
-                                            islands[island_idx].by_region[region.print_region_id()].append(
-                                                ObjectByExtruder::Island::Region::PERIMETERS, clipped_ptr, nullptr);
-                                            break;
-                                        }
-                                    }
-                                }
-                            }
-
-                            // Base layer: clip away all mixed-paint regions so base layer does not overlap sub-layer passes.
-                            const ExPolygons* base_exclude_masks =
-                                local_z_ctx->mixed_masks_union_for_base_exclude.empty() ? &local_z_ctx->mixed_masks_union
-                                                                                        : &local_z_ctx->mixed_masks_union_for_base_exclude;
-                            auto clipped_base = clip_extrusion_collection_for_local_z(*extrusions, nullptr, base_exclude_masks, 0.);
-                            if (!clipped_base)
-                                continue;
-                            ++local_z_ctx->base_clipped_collections;
-                            const ExtrusionEntityCollection* base_ptr = clipped_base.get();
-                            local_z_clipped_collections.emplace_back(std::move(clipped_base));
-                            // Replace extrusions with the base-clipped variant for the remainder of the island assignment below.
-                            extrusions = base_ptr;
-                            if (extrusions->entities.empty())
-                                continue;
-                        }
-                        // ---- End Local-Z perimeter clipping ----
-
-                        // This extrusion is part of certain Region, which tells us which extruder should be used for it:
-                        int correct_extruder_id = layer_tools.extruder(*extrusions, region);
-
-                        // Let's recover vector of extruder overrides:
-                        const WipingExtrusions::ExtruderPerCopy *entity_overrides = nullptr;
-                        if (! layer_tools.has_extruder(correct_extruder_id)) {
-                            // this entity is not overridden, but its extruder is not in layer_tools - we'll print it
-                            // by last extruder on this layer (could happen e.g. when a wiping object is taller than others - dontcare extruders are eradicated from layer_tools).
-                            // Exception: do NOT remap a virtual mixed-filament slot — it may not appear in
-                            // layer_tools.extruders (only its resolved physical IDs do), so snapping it to
-                            // extruders.back() would send it to the wrong physical nozzle.
-                            if (!layer_tools.is_mixed_slot_0based(correct_extruder_id))
-                                correct_extruder_id = layer_tools.extruders.back();
-                        }
-                        // ---- SameLayerPointillisme dispatch (path-level splitting) ----
-                        // When the configured filament is a mixed slot in SameLayerPointillisme
-                        // mode AND we are not under a wiping override, split the extrusion
-                        // collection into per-physical-extruder buckets and bucket them directly
-                        // into by_extruder — then skip the normal single-extruder path.
-                        if (!is_anything_overridden &&
-                            layer_tools.mixed_mgr != nullptr &&
-                            layer_tools.num_physical > 0 &&
-                            correct_extruder_id >= 0) {
-
-                            // 1. Uniform-segment pointillism (SameLayerPointillisme with a
-                            //    simple ratio or a non-comma manual pattern).
-                            const unsigned int cfg_filament_id_1based =
-                                layer_tools.extruder_override != 0 ?
-                                    layer_tools.extruder_override :
-                                    unsigned(entity_type ==
-                                                ObjectByExtruder::Island::Region::PERIMETERS ?
-                                        region.config().wall_filament.value :
-                                        region.config().sparse_infill_filament.value);
-                            const std::vector<unsigned int>* pointillism_sequence =
-                                pointillism_sequence_for_filament(cfg_filament_id_1based);
-                            if (pointillism_sequence != nullptr) {
-                                std::vector<std::unique_ptr<ExtrusionEntityCollection>>
-                                    split_by_extruder;
-                                PointillismPathSplitStats split_stats;
-                                const size_t sequence_phase =
-                                    pointillism_sequence->empty() ?
-                                        0 :
-                                        size_t(std::max(0, layer_tools.layer_index)) %
-                                            pointillism_sequence->size();
-                                if (split_extrusion_collection_for_pointillism_paths(
-                                        *extrusions,
-                                        *pointillism_sequence,
-                                        layer_tools.num_physical,
-                                        pointillism_segment_len_scaled,
-                                        pointillism_line_gap_scaled,
-                                        sequence_phase,
-                                        split_by_extruder,
-                                        split_stats) &&
-                                    split_stats.bucket_count >= 2) {
-                                    ++pointillism_path_split_entities;
-                                    pointillism_path_split_segments += split_stats.segment_count;
-                                    for (size_t extruder_idx = 0;
-                                         extruder_idx < split_by_extruder.size();
-                                         ++extruder_idx) {
-                                        std::unique_ptr<ExtrusionEntityCollection>& sc =
-                                            split_by_extruder[extruder_idx];
-                                        if (!sc || sc->entities.empty())
+                                    for (size_t pass_extruder_id = 0; pass_extruder_id < pass_bucket.plan->painted_masks_by_extruder.size();
+                                         ++pass_extruder_id) {
+                                        const ExPolygons& pass_masks = pass_bucket.compensated_masks_by_extruder.empty()
+                                            ? pass_bucket.plan->painted_masks_by_extruder[pass_extruder_id]
+                                            : pass_bucket.compensated_masks_by_extruder[pass_extruder_id];
+                                        if (pass_masks.empty())
                                             continue;
-                                        const ExtrusionEntityCollection* split_ptr = sc.get();
-                                        pointillism_split_collections.emplace_back(
-                                            std::move(sc));
-                                        std::vector<ObjectByExtruder::Island>& islands =
-                                            object_islands_by_extruder(
-                                                by_extruder, unsigned(extruder_idx),
-                                                &layer_to_print - layers.data(),
-                                                layers.size(), n_slices + 1);
+                                        auto clipped_local = clip_extrusion_collection_for_local_z(*extrusions, &pass_masks, nullptr, pass_bucket.plan->flow_height);
+                                        if (!clipped_local)
+                                            continue;
+
+                                        const ExtrusionEntityCollection* clipped_ptr = clipped_local.get();
+                                        ++local_z_ctx->local_clipped_collections;
+                                        local_z_clipped_collections.emplace_back(std::move(clipped_local));
+                                        std::vector<ObjectByExtruder::Island>& islands = object_islands_by_extruder(
+                                            pass_bucket.by_extruder, unsigned(pass_extruder_id), layer_to_print_idx2, layers.size(), n_slices + 1);
+
                                         for (size_t i = 0; i <= n_slices; ++i) {
                                             const bool   last       = i == n_slices;
-                                            const size_t island_idx =
-                                                last ? n_slices : slices_test_order[i];
-                                            if (last ||
-                                                entity_matches_surface(island_idx, *split_ptr)) {
+                                            const size_t island_idx = last ? n_slices : slices_test_order[i];
+                                            if (last || entity_matches_surface(island_idx, *clipped_ptr)) {
                                                 if (islands[island_idx].by_region.empty())
-                                                    islands[island_idx].by_region.assign(
-                                                        print.num_print_regions(),
-                                                        ObjectByExtruder::Island::Region());
-                                                islands[island_idx]
-                                                    .by_region[region.print_region_id()]
-                                                    .append(entity_type, split_ptr, nullptr);
+                                                    islands[island_idx].by_region.assign(print.num_print_regions(), ObjectByExtruder::Island::Region());
+                                                islands[island_idx].by_region[region.print_region_id()].append(
+                                                    ObjectByExtruder::Island::Region::PERIMETERS, clipped_ptr, nullptr);
                                                 break;
                                             }
                                         }
                                     }
-                                    continue;
                                 }
-                                ++pointillism_path_split_fallbacks;
-                            }
 
-                            // 2. Grouped per-perimeter-index pattern (comma-separated manual
-                            //    pattern, e.g. "12,21").  Uses resolve_perimeter() via inset_idx.
-                            if (entity_type == ObjectByExtruder::Island::Region::PERIMETERS) {
-                                const unsigned int grouped_id =
-                                    grouped_manual_pattern_mixed_filament_id(
-                                        entity_type, *extrusions, region);
-                                if (grouped_id != 0) {
+                                // Base layer: clip away all mixed-paint regions so base layer does not overlap sub-layer passes.
+                                const ExPolygons* base_exclude_masks =
+                                    local_z_ctx->mixed_masks_union_for_base_exclude.empty() ? &local_z_ctx->mixed_masks_union
+                                                                                            : &local_z_ctx->mixed_masks_union_for_base_exclude;
+                                auto clipped_base = clip_extrusion_collection_for_local_z(*extrusions, nullptr, base_exclude_masks, 0.);
+                                if (!clipped_base)
+                                    return;
+                                ++local_z_ctx->base_clipped_collections;
+                                const ExtrusionEntityCollection* base_ptr = clipped_base.get();
+                                local_z_clipped_collections.emplace_back(std::move(clipped_base));
+                                // Replace extrusions with the base-clipped variant for the remainder of the island assignment below.
+                                extrusions = base_ptr;
+                                if (extrusions->entities.empty())
+                                    return;
+                            }
+                            // ---- End Local-Z perimeter clipping ----
+
+                            // This extrusion is part of certain Region, which tells us which extruder should be used for it.
+                            int correct_extruder_id = layer_tools.extruder(*current_extrusions, region);
+
+                            const WipingExtrusions::ExtruderPerCopy *entity_overrides = nullptr;
+                            if (! layer_tools.has_extruder(correct_extruder_id)) {
+                                // this entity is not overridden, but its extruder is not in layer_tools - we'll print it
+                                // by last extruder on this layer (could happen e.g. when a wiping object is taller than others - dontcare extruders are eradicated from layer_tools)
+                                // Exception: do NOT remap a virtual mixed-filament slot — it may not appear in
+                                // layer_tools.extruders (only its resolved physical IDs do), so snapping it to
+                                // extruders.back() would send it to the wrong physical nozzle.
+                                if (!layer_tools.is_mixed_slot_0based(correct_extruder_id))
+                                    correct_extruder_id = layer_tools.extruders.back();
+                            }
+                            // ---- SameLayerPointillisme dispatch (path-level splitting) ----
+                            // When the configured filament is a mixed slot in SameLayerPointillisme
+                            // mode AND we are not under a wiping override, split the extrusion
+                            // collection into per-physical-extruder buckets and bucket them directly
+                            // into by_extruder — then skip the normal single-extruder path.
+                            if (!is_anything_overridden &&
+                                layer_tools.mixed_mgr != nullptr &&
+                                layer_tools.num_physical > 0 &&
+                                correct_extruder_id >= 0) {
+
+                                // 1. Uniform-segment pointillism (SameLayerPointillisme with a
+                                //    simple ratio or a non-comma manual pattern).
+                                const unsigned int cfg_filament_id_1based =
+                                    layer_tools.extruder_override != 0 ?
+                                        layer_tools.extruder_override :
+                                        unsigned(entity_type ==
+                                                    ObjectByExtruder::Island::Region::PERIMETERS ?
+                                            region.config().wall_filament.value :
+                                            region.config().sparse_infill_filament.value);
+                                const std::vector<unsigned int>* pointillism_sequence =
+                                    pointillism_sequence_for_filament(cfg_filament_id_1based);
+                                if (pointillism_sequence != nullptr) {
                                     std::vector<std::unique_ptr<ExtrusionEntityCollection>>
                                         split_by_extruder;
-                                    size_t bucket_count = 0;
-                                    if (split_extrusion_collection_for_multi_perimeter_pattern(
+                                    PointillismPathSplitStats split_stats;
+                                    const size_t sequence_phase =
+                                        pointillism_sequence->empty() ?
+                                            0 :
+                                            size_t(std::max(0, layer_tools.layer_index)) %
+                                                pointillism_sequence->size();
+                                    if (split_extrusion_collection_for_pointillism_paths(
                                             *extrusions,
-                                            *layer_tools.mixed_mgr,
-                                            grouped_id,
+                                            *pointillism_sequence,
                                             layer_tools.num_physical,
-                                            layer_tools.layer_index,
+                                            pointillism_segment_len_scaled,
+                                            pointillism_line_gap_scaled,
+                                            sequence_phase,
                                             split_by_extruder,
-                                            bucket_count)) {
-                                        if (bucket_count >= 2) {
-                                            for (size_t extruder_idx = 0;
-                                                 extruder_idx < split_by_extruder.size();
-                                                 ++extruder_idx) {
-                                                std::unique_ptr<ExtrusionEntityCollection>& sc =
-                                                    split_by_extruder[extruder_idx];
-                                                if (!sc || sc->entities.empty())
-                                                    continue;
-                                                const ExtrusionEntityCollection* split_ptr =
-                                                    sc.get();
-                                                pointillism_split_collections.emplace_back(
-                                                    std::move(sc));
-                                                std::vector<ObjectByExtruder::Island>& islands =
-                                                    object_islands_by_extruder(
-                                                        by_extruder, unsigned(extruder_idx),
-                                                        &layer_to_print - layers.data(),
-                                                        layers.size(), n_slices + 1);
-                                                for (size_t i = 0; i <= n_slices; ++i) {
-                                                    const bool   last = i == n_slices;
-                                                    const size_t island_idx =
-                                                        last ? n_slices : slices_test_order[i];
-                                                    if (last ||
-                                                        entity_matches_surface(island_idx, *split_ptr)) {
-                                                        if (islands[island_idx].by_region.empty())
-                                                            islands[island_idx].by_region.assign(
-                                                                print.num_print_regions(),
-                                                                ObjectByExtruder::Island::Region());
-                                                        islands[island_idx]
-                                                            .by_region[region.print_region_id()]
-                                                            .append(entity_type, split_ptr,
-                                                                    nullptr);
-                                                        break;
-                                                    }
+                                            split_stats) &&
+                                        split_stats.bucket_count >= 2) {
+                                        ++pointillism_path_split_entities;
+                                        pointillism_path_split_segments += split_stats.segment_count;
+                                        for (size_t extruder_idx = 0;
+                                             extruder_idx < split_by_extruder.size();
+                                             ++extruder_idx) {
+                                            std::unique_ptr<ExtrusionEntityCollection>& sc =
+                                                split_by_extruder[extruder_idx];
+                                            if (!sc || sc->entities.empty())
+                                                continue;
+                                            const ExtrusionEntityCollection* split_ptr = sc.get();
+                                            pointillism_split_collections.emplace_back(
+                                                std::move(sc));
+                                            std::vector<ObjectByExtruder::Island>& islands =
+                                                object_islands_by_extruder(
+                                                    by_extruder, unsigned(extruder_idx),
+                                                    &layer_to_print - layers.data(),
+                                                    layers.size(), n_slices + 1);
+                                            for (size_t i = 0; i <= n_slices; ++i) {
+                                                const bool   last       = i == n_slices;
+                                                const size_t island_idx =
+                                                    last ? n_slices : slices_test_order[i];
+                                                if (last ||
+                                                    entity_matches_surface(island_idx, *split_ptr)) {
+                                                    if (islands[island_idx].by_region.empty())
+                                                        islands[island_idx].by_region.assign(
+                                                            print.num_print_regions(),
+                                                            ObjectByExtruder::Island::Region());
+                                                    islands[island_idx]
+                                                        .by_region[region.print_region_id()]
+                                                        .append(entity_type, split_ptr, nullptr);
+                                                    break;
                                                 }
                                             }
-                                            continue;
                                         }
-                                        if (bucket_count == 1) {
-                                            for (size_t extruder_idx = 0;
-                                                 extruder_idx < split_by_extruder.size();
-                                                 ++extruder_idx) {
-                                                const std::unique_ptr<ExtrusionEntityCollection>&
-                                                    sc = split_by_extruder[extruder_idx];
-                                                if (sc && !sc->entities.empty()) {
-                                                    correct_extruder_id = int(extruder_idx);
-                                                    break;
+                                        return;
+                                    }
+                                    ++pointillism_path_split_fallbacks;
+                                }
+
+                                // 2. Grouped per-perimeter-index pattern (comma-separated manual
+                                //    pattern, e.g. "12,21").  Uses resolve_perimeter() via inset_idx.
+                                if (entity_type == ObjectByExtruder::Island::Region::PERIMETERS) {
+                                    const unsigned int grouped_id =
+                                        grouped_manual_pattern_mixed_filament_id(
+                                            entity_type, *extrusions, region);
+                                    if (grouped_id != 0) {
+                                        std::vector<std::unique_ptr<ExtrusionEntityCollection>>
+                                            split_by_extruder;
+                                        size_t bucket_count = 0;
+                                        if (split_extrusion_collection_for_multi_perimeter_pattern(
+                                                *extrusions,
+                                                *layer_tools.mixed_mgr,
+                                                grouped_id,
+                                                layer_tools.num_physical,
+                                                layer_tools.layer_index,
+                                                split_by_extruder,
+                                                bucket_count)) {
+                                            if (bucket_count >= 2) {
+                                                for (size_t extruder_idx = 0;
+                                                     extruder_idx < split_by_extruder.size();
+                                                     ++extruder_idx) {
+                                                    std::unique_ptr<ExtrusionEntityCollection>& sc =
+                                                        split_by_extruder[extruder_idx];
+                                                    if (!sc || sc->entities.empty())
+                                                        continue;
+                                                    const ExtrusionEntityCollection* split_ptr =
+                                                        sc.get();
+                                                    pointillism_split_collections.emplace_back(
+                                                        std::move(sc));
+                                                    std::vector<ObjectByExtruder::Island>& islands =
+                                                        object_islands_by_extruder(
+                                                            by_extruder, unsigned(extruder_idx),
+                                                            &layer_to_print - layers.data(),
+                                                            layers.size(), n_slices + 1);
+                                                    for (size_t i = 0; i <= n_slices; ++i) {
+                                                        const bool   last = i == n_slices;
+                                                        const size_t island_idx =
+                                                            last ? n_slices : slices_test_order[i];
+                                                        if (last ||
+                                                            entity_matches_surface(island_idx, *split_ptr)) {
+                                                            if (islands[island_idx].by_region.empty())
+                                                                islands[island_idx].by_region.assign(
+                                                                    print.num_print_regions(),
+                                                                    ObjectByExtruder::Island::Region());
+                                                            islands[island_idx]
+                                                                .by_region[region.print_region_id()]
+                                                                .append(entity_type, split_ptr,
+                                                                        nullptr);
+                                                            break;
+                                                        }
+                                                    }
+                                                }
+                                                return;
+                                            }
+                                            if (bucket_count == 1) {
+                                                for (size_t extruder_idx = 0;
+                                                     extruder_idx < split_by_extruder.size();
+                                                     ++extruder_idx) {
+                                                    const std::unique_ptr<ExtrusionEntityCollection>&
+                                                        sc = split_by_extruder[extruder_idx];
+                                                    if (sc && !sc->entities.empty()) {
+                                                        correct_extruder_id = int(extruder_idx);
+                                                        break;
+                                                    }
                                                 }
                                             }
                                         }
                                     }
                                 }
                             }
-                        }
-                        // ---- end SameLayerPointillisme dispatch ----
+                            // ---- end SameLayerPointillisme dispatch ----
 
-                        printing_extruders.clear();
-                        if (is_anything_overridden) {
-                            entity_overrides = const_cast<LayerTools&>(layer_tools).wiping_extrusions().get_extruder_overrides(extrusions, layer_to_print.original_object, correct_extruder_id, layer_to_print.object()->instances().size());
-                            if (entity_overrides == nullptr) {
-                                printing_extruders.emplace_back(correct_extruder_id);
+                            printing_extruders.clear();
+                            if (is_anything_overridden && use_overrides) {
+                                entity_overrides = const_cast<LayerTools&>(layer_tools).wiping_extrusions().get_extruder_overrides(overrides_key, layer_to_print.original_object, correct_extruder_id, layer_to_print.object()->instances().size());
+                                if (entity_overrides == nullptr) {
+                                    printing_extruders.emplace_back(correct_extruder_id);
+                                } else {
+                                    printing_extruders.reserve(entity_overrides->size());
+                                    for (int extruder : *entity_overrides)
+                                        printing_extruders.emplace_back(extruder >= 0 ?
+                                            // at least one copy is overridden to use this extruder
+                                            extruder :
+                                            // at least one copy would normally be printed with this extruder (see get_extruder_overrides function for explanation)
+                                            static_cast<unsigned int>(- extruder - 1));
+                                    Slic3r::sort_remove_duplicates(printing_extruders);
+                                }
                             } else {
-                                printing_extruders.reserve(entity_overrides->size());
-                                for (int extruder : *entity_overrides)
-                                    printing_extruders.emplace_back(extruder >= 0 ?
-                                        // at least one copy is overridden to use this extruder
-                                        extruder :
-                                        // at least one copy would normally be printed with this extruder (see get_extruder_overrides function for explanation)
-                                        static_cast<unsigned int>(- extruder - 1));
-                                Slic3r::sort_remove_duplicates(printing_extruders);
+                                printing_extruders.emplace_back(correct_extruder_id);
                             }
-                        } else
-                            printing_extruders.emplace_back(correct_extruder_id);
 
-                        // Now we must add this extrusion into the by_extruder map, once for each extruder that will print it:
-                        for (unsigned int extruder : printing_extruders)
-                        {
-                            std::vector<ObjectByExtruder::Island> &islands = object_islands_by_extruder(
-                                by_extruder,
-                                extruder,
-                                &layer_to_print - layers.data(),
-                                layers.size(), n_slices+1);
-                            for (size_t i = 0; i <= n_slices; ++ i) {
-                                bool   last = i == n_slices;
-                                size_t island_idx = last ? n_slices : slices_test_order[i];
-                                if (// extrusions->first_point does not fit inside any slice
-                                    last ||
-                                    // extrusions->first_point fits inside ith slice
-                                    entity_matches_surface(island_idx, *extrusions)) {
-                                    if (islands[island_idx].by_region.empty())
-                                        islands[island_idx].by_region.assign(print.num_print_regions(), ObjectByExtruder::Island::Region());
-                                    islands[island_idx].by_region[region.print_region_id()].append(entity_type, extrusions, entity_overrides);
-                                    break;
+                            // Now we must add this extrusion into the by_extruder map, once for each extruder that will print it.
+                            for (unsigned int extruder : printing_extruders) {
+                                std::vector<ObjectByExtruder::Island> &islands = object_islands_by_extruder(
+                                    by_extruder,
+                                    extruder,
+                                    &layer_to_print - layers.data(),
+                                    layers.size(), n_slices + 1);
+                                for (size_t i = 0; i <= n_slices; ++i) {
+                                    bool   last       = i == n_slices;
+                                    size_t island_idx = last ? n_slices : slices_test_order[i];
+                                    if (last || entity_matches_surface(island_idx, *current_extrusions)) {
+                                        if (islands[island_idx].by_region.empty())
+                                            islands[island_idx].by_region.assign(print.num_print_regions(), ObjectByExtruder::Island::Region());
+                                        islands[island_idx].by_region[region.print_region_id()].append(entity_type, current_extrusions, entity_overrides);
+                                        break;
+                                    }
                                 }
                             }
+                        };
+
+                        bool split_mixed_perimeters =
+                            entity_type == ObjectByExtruder::Island::Region::PERIMETERS &&
+                            region.config().outer_wall_filament_id.value != region.config().inner_wall_filament_id.value &&
+                            extrusions->role() == erMixed;
+
+                        if (split_mixed_perimeters) {
+                            auto outer_perimeters = std::make_unique<ExtrusionEntityCollection>();
+                            auto inner_perimeters = std::make_unique<ExtrusionEntityCollection>();
+                            for (const ExtrusionEntity *entity : extrusions->entities) {
+                                const ExtrusionRole role = entity->role();
+                                if (role == erExternalPerimeter || role == erOverhangPerimeter)
+                                    outer_perimeters->append(*entity);
+                                else if (role == erPerimeter)
+                                    inner_perimeters->append(*entity);
+                            }
+
+                            if (!outer_perimeters->entities.empty()) {
+                                split_perimeter_storage.emplace_back(std::move(outer_perimeters));
+                                process_extrusions(split_perimeter_storage.back().get(), nullptr, false);
+                            }
+                            if (!inner_perimeters->entities.empty()) {
+                                split_perimeter_storage.emplace_back(std::move(inner_perimeters));
+                                process_extrusions(split_perimeter_storage.back().get(), nullptr, false);
+                            }
+                        } else {
+                            process_extrusions(extrusions, extrusions, true);
                         }
                     }
                 }
@@ -7964,7 +7993,9 @@ std::string GCode::extrude_support(const ExtrusionEntityCollection &support_fill
         if (extrusions.empty())
             return gcode;
 
-        chain_and_reorder_extrusion_entities(extrusions, m_last_pos.to_point());
+        //ORCA: Respect no_sort to preserve support base outline->fill order.
+        if (!support_fills.no_sort)
+            chain_and_reorder_extrusion_entities(extrusions, m_last_pos.to_point());
 
         const double  support_speed            = m_config.support_speed.value;
         const double  support_interface_speed  = m_config.get_abs_value("support_interface_speed");

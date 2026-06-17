@@ -2042,12 +2042,12 @@ StringObjectException Print::validate(StringObjectException *warning, Polygons* 
         auto validate_extrusion_width = [min_nozzle_diameter, max_nozzle_diameter](const ConfigBase &config, const char *opt_key, double layer_height, std::string &err_msg) -> bool {
             double extrusion_width_min = config.get_abs_value(opt_key, min_nozzle_diameter);
             double extrusion_width_max = config.get_abs_value(opt_key, max_nozzle_diameter);
-        	if (extrusion_width_min == 0) {
-        		// Default "auto-generated" extrusion width is always valid.
-        	} else if (extrusion_width_min <= layer_height) {
-                err_msg = L("Too small line width");
-				return false;
-			} else if (extrusion_width_max > max_nozzle_diameter * MAX_LINE_WIDTH_MULTIPLIER) {
+            if (extrusion_width_min == 0) {
+                // Default "auto-generated" extrusion width is always valid.
+            } else if (extrusion_width_min <= layer_height) {
+                    err_msg = L("Too small line width");
+                    return false;
+                } else if (extrusion_width_max > max_nozzle_diameter * MAX_LINE_WIDTH_MULTIPLIER) {
                 err_msg = L("Too large line width");
 				return false;
 			}
@@ -2169,6 +2169,25 @@ StringObjectException Print::validate(StringObjectException *warning, Polygons* 
 				for (const PrintRegion &region : object->all_regions())
                     if (!validate_extrusion_width(region.config(), opt_key, layer_height, err_msg))
 		            	return  {err_msg, object, opt_key};
+
+            const bool allow_thin_bridge_width = object->config().thick_bridges && object->config().thick_internal_bridges;
+            for (const PrintRegion &region : object->all_regions()) {
+                const auto &bridge_width_opt = region.config().bridge_line_width;
+                for (FlowRole bridge_role : { frPerimeter, frInfill, frSolidInfill, frTopSolidInfill }) {
+                    const double nozzle_diameter = m_config.nozzle_diameter.get_at(region.extruder(bridge_role) - 1);
+                    const double bridge_width    = bridge_width_opt.get_abs_value(nozzle_diameter);
+                    if (bridge_width <= 0.)
+                        continue;
+                    if (bridge_width > nozzle_diameter) {
+                        err_msg = L("Bridge line width must not exceed nozzle diameter");
+                        return { err_msg, object, "bridge_line_width" };
+                    }
+                    if (!allow_thin_bridge_width && bridge_width <= layer_height) {
+                        err_msg = L("Too small line width");
+                        return { err_msg, object, "bridge_line_width" };
+                    }
+                }
+            }
         }
     }
 
@@ -2319,15 +2338,12 @@ StringObjectException Print::validate(StringObjectException *warning, Polygons* 
                    }
                 }
             }
-
-            // Check junction deviation
-            // Orca: Only marlin FW supports max junction deviation. Dont display warning if firmware is not supporting it.
-            const bool support_max_junction_deviation = ( m_config.gcode_flavor == gcfMarlinFirmware);
-            if (warning_key.empty() && m_default_object_config.default_junction_deviation.value > max_junction_deviation && support_max_junction_deviation) {
+            // check junction deviation
+            else if (m_default_object_config.default_junction_deviation.value > max_junction_deviation) {
                 warning->string  = L( "Junction deviation setting exceeds the printer's maximum value (machine_max_junction_deviation).\n"
                                       "Orca will automatically cap the junction deviation to ensure it doesn't surpass the printer's capabilities.\n"
                                       "You can adjust the machine_max_junction_deviation value in your printer's configuration to get higher limits.");
-                warning->opt_key = warning_key;
+                warning->opt_key = "default_junction_deviation";
             }
             
             // check acceleration
@@ -2504,7 +2520,7 @@ Flow Print::brim_flow() const
         frPerimeter,
         // Flow::new_from_config_width takes care of the percent to value substitution
 		width,
-        (float)m_config.nozzle_diameter.get_at(m_print_regions.front()->config().wall_filament-1),
+        (float)m_config.nozzle_diameter.get_at(m_print_regions.front()->config().outer_wall_filament_id-1),
 		(float)this->skirt_first_layer_height());
 }
 
@@ -3133,7 +3149,8 @@ std::string Print::export_gcode(const std::string& path_template, GCodeProcessor
     gcode.do_export(this, path.c_str(), result, thumbnail_cb);
     gcode.export_layer_filaments(result);
     //BBS
-    result->conflict_result = m_conflict_result;
+    if (result != nullptr)
+        result->conflict_result = m_conflict_result;
     return path.c_str();
 }
 

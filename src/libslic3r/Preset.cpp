@@ -1072,10 +1072,13 @@ static std::vector<std::string> s_Preset_print_options{
     "print_order",
     "support_remove_small_overhang",
     "filename_format",
-    "wall_filament",
+    "outer_wall_filament_id",
+    "inner_wall_filament_id",
     "support_bottom_z_distance",
-    "sparse_infill_filament",
-    "solid_infill_filament",
+    "sparse_infill_filament_id",
+    "internal_solid_filament_id",
+    "top_surface_filament_id",
+    "bottom_surface_filament_id",
     "support_filament",
     "support_interface_filament",
     "support_interface_not_for_body",
@@ -1097,6 +1100,7 @@ static std::vector<std::string> s_Preset_print_options{
     "infill_wall_overlap",
     "top_bottom_infill_wall_overlap",
     "bridge_flow",
+    "bridge_line_width",
     "internal_bridge_flow",
     "elefant_foot_compensation",
     "elefant_foot_compensation_layers",
@@ -1161,6 +1165,7 @@ static std::vector<std::string> s_Preset_print_options{
     "small_perimeter_threshold",
     "bridge_angle",
     "internal_bridge_angle",
+    "relative_bridge_angle",
     "filter_out_gap_fill",
     "travel_acceleration",
     "inner_wall_acceleration",
@@ -2377,6 +2382,10 @@ bool PresetCollection::validate_preset(const std::string &preset_name, std::stri
             const std::string canonical_inherit_name = this->canonical_preset_name(inherit_name);
             it    = this->find_preset_internal(canonical_inherit_name);
             found = it != m_presets.end() && it->name == canonical_inherit_name && is_trusted(*it);
+            if (!found) {
+                it    = this->find_preset_renamed(canonical_inherit_name);
+                found = it != m_presets.end() && is_trusted(*it);
+            }
             if (found)
                 BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << boost::format(": preset_name %1%, inherit_name %2%, found inherit in list")%preset_name %inherit_name;
             else
@@ -2468,7 +2477,9 @@ std::pair<Preset*, bool> PresetCollection::load_external_preset(
 
     if (!inherits.empty() && (different_settings_list.size() > 0)) {
         auto iter = this->find_preset_internal(inherits);
-        if (iter != m_presets.end() && iter->name == inherits) {
+        if (iter == m_presets.end() || iter->name != inherits)
+            iter = this->find_preset_renamed(inherits);
+        if (iter != m_presets.end()) {
             //std::vector<std::string> dirty_options = cfg.diff(iter->config);
             BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << boost::format(": change preset %1% inherit %2% 's value to %3% 's values")%original_name %inherits %path;
             cfg.update_non_diff_values_to_base_config(iter->config, keys, different_settings_list, extruder_id_name, extruder_variant_name, *key_set1, *key_set2);
@@ -2520,7 +2531,9 @@ std::pair<Preset*, bool> PresetCollection::load_external_preset(
         // and override its settings with the loaded ones.
         assert(it == m_presets.end());
         it    = this->find_preset_internal(inherits);
-        found = it != m_presets.end() && it->name == inherits;
+        if (it == m_presets.end() || it->name != inherits)
+            it = this->find_preset_renamed(inherits);
+        found = it != m_presets.end();
         if (found && profile_print_params_same(it->config, cfg)) {
             // The system preset exists and it matches the values stored inside config.
             if (select == LoadAndSelect::Always)
