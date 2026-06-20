@@ -705,6 +705,15 @@ void apply_fuzzy_skin(Arachne::ExtrusionLine* extrusion, const PerimeterGenerato
                 return;
             }
 
+            // Open path means this is a thin wall that collapsed into a single thick line, in this case the path will go exactly
+            // between the middle two sides of the object. And since the paint segmentation never goes beyond the middle line because
+            // it uses voronoi diagram, we need to expand the segmentation a little bit to make sure it covers the path.
+            if (!closed) {
+                for (auto& r : merged_regions) {
+                    r.expolygons = offset_ex(r.expolygons, perimeter_generator.ext_perimeter_flow.scaled_width() / 10);
+                }
+            }
+
 #ifdef DEBUG_FUZZY
             {
                 int i = 0;
