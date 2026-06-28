@@ -158,6 +158,8 @@ set(SLIC3R_GUI_SOURCES
     GUI/Gizmos/GLGizmoPainterBase.hpp
     GUI/Gizmos/GLGizmoRotate.cpp
     GUI/Gizmos/GLGizmoRotate.hpp
+    GUI/Gizmos/GLGizmoRotate2.cpp
+    GUI/Gizmos/GLGizmoRotate2.hpp
     GUI/Gizmos/GLGizmoScale.cpp
     GUI/Gizmos/GLGizmoScale.hpp
     GUI/Gizmos/GLGizmosCommon.cpp
