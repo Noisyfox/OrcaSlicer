@@ -2021,13 +2021,6 @@ void GLCanvas3D::render(bool only_init)
         else {
             // regular picking pass
             _picking_pass();
-
-#if ENABLE_RAYCAST_PICKING_DEBUG
-            ImGuiWrapper& imgui = *wxGetApp().imgui();
-            imgui.begin(std::string("Hit result"), ImGuiWindowFlags_AlwaysAutoResize);
-            imgui.text("Picking disabled");
-            imgui.end();
-#endif // ENABLE_RAYCAST_PICKING_DEBUG
         }
     }
 
