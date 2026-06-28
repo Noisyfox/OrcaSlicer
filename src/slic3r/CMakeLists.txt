@@ -290,8 +290,6 @@ set(SLIC3R_GUI_SOURCES
     GUI/Jobs/PrintJob.cpp
     GUI/Jobs/PrintJob.hpp
     GUI/Jobs/ProgressIndicator.hpp
-    GUI/Jobs/RotoptimizeJob.cpp
-    GUI/Jobs/RotoptimizeJob.hpp
     GUI/Jobs/SendJob.cpp
     GUI/Jobs/SendJob.hpp
     GUI/Jobs/SLAImportDialog.hpp
