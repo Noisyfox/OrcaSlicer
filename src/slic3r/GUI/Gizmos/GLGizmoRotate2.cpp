@@ -114,7 +114,7 @@ void GLGizmoRotate2::on_dragging(const UpdateData& data)
     }
 
     if (m_precise) {
-        theta = theta / 60;
+        theta = theta / 30; // In precise mode, one rotate does 12 degrees
     }
 
     m_angle          = cap_angle(m_angle + theta);
