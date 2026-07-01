@@ -8,7 +8,7 @@
 
 #include <glad/gl.h>
 
-#define GIZMO_2_DEBUG
+// #define GIZMO_2_DEBUG
 
 namespace Slic3r {
 namespace GUI {

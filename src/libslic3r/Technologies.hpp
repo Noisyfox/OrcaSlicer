@@ -44,7 +44,7 @@
 // Enable fit print volume command for circular printbeds
 #define ENABLE_ENHANCED_PRINT_VOLUME_FIT 1
 // Enable picking using raytracing
-#define ENABLE_RAYCAST_PICKING_DEBUG 1
+#define ENABLE_RAYCAST_PICKING_DEBUG 0
 
 // Enable imgui debug dialog for new gcode viewer (using libvgcode)
 #define ENABLE_NEW_GCODE_VIEWER_DEBUG 0
