@@ -614,7 +614,7 @@ std::string GLGizmoRotate2::get_tooltip() const
     case Y: { axis = "Y"; break; }
     case Z: { axis = "Z"; break; }
     }
-    return (m_hover_id == 0 || m_dragging) ? axis + ": " + format(float(Geometry::rad2deg(get_angle())), 2) : "";
+    return (m_hover_id == 0 && !m_dragging) ? wxString::Format(_L("Drag to rotate around %s axis"),axis).utf8_string() : "";
 }
 
 void GLGizmoRotate2::set_precise(bool enabled)
