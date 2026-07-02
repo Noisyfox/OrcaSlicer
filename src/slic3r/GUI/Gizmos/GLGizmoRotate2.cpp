@@ -7,6 +7,7 @@
 #include "GLGizmoMeasure.hpp"
 
 #include <glad/gl.h>
+#include <wx/glcanvas.h>
 
 // #define GIZMO_2_DEBUG
 
@@ -30,6 +31,38 @@ constexpr int SNAP_DEG_FINE = 1; // in degree
 constexpr double SNAP_RADII_OFFSET = 16;
 constexpr double SNAP_RADII_LEN    = 22;
 constexpr double SNAP_RADII_WIDTH  = 1;
+
+constexpr double DRAG_REF_SEGMENT_LENGTH = 12;
+
+void render_dragging_mouse_ref(const Vec2d& mouse_pos, const Vec2d& center_pos)
+{
+    const ImU32 color = ImGuiWrapper::to_ImU32(GLGizmoBase::DEFAULT_DRAG_COLOR);
+    constexpr double line_width = AXIS_RING_THICKNESS / 2;
+
+    // Draw cursor reference line
+    auto draw_list = ImGui::GetOverlayDrawList();
+    draw_list->AddLineDashed({(float) mouse_pos.x(), (float) mouse_pos.y()}, {(float) center_pos.x(), (float) center_pos.y()},
+                             color, line_width,
+                             std::max(1, (int) ((mouse_pos - center_pos).norm() / DRAG_REF_SEGMENT_LENGTH)));
+
+    // Draw arrow cursor
+    const Vec2d normal = (mouse_pos - center_pos).normalized();
+    const Transform2d trafo =
+        Eigen::Translation2d(mouse_pos) *
+        Eigen::Rotation2Dd(std::atan2(normal.y(), normal.x()));
+
+    auto draw_line = [&trafo, &color, draw_list, line_width](const Vec2d& a, const Vec2d& b) {
+        const Vec2d at = trafo * a;
+        const Vec2d bt = trafo * b;
+        draw_list->AddLine({(float) at.x(), (float) at.y()}, {(float) bt.x(), (float) bt.y()}, color, line_width);
+    };
+    draw_line({0, 6}, {0, 18});
+    draw_line({0, 18}, {-6, 12});
+    draw_line({0, 18}, {6, 12});
+    draw_line({0, -6}, {0, -18});
+    draw_line({0, -18}, {-6, -12});
+    draw_line({0, -18}, {6, -12});
+}
 
 GLGizmoRotate2::GLGizmoRotate2(GLCanvas3D& parent, GLGizmoRotate::Axis axis)
     : GLGizmoBase(parent, "", -1)
@@ -66,9 +99,8 @@ void GLGizmoRotate2::on_start_dragging()
     init_data_from_selection(m_parent.get_selection());
     m_mouse_curr_pos = m_parent.get_local_mouse_position();
 
-    const Camera& camera = wxGetApp().plater()->get_camera();
-
     // Find where the mouse clicked on the ring
+    const Camera& camera = wxGetApp().plater()->get_camera();
     const auto raycaster = m_raycasters[1];
     Vec3f position, normal;
     const bool hit = raycaster->get_raycaster()->closest_hit(m_mouse_curr_pos, raycaster->get_transform(), camera, position, normal);
@@ -77,6 +109,10 @@ void GLGizmoRotate2::on_start_dragging()
     if (hit) {
         m_drag_angle_start = atan2f(position.y(), position.x());
     }
+
+    update_center_ss();
+
+    m_parent.set_as_dirty();
 }
 
 // Make sure angle is between [0, 2PI)
@@ -91,12 +127,7 @@ static double cap_angle(double angle)
 
 void GLGizmoRotate2::on_dragging(const UpdateData& data)
 {
-    const Camera& camera = wxGetApp().plater()->get_camera();
-
-    // Find the screen space gizmo center
-    const std::array<int, 4>& viewport = camera.get_viewport();
-    m_center_ss = TransformHelper::world_to_ss(m_center, camera.get_projection_matrix().matrix() * camera.get_view_matrix().matrix(), viewport);
-    m_center_ss.y() = viewport[3] - m_center_ss.y(); // y-axis is upside down in screen space
+    update_center_ss();
 
     // Calculate the delta angle which cursor rotate around center in ccw
     const Vec2d orig_dir = (m_mouse_curr_pos - m_center_ss).normalized();
@@ -107,6 +138,7 @@ void GLGizmoRotate2::on_dragging(const UpdateData& data)
         theta = -theta;
 
     // Revert the direction when the axis points towards the camera
+    const Camera& camera = wxGetApp().plater()->get_camera();
     const Vec3d normal     = local_transform().matrix().block(0, 0, 3, 3) * Vec3d::UnitZ();
     const Vec3d camera_dir = -camera.get_dir_forward();
     if (normal.dot(camera_dir) > 0) {
@@ -291,6 +323,10 @@ void GLGizmoRotate2::on_render()
         }
         
         shader->stop_using();
+    }
+
+    if (m_dragging) {
+        render_dragging_mouse_ref(m_mouse_curr_pos, m_center_ss);
     }
 
 #ifdef GIZMO_2_DEBUG
@@ -530,6 +566,14 @@ void GLGizmoRotate2::init_data_from_selection(const Selection& selection)
     m_center = sphere.first;
     m_orient_matrix = box_trafo;
     m_orient_matrix.translation() = m_center;
+}
+
+void GLGizmoRotate2::update_center_ss()
+{
+    const Camera& camera = wxGetApp().plater()->get_camera();
+    const std::array<int, 4>& viewport = camera.get_viewport();
+    m_center_ss = TransformHelper::world_to_ss(m_center, camera.get_projection_matrix().matrix() * camera.get_view_matrix().matrix(), viewport);
+    m_center_ss.y() = viewport[3] - m_center_ss.y(); // y-axis is upside down in screen space
 }
 
 Transform3d GLGizmoRotate2::local_transform() const

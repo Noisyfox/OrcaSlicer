@@ -47,6 +47,8 @@ private:
 
     void init_data_from_selection(const Selection& selection);
     Transform3d local_transform() const;
+    // Update m_center_ss — object center in screen space
+    void update_center_ss();
 
     void render_ring(const ColorRGBA& color, bool full);
     void render_circle(const ColorRGBA& color);
