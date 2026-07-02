@@ -482,7 +482,8 @@ public:
     enum ECursorType : unsigned char
     {
         Standard,
-        Cross
+        Cross,
+        Blank
     };
 
     struct ArrangeSettings

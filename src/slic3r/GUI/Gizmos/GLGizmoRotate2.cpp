@@ -548,12 +548,14 @@ bool GLGizmoRotate2::on_mouse(const wxMouseEvent &mouse_event)
 void GLGizmoRotate2::start_dragging()
 {
     m_dragging = true;
+    m_parent.set_cursor(GLCanvas3D::ECursorType::Blank);
     on_start_dragging();
 }
 
 void GLGizmoRotate2::stop_dragging()
 {
     m_dragging = false;
+    m_parent.set_cursor(GLCanvas3D::ECursorType::Standard);
     on_stop_dragging();
 }
 
