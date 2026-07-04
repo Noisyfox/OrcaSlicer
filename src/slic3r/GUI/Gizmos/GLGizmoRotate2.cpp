@@ -8,6 +8,7 @@
 
 #include <glad/gl.h>
 #include <wx/glcanvas.h>
+#include <imgui/imgui_internal.h>
 
 // #define GIZMO_2_DEBUG
 
@@ -25,6 +26,7 @@ constexpr double AXIS_RING_THICKNESS = 4.0;
 constexpr double AXIS_HOTSPOT_RADIUS = 12.0;
 constexpr unsigned int AXIS_RING_STEP_COUNT = 120;
 constexpr double AXIS_RING_STEP_RAD = 2.0f * PI / AXIS_RING_STEP_COUNT;
+constexpr double AXIS_NUMBER_OFFSET = 20;
 
 constexpr int SNAP_DEG = 5; // in degree
 constexpr int SNAP_DEG_FINE = 1; // in degree
@@ -327,6 +329,7 @@ void GLGizmoRotate2::on_render()
 
     if (m_dragging) {
         render_dragging_mouse_ref(m_mouse_curr_pos, m_center_ss);
+        render_angle_number();
     }
 
 #ifdef GIZMO_2_DEBUG
@@ -528,6 +531,41 @@ void GLGizmoRotate2::render_snap_radii(const ColorRGBA& color)
     }
 }
 
+
+void GLGizmoRotate2::render_angle_number()
+{
+    static ImVec2 size(0.0f, 0.0f);
+    Vec2f position((float) m_center_ss.x(), (float) (m_center_ss.y() - (AXIS_RING_RADIUS - AXIS_NUMBER_OFFSET) * (wxGetApp().em_unit() / 10.)));
+    const Size cnv_size = m_parent.get_canvas_size();
+    position.x() = std::clamp(position.x(), size.x / 2.f, cnv_size.get_width() - size.x / 2.f);
+    position.y() = std::clamp(position.y(), size.y, (float)cnv_size.get_height());
+    
+    ImGuiWrapper& imgui = *wxGetApp().imgui();
+    ImGuiWrapper::push_toolbar_style(m_parent.get_scale());
+    imgui.set_next_window_pos(position.x(), position.y(), ImGuiCond_Always, 0.5f, 1.0f);
+
+    imgui.begin(wxString("rotate_angle"), ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMouseInputs | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoFocusOnAppearing);
+    ImGui::BringWindowToDisplayFront(ImGui::GetCurrentWindow());
+    
+    std::string axis;
+    switch (m_axis)
+    {
+    case GLGizmoRotate::Axis::X: { axis = "X"; break; }
+    case GLGizmoRotate::Axis::Y: { axis = "Y"; break; }
+    case GLGizmoRotate::Axis::Z: { axis = "Z"; break; }
+    }
+    ImGui::TextUnformatted((axis + ": " + format(float(Geometry::rad2deg(get_angle())), 2)).c_str());
+
+    size = ImGui::GetWindowSize();
+    imgui.end();
+    ImGuiWrapper::pop_toolbar_style();
+
+    if (position.x() < size.x / 2.f || position.x() > cnv_size.get_width() - size.x / 2.f ||
+        position.y() < size.y || position.y() > cnv_size.get_height()) {
+        imgui.set_requires_extra_frame();
+    }
+}
+
 void GLGizmoRotate2::on_register_raycasters_for_picking()
 {
     m_raycasters[0] = wxGetApp().plater()->canvas3D()->add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, m_axis, *s_torus_half.mesh_raycaster);
@@ -584,18 +622,18 @@ Transform3d GLGizmoRotate2::local_transform() const
 
     switch (m_axis)
     {
-    case X:
+    case GLGizmoRotate::Axis::X:
     {
         ret = Geometry::rotation_transform(0.5 * PI * Vec3d::UnitY()) * Geometry::rotation_transform(0.5 * PI * Vec3d::UnitZ());
         break;
     }
-    case Y:
+    case GLGizmoRotate::Axis::Y:
     {
         ret = Geometry::rotation_transform(-0.5 * PI * Vec3d::UnitZ()) * Geometry::rotation_transform(-0.5 * PI * Vec3d::UnitY());
         break;
     }
     default:
-    case Z:
+    case GLGizmoRotate::Axis::Z:
     {
         ret = Transform3d::Identity();
         break;
@@ -610,9 +648,9 @@ std::string GLGizmoRotate2::get_tooltip() const
     std::string axis;
     switch (m_axis)
     {
-    case X: { axis = "X"; break; }
-    case Y: { axis = "Y"; break; }
-    case Z: { axis = "Z"; break; }
+    case GLGizmoRotate::Axis::X: { axis = "X"; break; }
+    case GLGizmoRotate::Axis::Y: { axis = "Y"; break; }
+    case GLGizmoRotate::Axis::Z: { axis = "Z"; break; }
     }
     return (m_hover_id == 0 && !m_dragging) ? wxString::Format(_L("Drag to rotate around %s axis"),axis).utf8_string() : "";
 }

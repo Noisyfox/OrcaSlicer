@@ -55,6 +55,7 @@ private:
     void render_radius(const ColorRGBA& color);
     void render_angle_arc(const ColorRGBA& color);
     void render_snap_radii(const ColorRGBA& color);
+    void render_angle_number();
 
 protected:
     bool on_init() override;
