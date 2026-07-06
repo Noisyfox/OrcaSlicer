@@ -161,7 +161,7 @@ size_t count_opt_key(const std::vector<StringObjectException>& warnings, const s
 void trigger_acceleration_warning(DynamicPrintConfig& c)
 {
     c.set_key_value("machine_max_acceleration_extruding", new ConfigOptionFloats{ 100. });
-    c.set_key_value("default_acceleration", new ConfigOptionFloat(100000.));
+    c.set_key_value("default_acceleration", new ConfigOptionFloatsNullable{ 100000. });
 }
 
 // Make `default_jerk` exceed the machine's jerk limit (junction deviation off so
@@ -171,7 +171,7 @@ void trigger_jerk_warning(DynamicPrintConfig& c)
     c.set_key_value("machine_max_junction_deviation", new ConfigOptionFloats{ 0. });
     c.set_key_value("machine_max_jerk_x", new ConfigOptionFloats{ 1. });
     c.set_key_value("machine_max_jerk_y", new ConfigOptionFloats{ 1. });
-    c.set_key_value("default_jerk", new ConfigOptionFloat(9999.));
+    c.set_key_value("default_jerk", new ConfigOptionFloatsNullable{ 9999. });
 }
 
 // Precise outer wall is ignored unless the wall sequence is inner-outer.
@@ -182,6 +182,74 @@ void trigger_precise_wall_warning(DynamicPrintConfig& c)
 }
 
 } // namespace
+
+// ---------------------------------------------------------------------------
+// {first_object_name} filename placeholder
+// ---------------------------------------------------------------------------
+namespace {
+
+// Add a printable 20mm cube named `name` to `model`; returns it so the caller can tweak it.
+ModelObject* add_named_cube(Model& model, const std::string& name)
+{
+    ModelObject* obj = model.add_object();
+    obj->name = name;
+    obj->add_volume(make_cube(20.0, 20.0, 20.0));
+    obj->add_instance();
+    obj->ensure_on_bed();
+    return obj;
+}
+
+// Resolve `format` to an output file name for a print of `model`. `filename_base`, when set,
+// is the saved-project name passed to output_filename().
+std::string resolved_output_name(Model& model, const std::string& format, const std::string& filename_base = {})
+{
+    DynamicPrintConfig config = DynamicPrintConfig::full_print_config();
+    config.set_key_value("filename_format", new ConfigOptionString(format));
+
+    Print print;
+    for (ModelObject* obj : model.objects)
+        print.auto_assign_extruders(obj);
+    print.apply(model, config);
+    return print.output_filename(filename_base);
+}
+
+} // namespace
+
+TEST_CASE("Print: {first_object_name} names the first printable object on the plate", "[Print]")
+{
+    Model model;
+
+    SECTION("uses the object's name") {
+        add_named_cube(model, "WidgetPart");
+        CHECK(resolved_output_name(model, "{first_object_name}") == "WidgetPart.gcode");
+    }
+
+    SECTION("picks the first when several objects are printable") {
+        add_named_cube(model, "FirstPart");
+        add_named_cube(model, "SecondPart");
+        CHECK(resolved_output_name(model, "{first_object_name}") == "FirstPart.gcode");
+    }
+
+    SECTION("skips objects outside the print volume (e.g. on another plate)") {
+        // First in model order, but not on the current plate, so is_printable() is false.
+        add_named_cube(model, "OtherPlatePart")->instances.front()->print_volume_state = ModelInstancePVS_Fully_Outside;
+        add_named_cube(model, "OnPlatePart");
+        CHECK(resolved_output_name(model, "{first_object_name}") == "OnPlatePart.gcode");
+    }
+
+    SECTION("is empty when the object has no name") {
+        add_named_cube(model, "");
+        CHECK(resolved_output_name(model, "part_{first_object_name}") == "part_.gcode");
+    }
+}
+
+TEST_CASE("Print: {first_object_name} is not replaced by the saved-project file name", "[Print]")
+{
+    // Passing a saved-project file name as the filename_base must not change {first_object_name}.
+    Model model;
+    add_named_cube(model, "WidgetPart");
+    CHECK(resolved_output_name(model, "{first_object_name}", "SavedProject") == "WidgetPart.gcode");
+}
 
 TEST_CASE("Print::validate stacks independent warnings", "[Print][validate]")
 {
