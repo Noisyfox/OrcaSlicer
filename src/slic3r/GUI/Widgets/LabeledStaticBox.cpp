@@ -162,18 +162,14 @@ void LabeledStaticBox::DrawBorderAndLabel(wxDC& dc)
     dc.Clear();
 
     wxSize wSz = GetSize();
-    #if defined(__WXMSW__)
-        m_scale = m_parent->GetDPIScaleFactor();
-    #else
-        m_scale = FromDIP(100) / 100.f;
-    #endif
+    m_scale = FromDIP(100) / 100.f;
 
     int tW = 0;
     int tH = 0;
 
     if (!m_label.IsEmpty()) {
         #ifdef __WXMSW__ 
-            dc.SetFont(m_font.Scaled(m_scale));
+            dc.SetFont(m_font.Scaled(m_parent->GetDPIScaleFactor()));
         #else
             dc.SetFont(m_font);
         #endif
