@@ -52,11 +52,7 @@ bool LabeledStaticBox::Create(
 #endif
 
     m_label = label;
-    #if defined(__WXMSW__)
-        m_scale = parent->GetDPIScaleFactor();
-    #else
-        m_scale = FromDIP(100) / 100.f;
-    #endif
+    m_scale = FromDIP(100) / 100.f;
     m_pos   = this->GetPosition();
 
     int tW,tH,descent,externalLeading;
