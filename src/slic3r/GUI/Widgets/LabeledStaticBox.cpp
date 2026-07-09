@@ -158,7 +158,6 @@ void LabeledStaticBox::DrawBorderAndLabel(wxDC& dc)
     dc.Clear();
 
     wxSize wSz = GetSize();
-    m_scale = FromDIP(100) / 100.f;
 
     int tW = 0;
     int tH = 0;
