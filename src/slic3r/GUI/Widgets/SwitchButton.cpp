@@ -640,7 +640,7 @@ MultiSwitchButton::MultiSwitchButton(wxWindow *parent, wxWindowID id, const wxPo
     , m_button_radius(10.0)
     , m_button_padding(10, 6)
 {
-    SetCornerRadius(m_button_radius);
+    SetCornerRadius(parent->FromDIP(m_button_radius));
     SetBorderWidth(0);
 
     sizer = new wxBoxSizer(wxHORIZONTAL);
@@ -665,15 +665,15 @@ int MultiSwitchButton::AppendOption(const wxString &option, void *clientData)
     btn->SetFont(GetFont());
     btn->SetBackgroundColor(m_bg_color);
     btn->SetTextColor(m_text_color);
-    btn->SetCornerRadius(m_button_radius);
-    btn->SetPaddingSize(m_button_padding);
+    btn->SetCornerRadius(m_parent->FromDIP(m_button_radius));
+    btn->SetPaddingSize(m_parent->FromDIP(m_button_padding));
     btn->SetClientData(clientData);
 
     btns.push_back(btn);
     sizer->Add(btn, 1, wxEXPAND | wxALIGN_CENTER_VERTICAL);
 
     wxSize text_size = btn->GetTextExtent(option);
-    btn->SetMinSize(wxSize(text_size.x + m_button_padding.x * 2 + 6, -1));
+    btn->SetMinSize(wxSize(text_size.x + (m_parent->FromDIP(m_button_padding)).x * 2 + 6, -1));
 
     return int(btns.size()) - 1;
 }
@@ -774,10 +774,10 @@ void MultiSwitchButton::SetTextColor(const StateColor &color)
 
 void MultiSwitchButton::SetButtonCornerRadius(double radius)
 {
-    m_button_radius = radius;
-    SetCornerRadius(radius);
+    m_button_radius = m_parent->FromDIP(radius);
+    SetCornerRadius(m_button_radius);
     for (auto *btn : btns)
-        btn->SetCornerRadius(radius);
+        btn->SetCornerRadius(m_button_radius);
     Layout();
     Refresh();
 }
@@ -793,8 +793,11 @@ void MultiSwitchButton::SetButtonPadding(const wxSize &padding)
 
 void MultiSwitchButton::Rescale()
 {
-    for (auto *btn : btns)
+    for (auto *btn : btns){
         btn->Rescale();
+        btn->SetCornerRadius(m_parent->FromDIP(m_button_radius));
+        btn->SetPaddingSize(m_parent->FromDIP(m_button_padding));
+    }
 }
 
 void MultiSwitchButton::button_clicked(wxCommandEvent &event)

@@ -855,12 +855,6 @@ void ConfigOptionsGroup::msw_rescale()
                     cbtn->Rescale();
                     return;
                 }
-                // check if window is MultiSwitchButton // m_extruder_switch / m_variant_combo   
-                MultiSwitchButton* msbtn = dynamic_cast<MultiSwitchButton*>(win); 
-                if (msbtn) { 
-                    msbtn->Rescale();
-                    return;
-                }
                 // check if window is wxButton
                 wxButton* btn = dynamic_cast<wxButton*>(win);
                 if (btn) {
