@@ -2255,7 +2255,7 @@ Sidebar::Sidebar(Plater *parent)
     p->sizer_params = new wxBoxSizer(wxVERTICAL);
 
     // ORCA: Update search box to modern style
-    p->m_search_bar = new StaticBox(p->scrolled);
+    p->m_search_bar = new StaticBox(p->scrolled, wxID_ANY, wxDefaultPosition, wxSize(-1, 3 * wxGetApp().em_unit())); // ensure its size matches with combo box
     p->m_search_bar->SetCornerRadius(0);
     p->m_search_bar->SetBorderColor(wxColour("#CECECE"));
 
@@ -3042,6 +3042,7 @@ void Sidebar::msw_rescale()
     // BBS
     //p->object_manipulation->msw_rescale();
     p->object_settings->msw_rescale();
+    p->m_search_bar->SetSize(wxSize(-1, 3 * wxGetApp().em_unit()));
     p->m_search_item->Rescale();
     p->m_search_item->GetTextCtrl()->SetSize(wxSize(-1, FromDIP(16)));
     p->m_search_bar->Layout();
