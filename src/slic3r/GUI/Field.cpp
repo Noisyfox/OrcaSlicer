@@ -2202,6 +2202,9 @@ void PointCtrl::msw_rescale()
         x_input->SetMinSize(field_size);
         y_input->SetMinSize(field_size);
     }
+
+    x_input->Rescale(); // for icons
+    y_input->Rescale();
 }
 
 void PointCtrl::sys_color_changed()
