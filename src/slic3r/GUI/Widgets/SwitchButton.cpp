@@ -139,18 +139,17 @@ void SwitchButton::Rescale()
 			}
 		}
 		for (int i = 0; i < 2; ++i) {
-			wxMemoryDC memdc(&dc);
-#ifdef __WXMSW__
-			wxBitmap bmp(trackSize.x, trackSize.y);
-			memdc.SelectObject(bmp);
-			memdc.SetBackground(wxBrush(GetBackgroundColour()));
-			memdc.Clear();
-#else
+            wxMemoryDC memdc(&dc);
             wxImage image(trackSize);
+#ifndef __WXMSW__ // DrawText doesn't work properly on Windows with Alpha channel
             image.InitAlpha();
             memset(image.GetAlpha(), 0, trackSize.GetWidth() * trackSize.GetHeight());
+#endif
             wxBitmap bmp(std::move(image));
             memdc.SelectObject(bmp);
+#ifdef __WXMSW__
+            memdc.SetBackground(wxBrush(GetBackgroundColour()));
+            memdc.Clear();
 #endif
             memdc.SetFont(dc.GetFont());
 #ifdef __WXMSW__
