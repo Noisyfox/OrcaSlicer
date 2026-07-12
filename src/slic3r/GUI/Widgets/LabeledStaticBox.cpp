@@ -180,7 +180,7 @@ void LabeledStaticBox::DrawBorderAndLabel(wxDC& dc)
         std::max(0, m_pos.y) + tH * .5,
         wSz.GetWidth(),
         wSz.GetHeight() - tH * .5,
-        m_radius * m_scale
+        m_radius
     );
 
     if (!m_label.IsEmpty()) {
