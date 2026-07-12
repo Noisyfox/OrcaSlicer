@@ -646,7 +646,7 @@ MultiSwitchButton::MultiSwitchButton(wxWindow *parent, wxWindowID id, const wxPo
     auto *hsizer = new wxBoxSizer(wxVERTICAL);
     hsizer->Add(sizer, 1, wxEXPAND);
     SetSizer(hsizer);
-    SetMinSize(wxSize(-1, 20));
+    SetMinSize(parent->FromDIP(wxSize(-1, 20)));
 
     Bind(wxEVT_COMMAND_BUTTON_CLICKED, &MultiSwitchButton::button_clicked, this);
     SetFont(Label::Body_12);
@@ -797,6 +797,7 @@ void MultiSwitchButton::Rescale()
         btn->SetCornerRadius(m_parent->FromDIP(m_button_radius));
         btn->SetPaddingSize(m_parent->FromDIP(m_button_padding));
     }
+    SetMinSize(GetParent()->FromDIP(wxSize(-1, 20)));
 }
 
 void MultiSwitchButton::button_clicked(wxCommandEvent &event)
