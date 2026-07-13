@@ -710,7 +710,7 @@ wxBitmap *PresetComboBox::get_bmp(Preset const &preset)
                 dc.SelectObject(*bmp);
         #else
                 wxMemoryDC dc;
-                dc.SelectObject(*bitmap);
+                dc.SelectObject(*bmp);
         #endif
                 dc.SetBackground(wxBrush(clr));
                 dc.Clear();
