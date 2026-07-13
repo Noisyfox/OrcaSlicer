@@ -695,19 +695,31 @@ wxBitmap *PresetComboBox::get_bmp(Preset const &preset)
         wxString color = preset2.config.opt_string("default_filament_colour", 0);
         wxColour clr(color);
         if (clr.IsOk()) {
-            std::string bitmap_key = "default_filament_colour_" + color.ToStdString();
+            const double em      = Slic3r::GUI::wxGetApp().em_unit();
+            const int    icon_sz = lround(1.5 * em);
+            std::string bitmap_key = "default_filament_colour_" + color.ToStdString() + "-h" + std::to_string(icon_sz) + "-w" + std::to_string(icon_sz);
             wxBitmap *bmp        = bitmap_cache().find(bitmap_key);
             if (bmp == nullptr) {
-                wxImage img(16, 16);
-                if (clr.Red() > 224 && clr.Blue() > 224 && clr.Green() > 224) {
-                    img.SetRGB(wxRect({0, 0}, img.GetSize()), 128, 128, 128);
-                    img.SetRGB(wxRect({1, 1}, img.GetSize() - wxSize{2, 2}), clr.Red(), clr.Green(), clr.Blue());
-                } else {
-                    img.SetRGB(wxRect({0, 0}, img.GetSize()), clr.Red(), clr.Green(), clr.Blue());
-                }
-                bmp = new wxBitmap(img);
-                bmp = bitmap_cache().insert(bitmap_key, *bmp);
+                bmp = bitmap_cache().insert(bitmap_key, wxBitmap(icon_sz, icon_sz));
+        #ifdef __WXOSX__
+                bmp->UseAlpha();
+                wxMemoryDC dc(*bmp);
+        #elif defined(__WXMSW__)
+                wxClientDC cdc(this);
+                wxMemoryDC dc(&cdc);
+                dc.SelectObject(*bmp);
+        #else
+                wxMemoryDC dc;
+                dc.SelectObject(*bitmap);
+        #endif
+                dc.SetBackground(wxBrush(clr));
+                dc.Clear();
+                dc.SetBrush(wxBrush(clr));
+                dc.SelectObject(wxNullBitmap);
             }
+            #ifdef __WXMSW__  // ORCA MSW needs to set scale factor for bitmaps loaded from cache because they arent auto scaled by wxBitmapBundle like bitmaps
+                bmp->SetScaleFactor(GetDPIScaleFactor());
+            #endif
             return bmp;
         }
     }
