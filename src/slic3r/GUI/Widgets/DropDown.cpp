@@ -157,7 +157,8 @@ void DropDown::SetAlignIcon(bool align) { align_icon = align; }
 
 void DropDown::Rescale()
 {
-    check_bitmap.msw_rescale();
+    if(!check_bitmap.name().empty())
+        check_bitmap.msw_rescale();
     arrow_bitmap.msw_rescale();
     need_sync = true;
     messureSize();
