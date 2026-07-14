@@ -4,9 +4,12 @@
 
 #include "DevDefs.h"
 #include "DevFilaAmsSetting.h"
+#include "DevFilaSwitch.h"
 #include "DevUtil.h"
 
 #include <map>
+#include <set>
+#include <vector>
 #include <optional>
 #include <memory>
 #include <unordered_map>
@@ -209,10 +212,15 @@ public:
 
     void     SetAmsType(int type) { m_ams_type = (AmsType)type; }
     void     SetAmsType(AmsType type) { m_ams_type = type; }
-    AmsType  GetAmsType() const { return m_ams_type; }
+    // AMS-Lite-mixed (N9) is a variant of AMS-Lite: report AMS_LITE to generic callers so all
+    // existing AMS_LITE handling applies. Mixed-specific code uses IsAmsLiteMixed().
+    AmsType  GetAmsType() const { return m_ams_type == AMS_LITE_MIXED ? AMS_LITE : m_ams_type; }
 
     // exist or not
     bool  IsExist() const { return m_exist; }
+
+    // AMS-Lite-mixed for N9 (A2L)
+    bool  IsAmsLiteMixed() const { return m_ams_type == AMS_LITE_MIXED; }
 
     // slots
     int   GetSlotCount() const;
@@ -221,6 +229,20 @@ public:
 
     // installed on the extruder
     int   GetExtruderId() const { return m_ext_id; }
+
+    // Extruders this AMS can currently feed. Without a Filament Track Switch installed this
+    // is the single {m_ext_id}; with the switch installed the device binds it to both extruders.
+    const std::set<int>& GetBindedExtruderSet() const { return m_binded_extruder_set; }
+
+    // The bound extruder when exactly one is bound, empty otherwise. Used to attribute an AMS
+    // to a single extruder on printers without the switch.
+    std::optional<int> GetUniqueBindedExtruderId() const
+    {
+        return m_binded_extruder_set.size() == 1 ? std::optional<int>(*m_binded_extruder_set.begin()) : std::nullopt;
+    }
+
+    // Which switch input track (A/B) feeds this AMS, set only when a Filament Track Switch is installed.
+    std::optional<DevFilaSwitch::SwitchPos> GetSwitcherPos() const { return m_binded_switcher_pos; }
 
     // temperature and humidity
     float GetCurrentTemperature() const { return m_current_temperature; }
@@ -247,6 +269,12 @@ private:
     AmsType       m_ams_type = AmsType::AMS;
     std::string   m_ams_id;
     int           m_ext_id;//extruder id
+    // Orca: keeps the legacy single m_ext_id for existing consumers and carries the
+    // switch-aware binding alongside it (BambuStudio stores only the set). Without a Filament
+    // Track Switch the set is {m_ext_id}; with one installed the device binds both extruders and
+    // records which input track (A/B) feeds this AMS.
+    std::set<int> m_binded_extruder_set;
+    std::optional<DevFilaSwitch::SwitchPos> m_binded_switcher_pos;
     bool          m_exist = false;
 
     // slots and trays
@@ -319,8 +347,15 @@ public:
     DevAmsTray* GetAmsTray(const std::string& ams_id, const std::string& tray_id) const;
     void        CollectAmsColors(std::vector<wxColour>& ams_colors) const;
 
+    // Map a linear tray index -> {ams_id, slot_id}. Includes the two virtual (external-spool) trays,
+    // N3S single-slot units, and the A2L/N9 AMS-Lite-mixed layout (trays 24-27).
+    std::map<int, DevAmsSlotId> GetTrayIndexMap();
+
     // extruder
     int  GetExtruderIdByAmsId(const std::string& ams_id) const;
+
+    // nozzle: untranslated flow-type string of the extruder bound to this ams (for blacklist matching)
+    std::string GetNozzleFlowStringByAmsId(const std::string& ams_id) const;
 
     /* AMS settings*/
     DevAmsSystemSetting& GetAmsSystemSetting() { return m_ams_system_setting; }
@@ -330,6 +365,11 @@ public:
     bool                 IsAutoRefillEnabled() const { return m_ams_system_setting.IsAutoRefillEnabled(); }
 
     std::weak_ptr<DevAmsSystemFirmwareSwitch> GetAmsFirmwareSwitch() const { return m_ams_firmware_switch;}
+
+    // filament change steps
+    // The exact change-step sequence reported by the AMS (ams.cfs). Empty on current firmware,
+    // which leaves the legacy hardcoded/ams_status_sub step handling in effect.
+    const std::vector<DevFilamentStep>& GetFilamentChangeSteps() const { return m_filament_change_steps; }
 
 public:
     // ctrls
@@ -347,6 +387,9 @@ private:
 
     /* ams properties */
     int  m_ams_cali_stat = 0;
+
+    // Change-step sequence reported by the AMS (ams.cfs); empty when firmware doesn't send it.
+    std::vector<DevFilamentStep> m_filament_change_steps;
 
     std::map<std::string, DevAms*, NumericStrCompare> amsList;// key: ams[id], start with 0
 
