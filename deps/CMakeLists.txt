@@ -367,6 +367,8 @@ include(libnoise/libnoise.cmake)
 
 include(Draco/Draco.cmake)
 
+include(FFMPEG/FFMPEG.cmake)
+
 
 # I *think* 1.1 is used for *just* md5 hashing?
 # 3.1 has everything in the right place, but the md5 funcs used are deprecated
@@ -446,6 +448,7 @@ set(_dep_list
     ${EXPAT_PKG}
     dep_libnoise
     dep_python3
+    dep_FFMPEG
     )
 
 if (MSVC)
