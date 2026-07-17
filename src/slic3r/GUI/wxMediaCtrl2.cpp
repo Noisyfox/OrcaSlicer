@@ -1,6 +1,7 @@
 #include "wxMediaCtrl2.h"
 #include "libslic3r/Time.hpp"
 #include "I18N.hpp"
+#include "GUI_App.hpp"
 #include "libslic3r/Utils.hpp"
 #include <wx/log.h>
 #include <wx/msgdlg.h>
