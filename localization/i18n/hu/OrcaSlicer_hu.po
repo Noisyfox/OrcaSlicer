@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Orca Slicer\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-07-12 12:27-0300\n"
+"POT-Creation-Date: 2026-07-17 15:13-0300\n"
 "Language: hu\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -32,6 +32,24 @@ msgstr "Az AMS nem támogatja a TPU-t."
 msgid "AMS does not support 'Bambu Lab PET-CF'."
 msgstr "Az AMS nem támogatja a \"Bambu Lab PET-CF\" filamentet."
 
+msgid "The current filament doesn't support the E3D high-flow nozzle and can't be used."
+msgstr ""
+
+msgid "The current filament doesn't support the TPU high-flow nozzle and can't be used."
+msgstr ""
+
+msgid "Auto dynamic flow calibration is not supported for TPU filament."
+msgstr ""
+
+msgid "Bambu TPU 85A is not supported for printing with 0.4 mm Standard or High Flow nozzles."
+msgstr ""
+
+msgid "How to feed TPU filament."
+msgstr ""
+
+msgid "How to feed TPU filament on X2D."
+msgstr ""
+
 msgid "Please cold pull before printing TPU to avoid clogging. You may use cold pull maintenance on the printer."
 msgstr "TPU nyomtatása előtt végezz hideghúzási módszert az eltömődés elkerüléséhez. Használhatod a hideghúzási módszert a nyomtató karbantartásához."
 
@@ -44,6 +62,9 @@ msgstr "A nedves PVA rugalmas, ezért elakadhat az extruderben. Használat előt
 msgid "The rough surface of PLA Glow can accelerate wear on the AMS system, particularly on the internal components of the AMS Lite."
 msgstr "A PLA Glow érdes felülete felgyorsíthatja az AMS rendszer kopását, különösen az AMS Lite belső alkatrészein."
 
+msgid "PLA Glow may wear the AMS first stage feeder. Use an external spool instead."
+msgstr ""
+
 msgid "CF/GF filaments are hard and brittle, it's easy to break or get stuck in AMS, please use with caution."
 msgstr "A CF/GF filament rideg és törékeny, ezért könnyen eltörhet vagy elakadhat az AMS-ben; kérlek, légy körültekintő a használatakor."
 
@@ -53,9 +74,89 @@ msgstr "A PPS-CF rideg, ezért eltörhet a nyomtatófej feletti meghajlított PT
 msgid "PPA-CF is brittle and could break in bended PTFE tube above Toolhead."
 msgstr "A PPA-CF rideg, ezért eltörhet a nyomtatófej feletti meghajlított PTFE csőben."
 
+msgid "Default settings may affect print quality. Adjust as needed for best results."
+msgstr ""
+
+#, c-format, boost-format
+msgid "%s has a risk of nozzle clogging when using 0.4mm high-flow nozzles. Use with caution."
+msgstr ""
+
+#, c-format, boost-format
+msgid "%s filaments are hard and brittle and could break in AMS, and there is also a risk of nozzle clogging when using 0.4mm high-flow nozzles. Use with caution."
+msgstr ""
+
+#, c-format, boost-format
+msgid "%s has a risk of nozzle clogging when using 0.4, 0.6, 0.8mm high-flow nozzles. Use with caution."
+msgstr ""
+
+#, c-format, boost-format
+msgid "%s may fail to load or unload due to the Filament Track Switch. If you wish to continue."
+msgstr ""
+
 #, c-format, boost-format
 msgid "%s is not supported by %s extruder."
 msgstr "A(z) %s nem támogatott a(z) %s extruderen."
+
+#, c-format, boost-format
+msgid "There may be critical print quality issues when printing '%s' with %s Bowden extruder. Use with caution!"
+msgstr ""
+
+#, c-format, boost-format
+msgid "There may be critical print quality issues when printing '%s' with %s extruder. Use with caution!"
+msgstr ""
+
+#, c-format, boost-format
+msgid "There may be print quality issues when printing '%s' with %s Bowden extruder. Use with caution."
+msgstr ""
+
+#, c-format, boost-format
+msgid "There may be print quality issues when printing '%s' with %s extruder. Use with caution."
+msgstr ""
+
+msgid "High Flow"
+msgstr "Nagy áramlás"
+
+msgid "Standard"
+msgstr "Normál"
+
+msgid "TPU High Flow"
+msgstr "TPU nagy áramlású"
+
+msgid "Unknown"
+msgstr "Ismeretlen"
+
+msgid "Hardened Steel"
+msgstr "Edzett acél"
+
+msgid "Stainless Steel"
+msgstr "Rozsdamentes acél"
+
+msgid "Tungsten Carbide"
+msgstr "Volfrám-karbid"
+
+msgid "The toolhead and hotend rack may move. Please keep your hands away from the chamber."
+msgstr "Előfordulhat, hogy a szerszámfej és a hotendtartó megmozdul. Kérjük, ne nyúlj a kamrába."
+
+msgid "Warning"
+msgstr "Figyelmeztetés"
+
+msgid "Hotend information may be inaccurate. Would you like to re-read the hotend? (Hotend information may change during power-off)."
+msgstr "A hotendinformációk pontatlanok lehetnek. Szeretnéd újra beolvasni a hotendet? (A hotendinformáció kikapcsolt állapotban megváltozhat)."
+
+msgid "I confirm all"
+msgstr "Összes megerősítése"
+
+msgid "Re-read all"
+msgstr "Összes újraolvasása"
+
+msgid "Reading the hotends, please wait."
+msgstr "A hotendek beolvasása folyamatban van, kérjük várj."
+
+msgid "During the hotend upgrade, the toolhead will move. Don't reach into the chamber."
+msgstr "A hotend felismerése során a szerszámfej mozogni fog. Ne nyúlj be a kamrába."
+
+msgid "Update"
+msgstr ""
 
 msgid "Current AMS humidity"
 msgstr "Jelenlegi AMS páratartalom"
@@ -86,6 +187,85 @@ msgstr "Verzió:"
 
 msgid "Latest version"
 msgstr "Legfrissebb verzió"
+
+msgid "Row A"
+msgstr "„A“ sor"
+
+msgid "Row B"
+msgstr "„B“ sor"
+
+msgid "Toolhead"
+msgstr "Szerszámfej"
+
+msgid "Empty"
+msgstr "Üres"
+
+msgid "Error"
+msgstr "Hiba"
+
+msgid "Induction Hotend Rack"
+msgstr "Indukciós hotendtartó"
+
+msgid "Hotends Info"
+msgstr "Hotendek adatai"
+
+msgid "Read All"
+msgstr "Összes beolvasása"
+
+msgid "Reading "
+msgstr "Beolvasás "
+
+msgid "Please wait"
+msgstr "Kérjük, várj"
+
+msgid "Running..."
+msgstr "Futtatás..."
+
+msgid "Raised"
+msgstr "Felemelve"
+
+msgid "The hotend is in an abnormal state and currently unavailable. Please go to 'Device -> Upgrade' to upgrade firmware."
+msgstr "A hotend állapota rendellenes, és jelenleg nem elérhető. Kérjük, lépj az „Eszköz -> Frissítés“ oldalra a firmware frissítéséhez."
+
+msgid "Abnormal Hotend"
+msgstr "Rendellenes hotend"
+
+msgid "Refresh"
+msgstr "Frissítés"
+
+msgid "Refreshing"
+msgstr "Frissítés"
+
+msgid "Hotend status abnormal, unavailable at present. Please upgrade the firmware and try again."
+msgstr "A hotend állapota nem megfelelő, jelenleg nem kérdezhető le. Frissítsd a firmware-t, és próbáld újra."
+
+msgid "Cancel"
+msgstr "Mégse"
+
+msgid "Jump to the upgrade page"
+msgstr "Ugrás a frissítés oldalra"
+
+msgid "SN"
+msgstr ""
+
+msgid "Version"
+msgstr "Verzió"
+
+#, c-format, boost-format
+msgid "Used Time: %s"
+msgstr "Felhasznált idő: %s"
+
+msgid "Dynamic nozzles are allocated on the current plate. Picking hotend is not supported."
+msgstr "A dinamikus fúvókák a jelenlegi tálcához vannak kiosztva. A hotend kiválasztása nem támogatott."
+
+msgid "Hotend Rack"
+msgstr "Hotendtartó"
+
+msgid "ToolHead"
+msgstr "Szerszámfej"
+
+msgid "Nozzle information needs to be read"
+msgstr "A fúvókainformációkat be kell olvasni"
 
 # TODO: Review, changed by lang refactor. PR 14254
 msgid "Support Painting"
@@ -609,9 +789,6 @@ msgstr "Távolság aránya a sugárhoz viszonyítva"
 msgid "Confirm connectors"
 msgstr "Csatlakozók megerősítése"
 
-msgid "Cancel"
-msgstr "Mégse"
-
 msgid "Flip cut plane"
 msgstr "Vágósík megfordítása"
 
@@ -652,11 +829,11 @@ msgstr "Részekre darabolás"
 msgid "Reset cutting plane and remove connectors"
 msgstr "Vágósík visszaállítása és connectorok eltávolítása"
 
+msgid "Reset Cut"
+msgstr ""
+
 msgid "Perform cut"
 msgstr "Vágás"
-
-msgid "Warning"
-msgstr "Figyelmeztetés"
 
 msgid "Invalid connectors detected"
 msgstr "Érvénytelen csatlakozók észlelve"
@@ -687,6 +864,13 @@ msgstr "A horonnyal rendelkező vágósík érvénytelen"
 
 msgid "Connector"
 msgstr "Csatlakozó"
+
+#, boost-format
+msgid ""
+"Objects(%1%) have duplicated connectors. Some connectors may be missing in slicing result.\n"
+"Please report to PrusaSlicer team in which scenario this issue happened.\n"
+"Thank you."
+msgstr ""
 
 msgid "Cut by Plane"
 msgstr "Vágás Síkkal"
@@ -734,9 +918,6 @@ msgstr "Egyszerűsítés"
 
 msgid "Simplification is currently only allowed when a single part is selected"
 msgstr "Az egyszerűsítés jelenleg csak akkor engedélyezett, ha egyetlen tárgy van kiválasztva"
-
-msgid "Error"
-msgstr "Hiba"
 
 msgid "Extra high"
 msgstr "Extra magas"
@@ -1797,6 +1978,17 @@ msgstr "Ez a legújabb verzió."
 msgid "Info"
 msgstr "Infó"
 
+msgid "Loading Plugins"
+msgstr ""
+
+#, c-format, boost-format
+msgid "Plugin %s is no longer available."
+msgstr ""
+
+#, c-format, boost-format
+msgid "Plugin %s access is unauthorized."
+msgstr ""
+
 msgid "Loading printer & filament profiles"
 msgstr "Nyomtató- és filamentprofilok betöltése"
 
@@ -1914,6 +2106,18 @@ msgstr ""
 msgid "Resolve cloud sync conflict"
 msgstr ""
 
+msgid "Syncing your account…"
+msgstr ""
+
+msgid "Migrating presets…"
+msgstr ""
+
+msgid "Fetching plugins…"
+msgstr ""
+
+msgid "Loading user presets…"
+msgstr ""
+
 msgid "Retrieving printer information, please try again later."
 msgstr "Nyomtatóinformációk lekérése folyamatban, próbáld újra később."
 
@@ -2013,6 +2217,9 @@ msgstr "A %s csomaghoz való hozzáférés jogosulatlan."
 msgid "Loading user preset"
 msgstr "Felhasználói beállítás betöltése"
 
+msgid "There is an update available. Open the preset bundle dialog to update it."
+msgstr ""
+
 #, c-format, boost-format
 msgid "%s has been removed."
 msgstr "%s eltávolítva."
@@ -2026,8 +2233,35 @@ msgstr "Válaszd ki a nyelvet"
 msgid "Language"
 msgstr "Nyelv"
 
+#, c-format, boost-format
+msgid "Switching Orca Slicer to language %s failed."
+msgstr ""
+
+msgid ""
+"\n"
+"You may need to reconfigure the missing locales, likely by running the \"locale-gen\" and \"dpkg-reconfigure locales\" commands.\n"
+msgstr ""
+
+msgid "Orca Slicer - Switching language failed"
+msgstr ""
+
 msgid "*"
 msgstr "*"
+
+msgid "Plugins"
+msgstr ""
+
+#, c-format, boost-format
+msgid ""
+"Failed to open the Plugins dialog:\n"
+"%s"
+msgstr ""
+
+msgid "Failed to open the Plugins dialog (unknown error)."
+msgstr ""
+
+msgid "Plugin Terminal"
+msgstr ""
 
 msgid "Changing application language"
 msgstr "Alkalmazás nyelvének megváltoztatása"
@@ -2659,6 +2893,45 @@ msgstr "Kattints az ikonra az objektum színfestésének szerkesztéséhez"
 msgid "Click the icon to shift this object to the bed"
 msgstr "Kattints az ikonra az objektum tárgyasztalra helyezéséhez"
 
+msgid "Rename Object"
+msgstr ""
+
+msgid "Rename Part"
+msgstr ""
+
+msgid "Paste settings"
+msgstr ""
+
+msgid "Shift objects to bed"
+msgstr ""
+
+msgid "Object order changed"
+msgstr ""
+
+msgid "Layer setting added"
+msgstr ""
+
+msgid "Part setting added"
+msgstr ""
+
+msgid "Object setting added"
+msgstr ""
+
+msgid "Height range settings added"
+msgstr ""
+
+msgid "Part settings added"
+msgstr ""
+
+msgid "Object settings added"
+msgstr ""
+
+msgid "Load Part"
+msgstr ""
+
+msgid "Load Modifier"
+msgstr ""
+
 msgid "Loading file"
 msgstr "Fájl betöltése"
 
@@ -2667,6 +2940,9 @@ msgstr "Hiba!"
 
 msgid "Failed to get the model data in the current file."
 msgstr "Nem sikerült beolvasni a modelladatokat az aktuális fájlba."
+
+msgid "Add primitive"
+msgstr ""
 
 msgid "Generic"
 msgstr "Általános"
@@ -2679,6 +2955,12 @@ msgstr "Válts át objektumonkénti beállítás módba a kiválasztott objektum
 
 msgid "Remove paint-on fuzzy skin"
 msgstr "Festett bolyhos felület eltávolítása"
+
+msgid "Delete Settings"
+msgstr ""
+
+msgid "Remove height range"
+msgstr "Magasságtartomány eltávolítása"
 
 msgid "Delete connector from object which is a part of cut"
 msgstr "Connector törlése a vágás részét képező objektumból"
@@ -2710,11 +2992,23 @@ msgstr "Összes csatlakozó törlése"
 msgid "Deleting the last solid part is not allowed."
 msgstr "Az utolsó szilárd rész törlése nem megengedett."
 
+msgid "Delete part"
+msgstr ""
+
 msgid "The target object contains only one part and can not be split."
 msgstr "A célobjektum csak egy részt tartalmaz, ezért nem osztható fel."
 
+msgid "Split to parts"
+msgstr "Felosztás tárgyakra"
+
 msgid "Assembly"
 msgstr "Összeállítás"
+
+msgid "Merge parts to an object"
+msgstr ""
+
+msgid "Add layers"
+msgstr ""
 
 msgid "Cut Connectors information"
 msgstr "Vágási csatlakozó információk"
@@ -2749,6 +3043,9 @@ msgstr "Magasságtartományok"
 msgid "Settings for height range"
 msgstr "Magasságtartomány beállításai"
 
+msgid "Delete selected"
+msgstr ""
+
 msgid "Layer"
 msgstr "Réteg"
 
@@ -2770,6 +3067,9 @@ msgstr "Típus:"
 
 msgid "Choose part type"
 msgstr "Alkatrésztípus kiválasztása"
+
+msgid "Instances to Separated Objects"
+msgstr ""
 
 msgid "Enter new name"
 msgstr "Adj meg egy új nevet"
@@ -2798,6 +3098,9 @@ msgstr "A(z) \"%s\" a felosztás után meghaladja az 1 millió felületet, ami n
 msgid "\"%s\" part's mesh contains errors. Please repair it first."
 msgstr "A(z) \"%s\" rész hálója hibákat tartalmaz. Előbb javítsd ki."
 
+msgid "Change Filaments"
+msgstr ""
+
 msgid "Additional process preset"
 msgstr "További folyamatbeállítások"
 
@@ -2806,9 +3109,6 @@ msgstr "Paraméter eltávolítása"
 
 msgid "to"
 msgstr "eddig"
-
-msgid "Remove height range"
-msgstr "Magasságtartomány eltávolítása"
 
 msgid "Add height range"
 msgstr "Magasságtartomány hozzáadása"
@@ -3021,6 +3321,9 @@ msgstr "Válassz ki egy AMS-helyet, majd nyomd meg a \"Betöltés\" vagy a \"Kit
 msgid "Filament type is unknown which is required to perform this action. Please set target filament's informations."
 msgstr "A művelethez szükséges filament típusa ismeretlen. Állítsd be a célfilament adatait."
 
+msgid "AMS has not been initialized. Please initialize it before use."
+msgstr ""
+
 msgid "Changing fan speed during printing may affect print quality, please choose carefully."
 msgstr "A ventilátorsebesség módosítása nyomtatás közben befolyásolhatja a nyomtatás minőségét, válassz körültekintően."
 
@@ -3143,6 +3446,24 @@ msgstr "Extrudálás megerősítése"
 msgid "Check filament location"
 msgstr "Ellenőrizd a filament helyzetét"
 
+msgid "Switch"
+msgstr ""
+
+msgid "hotend"
+msgstr ""
+
+msgid "Wait for AMS cooling"
+msgstr ""
+
+msgid "Switch current filament at Filament Track Switch"
+msgstr ""
+
+msgid "Pull back current filament at Filament Track Switch"
+msgstr ""
+
+msgid "Switch track at Filament Track Switch"
+msgstr ""
+
 msgid "The maximum temperature cannot exceed "
 msgstr "A maximális hőmérséklet nem haladhatja meg ezt: "
 
@@ -3194,6 +3515,62 @@ msgid "Developer mode"
 msgstr "Fejlesztői mód"
 
 msgid "Launch troubleshoot center"
+msgstr ""
+
+msgid "Set nozzle count"
+msgstr ""
+
+msgid "Please set nozzle count"
+msgstr "Kérjük, állítsd be a fúvókaszámot"
+
+msgid "Error: Can not set both nozzle count to zero."
+msgstr "Hiba: Nem lehet mindkét fúvóka számát nullára állítani."
+
+#, c-format, boost-format
+msgid "Error: Nozzle count can not exceed %d."
+msgstr "Hiba: A fúvóka száma nem haladhatja meg a(z) %d értéket."
+
+msgid "Confirm"
+msgstr "Megerősítés"
+
+msgid "Extruder"
+msgstr ""
+
+msgid "Nozzle Selection"
+msgstr "Fúvóka kiválasztás"
+
+msgid "Available Nozzles"
+msgstr "Elérhető fúvókák"
+
+msgid "Nozzle Info"
+msgstr "Fúvókaadatok"
+
+msgid "Sync Nozzle status"
+msgstr "Fúvókaállapot szinkronizálása"
+
+msgid "Caution: Mixing nozzle diameters in one print is not supported. If the selected size is only on one extruder, single-extruder printing will be enforced."
+msgstr "Figyelem: Nem lehetséges a fúvókaátmérők keverése egyetlen nyomtatás során. Ha a kiválasztott méret csak egy extruderen van, akkor az egy extruderes nyomtatás lesz kényszerítve."
+
+#, c-format, boost-format
+msgid "Refresh %d/%d..."
+msgstr "Frissítés %d/%d..."
+
+msgid "Unknown nozzle detected. Refresh to update info (unrefreshed nozzles will be excluded during slicing). Verify nozzle diameter & flow rate against displayed values."
+msgstr "Ismeretlen fúvóka érzékelve. Frissítsd az adatokat (a nem frissített fúvókákat nem használjuk a szeleteléskor). Hasonlítsd össze a fúvóka átmérőjét és a térfogatáramot a megjelenített értékekkel."
+
+msgid "Unknown nozzle detected. Refresh to update (unrefreshed nozzles will be skipped in slicing)."
+msgstr "Ismeretlen fúvóka érzékelve. Frissítsd az adatokat (a nem frissített fúvókákat nem használjuk a szeleteléskor)."
+
+msgid "Please confirm whether the required nozzle diameter and flow rate match the currently displayed values."
+msgstr "Kérjük, ellenőrizd, hogy a szükséges fúvókaátmérő és áramlási sebesség megegyezik-e a kijelzőn lévővel."
+
+msgid "Your printer has different nozzles installed. Please select a nozzle for this print."
+msgstr "A nyomtatóban különböző fúvókák vannak. Kérjük, válassz egy fúvókát a nyomtatáshoz."
+
+msgid "Ignore"
+msgstr "Mellőzés"
+
+msgid "Done."
 msgstr ""
 
 msgid ""
@@ -3529,14 +3906,8 @@ msgstr "Az OrcaSlicer ugyanebben a szellemben indult, a PrusaSlicer, a BambuStud
 msgid "Today, OrcaSlicer is the most widely used and actively developed open-source slicer in the 3D printing community. Many of its innovations have been adopted by other slicers, making it a driving force for the entire industry."
 msgstr "Ma az OrcaSlicer a legszélesebb körben használt és legaktívabban fejlesztett nyílt forráskódú szeletelő a 3D nyomtatási közösségben. Sok újítását más szeletelők is átvették, így az egész iparág hajtóereje."
 
-msgid "Version"
-msgstr "Verzió"
-
 msgid "AMS Materials Setting"
 msgstr "AMS anyagok beállítása"
-
-msgid "Confirm"
-msgstr "Megerősítés"
 
 msgid "Close"
 msgstr "Bezárás"
@@ -3558,11 +3929,11 @@ msgstr ""
 msgid "The input value should be greater than %1% and less than %2%"
 msgstr "A megadott értéknek nagyobbnak kell lennie, mint %1% és kisebbnek, mint %2%"
 
-msgid "SN"
-msgstr ""
-
 msgid "Factors of Flow Dynamics Calibration"
 msgstr "Anyagáramlás kalibrálásának faktorai"
+
+msgid "Wiki Guide"
+msgstr "Wiki útmutató"
 
 msgid "PA Profile"
 msgstr "PA-profil"
@@ -3736,6 +4107,19 @@ msgstr "Jobb fúvóka"
 
 msgid "Nozzle"
 msgstr "Fúvóka"
+
+msgid "Select Filament && Hotends"
+msgstr "Válassz filamentet és hotendet"
+
+msgid "Select Filament"
+msgstr "Filament kiválasztása"
+
+#, c-format, boost-format
+msgid "Printing with the current nozzle may produce an extra %0.2f g of waste."
+msgstr "A jelenlegi fúvókával történő nyomtatás %0.2f g többlethulladékot eredményezhet."
+
+msgid "External spools is not supported since Filament Track Switch has been installed. If you want to use external spool, please uninstall it."
+msgstr ""
 
 #, c-format, boost-format
 msgid "Note: the filament type(%s) does not match with the filament type(%s) in the slicing file. If you want to use this slot, you can install %s instead of %s and change slot information on the 'Device' page."
@@ -4447,9 +4831,6 @@ msgstr "Felület mérése"
 msgid "Calibrating the detection position of nozzle clumping"
 msgstr "A fúvóka csomósodás-észlelési pozíciójának kalibrálása"
 
-msgid "Unknown"
-msgstr "Ismeretlen"
-
 msgid "Update successful."
 msgstr "Sikeres frissítés."
 
@@ -4705,6 +5086,28 @@ msgstr "Érvénytelen formátum. Elvárt vektor formátum: \"%1%\""
 msgid "N/A"
 msgstr ""
 
+msgid "System agents"
+msgstr ""
+
+msgid "No plugin selected"
+msgstr ""
+
+msgid "Add plugin"
+msgstr ""
+
+msgid "Select plugin"
+msgstr ""
+
+msgid "Remove plugin"
+msgstr ""
+
+msgid "Configure"
+msgstr ""
+
+#, c-format, boost-format
+msgid "Configure (%d)"
+msgstr ""
+
 msgid "Pick"
 msgstr "Kiválasztás"
 
@@ -4870,9 +5273,6 @@ msgstr "Anyagáramlás"
 msgid "Fan speed"
 msgstr "Ventilátor fordulatszám"
 
-msgid "°C"
-msgstr "°C"
-
 msgid "Time"
 msgstr "Idő"
 
@@ -4961,9 +5361,6 @@ msgstr "Beállítás optimálisra"
 msgid "Regroup filament"
 msgstr "Filamentek újracsoportosítása"
 
-msgid "Wiki Guide"
-msgstr "Wiki útmutató"
-
 msgid "up to"
 msgstr "legfeljebb"
 
@@ -5000,7 +5397,7 @@ msgstr "Rántás (mm/s)"
 msgid "Fan speed (%)"
 msgstr "Ventilátor fordulatszám (%)"
 
-msgid "Temperature (°C)"
+msgid "Temperature (℃)"
 msgstr "Hőmérséklet (°C)"
 
 msgid "Volumetric flow rate (mm³/s)"
@@ -5018,9 +5415,6 @@ msgstr "Filamentcserék"
 
 msgid "Options"
 msgstr "Opciók"
-
-msgid "Extruder"
-msgstr ""
 
 msgid "Cost"
 msgstr "Költség"
@@ -5230,9 +5624,6 @@ msgstr "Objektumok elrendezése a kiválasztott tálcákon"
 
 msgid "Split to objects"
 msgstr "Felosztás objektumokra"
-
-msgid "Split to parts"
-msgstr "Felosztás tárgyakra"
 
 msgid "Assembly View"
 msgstr "Összeszerelési nézet"
@@ -5956,6 +6347,9 @@ msgstr "Exportálás eredménye"
 msgid "Select profile to load:"
 msgstr "Válaszd ki a betölteni kívánt profilt:"
 
+msgid "Config files (*.json;*.zip;*.orca_printer;*.orca_bundle;*.orca_filament)|*.json;*.zip;*.orca_printer;*.orca_bundle;*.orca_filament"
+msgstr ""
+
 #, c-format, boost-format
 msgid "There is %d config imported. (Only non-system and compatible configs)"
 msgid_plural "There are %d configs imported. (Only non-system and compatible configs)"
@@ -6123,9 +6517,6 @@ msgstr "Kiválasztott fájlok letöltése a nyomtatóról."
 
 msgid "Batch manage files."
 msgstr "Fájlok kötegelt kezelése."
-
-msgid "Refresh"
-msgstr "Frissítés"
 
 msgid "Reload file list from printer."
 msgstr "Fájllista újratöltése a nyomtatóról."
@@ -6439,6 +6830,9 @@ msgstr "Nyomtatási lehetőségek"
 msgid "Safety Options"
 msgstr "Biztonsági beállítások"
 
+msgid "Hotends"
+msgstr "Hotendek"
+
 msgid "Lamp"
 msgstr "Világítás"
 
@@ -6471,6 +6865,12 @@ msgstr "Ha a nyomtatás szünetel, filament be- és kitöltés csak külső fér
 
 msgid "Current extruder is busy changing filament."
 msgstr "Az aktuális extruder filamentet vált, ezért foglalt."
+
+msgid "\"Load\" or \"Unload\" is not supported for external spool while using Filament Track Switch."
+msgstr ""
+
+msgid "The Filament Track Switch has not been setup. Please setup on printer."
+msgstr ""
 
 msgid "Current slot has already been loaded."
 msgstr "Az aktuális férőhely már be van töltve."
@@ -6522,9 +6922,6 @@ msgstr "Ez csak a nyomtatás során érvényesül"
 msgid "Silent"
 msgstr "Csendes"
 
-msgid "Standard"
-msgstr "Normál"
-
 msgid "Sport"
 msgstr ""
 
@@ -6557,6 +6954,12 @@ msgstr "Fénykép hozzáadása"
 
 msgid "Delete Photo"
 msgstr "Fénykép törlése"
+
+msgid "Select Images"
+msgstr ""
+
+msgid "Image files (*.png;*.jpg;*jpeg)|*.png;*.jpg;*.jpeg"
+msgstr ""
 
 msgid "Submit"
 msgstr "Elküldés"
@@ -6741,6 +7144,9 @@ msgstr "LAN only mód használata"
 msgid "Don't show this dialog again"
 msgstr "Ne jelenjen meg többé ez a párbeszédablak"
 
+msgid "Please refer to Wiki before use->"
+msgstr "Használat előtt nézd meg a Wikit ->"
+
 msgid "3D Mouse disconnected."
 msgstr "3D Mouse csatlakoztatva."
 
@@ -6902,6 +7308,14 @@ msgctxt "Layers"
 msgid "Bottom"
 msgstr "Alsó"
 
+msgid "Plugin Selection"
+msgstr ""
+
+msgid ""
+"No plugins capabilities available for this type.\n"
+"Enable or install some to use."
+msgstr ""
+
 msgid "Enable detection of build plate position"
 msgstr "Nyomtatótálca helyzetének érzékelése"
 
@@ -6995,26 +7409,17 @@ msgstr "Áramlás"
 msgid "Please change the nozzle settings on the printer."
 msgstr "Módosítsd a fúvóka beállításait a nyomtatón."
 
-msgid "Hardened Steel"
-msgstr "Edzett acél"
-
-msgid "Stainless Steel"
-msgstr "Rozsdamentes acél"
-
-msgid "Tungsten Carbide"
-msgstr "Volfrám-karbid"
-
 msgid "Brass"
 msgstr "Sárgaréz"
 
 msgid "High flow"
 msgstr "Nagy átfolyás"
 
+msgid "TPU High flow"
+msgstr ""
+
 msgid "No wiki link available for this printer."
 msgstr "Ehhez a nyomtatóhoz nincs elérhető wiki hivatkozás."
-
-msgid "Refreshing"
-msgstr "Frissítés"
 
 msgid "Unavailable while heating maintenance function is on."
 msgstr "Nem érhető el, amíg a fűtéskarbantartási funkció be van kapcsolva."
@@ -7138,6 +7543,15 @@ msgstr "Átmérő váltása"
 msgid "Configuration incompatible"
 msgstr "Nem kompatibilis konfiguráció"
 
+msgid "Filament switcher detected. All AMS filaments are now available for both extruders. The slicer will auto-assign for optimal printing. "
+msgstr ""
+
+msgid "A filament switcher is detected but not calibrated and thus currently unavailable. Please calibrate it on the printer and synchronize before use. "
+msgstr ""
+
+msgid "Tips"
+msgstr "Tippek"
+
 msgid "Sync printer information"
 msgstr "Nyomtatóinformációk szinkronizálása"
 
@@ -7165,6 +7579,9 @@ msgstr "Kattints a beállítás szerkesztéséhez"
 
 msgid "Project Filaments"
 msgstr "Projekt filamentek"
+
+msgid "Purge mode"
+msgstr ""
 
 msgid "Flushing volumes"
 msgstr "Öblítési mennyiségek"
@@ -7386,9 +7803,6 @@ msgstr "A csatlakoztatott nyomtató: %s. Ennek egyeznie kell a projekt nyomtatá
 msgid "Do you want to sync the printer information and automatically switch the preset?"
 msgstr "Szeretnéd szinkronizálni a nyomtató adatait, és automatikusan átváltani a beállítást?"
 
-msgid "Tips"
-msgstr "Tippek"
-
 msgid "The file does not contain any geometry data."
 msgstr "A fájl nem tartalmaz geometriai adatokat."
 
@@ -7437,8 +7851,20 @@ msgstr ""
 "Ez a művelet megszakítja a vágási kapcsolatot.\n"
 "Ezután a modell konzisztenciája nem garantálható."
 
+msgid "Delete Object"
+msgstr ""
+
+msgid "Delete All Objects"
+msgstr ""
+
+msgid "Reset Project"
+msgstr ""
+
 msgid "The selected object couldn't be split."
 msgstr "A kijelölt objektumot nem lehet feldarabolni."
+
+msgid "Split to Objects"
+msgstr ""
 
 msgid "Disable Auto-Drop to preserve Z positioning?\n"
 msgstr "Letiltja az Auto-Drop funkciót a Z pozicionálás megőrzéséhez?\n"
@@ -7465,6 +7891,9 @@ msgstr "Válassz egy új fájlt"
 # TODO: Review, changed by lang refactor. PR 14254
 msgid "File for the replacement wasn't selected"
 msgstr "A cserefájl nem lett kiválasztva"
+
+msgid "Replace with 3D file"
+msgstr ""
 
 msgid "Select folder to replace from"
 msgstr "Cseréhez mappa kiválasztása"
@@ -7511,6 +7940,9 @@ msgstr "Nem sikerült újratölteni:"
 
 msgid "Error during reload"
 msgstr "Hiba az újratöltés során"
+
+msgid "Reload all"
+msgstr ""
 
 msgid "There are warnings after slicing models:"
 msgstr "A modellek szeletelése a következő figyelmeztetéseket generálta:"
@@ -7781,6 +8213,40 @@ msgstr "Eszköz oldal"
 
 msgid "Synchronize AMS Filament Information"
 msgstr "AMS filament információk szinkronizálása"
+
+msgid "OrcaCloud plugins required by the current preset are not installed:"
+msgstr ""
+
+msgid "Install Plugins"
+msgstr ""
+
+msgid "Local plugins required by the current preset are missing:"
+msgstr ""
+
+msgid "Find on OrcaCloud"
+msgstr ""
+
+msgid "Plugins required by the current preset are not activated:"
+msgstr ""
+
+msgid "Activate Now"
+msgstr ""
+
+msgid "The installed plugin does not provide the required capability — it may be outdated:"
+msgstr ""
+
+msgid "Preparing to install plugins..."
+msgstr ""
+
+msgid "Installing plugins"
+msgstr ""
+
+msgid "Cancelling — finishing the current plugin..."
+msgstr ""
+
+#, boost-format
+msgid "Installing %1%..."
+msgstr ""
 
 msgid "Plate Settings"
 msgstr "Tálca beállítások"
@@ -8284,6 +8750,15 @@ msgstr "Választásom törlése a nyomtatóbeállítás szinkronizálásához f�
 msgid "Graphics"
 msgstr "Grafika"
 
+msgid "Smooth normals"
+msgstr ""
+
+msgid ""
+"Applies smooth normals to the model.\n"
+"\n"
+"Requires manual scene reload to take effect (right-click on 3D view → \"Reload All\")."
+msgstr ""
+
 msgid "Phong shading"
 msgstr ""
 
@@ -8299,16 +8774,7 @@ msgstr ""
 msgid "Shadows"
 msgstr ""
 
-msgid "Renders cast shadows on the plate in realistic view."
-msgstr ""
-
-msgid "Smooth normals"
-msgstr ""
-
-msgid ""
-"Applies smooth normals to the realistic view.\n"
-"\n"
-"Requires manual scene reload to take effect (right-click on 3D view → \"Reload All\")."
+msgid "Renders cast shadows on the plate, other objects, and each object onto itself in realistic view."
 msgstr ""
 
 msgid "Anti-aliasing"
@@ -8606,6 +9072,9 @@ msgstr "Nem kompatibilis beállítások"
 msgid "My Printer"
 msgstr "A nyomtatóm"
 
+msgid "AMS filaments"
+msgstr ""
+
 msgid "Left filaments"
 msgstr "Bal oldali filamentek"
 
@@ -8624,6 +9093,9 @@ msgstr "Beállítások hozzáadása/eltávolítása"
 
 msgid "Edit preset"
 msgstr "Beállítás módosítása"
+
+msgid "Change extruder color"
+msgstr ""
 
 msgid "Unspecified"
 msgstr "Meghatározatlan"
@@ -8655,9 +9127,6 @@ msgstr "Nyomtatók kiválasztása/eltávolítása (rendszerbeállítások)"
 
 msgid "Create printer"
 msgstr "Nyomtató létrehozása"
-
-msgid "Empty"
-msgstr "Üres"
 
 msgid "Incompatible"
 msgstr "Nem kompatibilis"
@@ -8854,6 +9323,9 @@ msgstr "Többszínű nyomtatás külső tekercssel"
 msgid "Your filament grouping method in the sliced file is not optimal."
 msgstr "A szeletelt fájlban használt filamentcsoportosítás nem optimális."
 
+msgid "To ensure print quality, the drying temperature will be lowered during printing."
+msgstr ""
+
 msgid "Auto Bed Leveling"
 msgstr "Automatikus asztalszintezés"
 
@@ -8890,12 +9362,42 @@ msgstr "küldés befejezve"
 msgid "Error code"
 msgstr "Hibakód"
 
-msgid "High Flow"
-msgstr "Nagy áramlás"
+msgid "Error desc"
+msgstr "Hibaleírás"
+
+msgid "Extra info"
+msgstr "Extra infó"
+
+msgid "The Filament Track Switch installed on the printer does not match the slicing file. Please re-slice to avoid print quality issues."
+msgstr ""
+
+msgid "This print requires a Filament Track Switch. Please install it first."
+msgstr ""
+
+msgid "The Filament Track Switch has not been setup. Please setup it first."
+msgstr ""
 
 #, c-format, boost-format
-msgid "The nozzle flow setting of %s(%s) doesn't match with the slicing file(%s). Please make sure the nozzle installed matches with settings in printer, then set the corresponding printer preset while slicing."
-msgstr "A(z) %s(%s) fúvókaáramlási beállítása nem egyezik a szeletelési fájl értékével (%s). Győződj meg róla, hogy a beszerelt fúvóka megegyezik a nyomtató beállításaival, majd szeleteléskor állítsd be a megfelelő nyomtató-előbeállítást."
+msgid "Failed to send nozzle auto-mapping request to printer { code: %d }. Please try to refresh the printer information. If it still does not recover, you can try to rebind the printer and check the network connection."
+msgstr ""
+
+msgid "The printer is calculating nozzle mapping."
+msgstr ""
+
+msgid "Please wait a moment..."
+msgstr ""
+
+#, c-format, boost-format
+msgid "Failed to receive nozzle auto-mapping table from printer { msg: %s }. Please refresh the printer information."
+msgstr ""
+
+#, c-format, boost-format
+msgid "The printer failed to build the nozzle auto-mapping table { code: %d }. Please refresh nozzle information."
+msgstr ""
+
+#, c-format, boost-format
+msgid "The current nozzle mapping may produce an extra %0.2f g of waste."
+msgstr ""
 
 #, c-format, boost-format
 msgid "Filament %s does not match the filament in AMS slot %s. Please update the printer firmware to support AMS slot assignment."
@@ -8958,8 +9460,38 @@ msgstr "%dg-mal több filament és %d váltással több az optimális csoportos�
 msgid "nozzle"
 msgstr "fúvóka"
 
-msgid "both extruders"
-msgstr "mindkét extruder"
+#, c-format, boost-format
+msgid "Refreshing information of hotends(%d/%d)."
+msgstr ""
+
+msgid "There are not enough available hotends currently."
+msgstr ""
+
+msgid "Please complete the hotend rack setup and try again."
+msgstr ""
+
+msgid "Please refresh the nozzle information and try again."
+msgstr ""
+
+msgid "Please re-slice to avoid filament waste."
+msgstr ""
+
+msgid "The reported hotend information may be unreliable."
+msgstr ""
+
+#, c-format, boost-format
+msgid "The printer has no nozzle matching the slicing file (%s)."
+msgstr ""
+
+msgid "Please install a matching nozzle in the hotend rack, or set the corresponding printer preset while slicing."
+msgstr ""
+
+msgid "The toolhead and hotend rack are full. Please remove at least one hotend before printing."
+msgstr ""
+
+#, c-format, boost-format
+msgid "The nozzle flow setting of %s(%s) doesn't match with the slicing file(%s). Please make sure the nozzle installed matches with settings in printer, then set the corresponding printer preset while slicing."
+msgstr "A(z) %s(%s) fúvókaáramlási beállítása nem egyezik a szeletelési fájl értékével (%s). Győződj meg róla, hogy a beszerelt fúvóka megegyezik a nyomtató beállításaival, majd szeleteléskor állítsd be a megfelelő nyomtató-előbeállítást."
 
 msgid "Tips: If you changed your nozzle of your printer lately, Please go to 'Device -> Printer parts' to change your nozzle setting."
 msgstr "Tipp: Ha nemrég cseréltél fúvókát a nyomtatón, lépj az 'Eszköz -> Nyomtató alkatrészei' menübe, és módosítsd a fúvóka beállítását."
@@ -8972,9 +9504,16 @@ msgstr "A jelenlegi nyomtató %s átmérője (%.1fmm) nem egyezik a szeletelési
 msgid "The current nozzle diameter (%.1fmm) doesn't match with the slicing file (%.1fmm). Please make sure the nozzle installed matches with settings in printer, then set the corresponding printer preset when slicing."
 msgstr "A jelenlegi fúvókaátmérő (%.1fmm) nem egyezik a szeletelési fájléval (%.1fmm). Győződj meg róla, hogy a beszerelt fúvóka egyezik a nyomtatóbeállításokkal, majd szeleteléskor válaszd a megfelelő nyomtatóbeállítást."
 
+msgid "both extruders"
+msgstr "mindkét extruder"
+
 #, c-format, boost-format
 msgid "The hardness of current material (%s) exceeds the hardness of %s(%s). Please verify the nozzle or material settings and try again."
 msgstr "A jelenlegi anyag keménysége (%s) meghaladja a(z) %s (%s) keménységét. Ellenőrizd a fúvóka- vagy anyagbeállításokat, majd próbáld újra."
+
+#, c-format, boost-format
+msgid "The hardness of current material (%s) exceeds the hardness of %s(%s). It may cause nozzle wear, leading to material leakage and unstable flow. Please exercise caution when using it."
+msgstr ""
 
 #, c-format, boost-format
 msgid "[ %s ] requires printing in a high-temperature environment. Please close the door."
@@ -9085,9 +9624,6 @@ msgstr "A jelenlegi firmware legfeljebb 16 anyagot támogat. Vagy csökkentsd az
 
 msgid "The type of external filament is unknown or does not match with the filament type in the slicing file. Please make sure you have installed the correct filament in the external spool."
 msgstr "A külső filament típusa ismeretlen, vagy nem egyezik a szeletelőfájlban szereplő filament típusával. Győződj meg arról, hogy a megfelelő filamentet helyezted be a külső orsóba."
-
-msgid "Please refer to Wiki before use->"
-msgstr "Használat előtt nézd meg a Wikit ->"
 
 msgid "Current firmware does not support file transfer to internal storage."
 msgstr "A jelenlegi firmware nem támogatja a fájlátvitelt belső tárolóra."
@@ -9272,6 +9808,9 @@ msgstr ""
 msgid "Click to reset all settings to the last saved preset."
 msgstr "Kattints az összes beállítás utolsó mentett változatának visszaállításához."
 
+msgid "Prime tower is required for nozzle changing. There may be flaws on the model without prime tower. Are you sure you want to disable prime tower?"
+msgstr "A fúvókacsere miatt szükség van a törlőtoronyra. Nélküle előfordulhatnak hibák a nyomtatott tárgyon. Biztos, hogy kikapcsolod a törlőtornyot?"
+
 # TODO: Review, changed by lang refactor. PR 14254
 msgid "A prime tower is required for smooth timelapse mode. There may be flaws on the model without a prime tower. Are you sure you want to disable the prime tower?"
 msgstr "A sima időfelvétel miatt szükség van a törlőtoronyra. Nélküle előfordulhatnak hibák a nyomtatott tárgyon. Biztos, hogy kikapcsolod a törlőtornyot?"
@@ -9352,9 +9891,6 @@ msgstr "Szeretnéd az értéket automatikusan a beállított tartományhoz igaz�
 
 msgid "Adjust"
 msgstr "Módosítás"
-
-msgid "Ignore"
-msgstr "Mellőzés"
 
 msgid "Experimental feature: Retracting and cutting off the filament at a greater distance during filament changes to minimize flush. Although it can notably reduce flush, it may also elevate the risk of nozzle clogs or other printing complications."
 msgstr "Kísérleti funkció: Filamentcsere közben nagyobb távolságon történő visszahúzás és elvágás az öblítés minimalizálása érdekében. Bár ez jelentősen csökkentheti az öblítés mértékét, növelheti a fúvóka eltömődésének vagy más nyomtatási problémák kockázatát."
@@ -9516,6 +10052,12 @@ msgstr "Extrudálási szerep váltása G-kód"
 
 msgid "Post-processing Scripts"
 msgstr "Utófeldolgozó szkriptek"
+
+msgid "Slicing Pipeline Plugin"
+msgstr ""
+
+msgid "Plugin Configuration"
+msgstr ""
 
 msgid "Notes"
 msgstr "Megjegyzések"
@@ -9857,6 +10399,12 @@ msgstr ""
 msgid "Are you sure you want to %1% the selected preset?"
 msgstr "Biztos, hogy %1% a kiválasztott beállítást?"
 
+msgid "Select printers"
+msgstr "Nyomtatók kiválasztása"
+
+msgid "Select profiles"
+msgstr "Profilok kiválasztása"
+
 #, c-format, boost-format
 msgid ""
 " - %s:\n"
@@ -10104,6 +10652,12 @@ msgstr "Értékek átvitele balról jobbra"
 
 msgid "If enabled, this dialog can be used for transfer selected values from left to right preset."
 msgstr "Ha engedélyezve van, ez a párbeszédablak használható a kijelölt értékek bal oldali előbeállításból a jobb oldaliba való átvitelére."
+
+msgid "One of the presets does not exist"
+msgstr ""
+
+msgid "Compared presets has different printer technology"
+msgstr ""
 
 msgid "Add File"
 msgstr "Fájl hozzáadása"
@@ -10469,6 +11023,9 @@ msgstr "Bejelentkezés"
 msgid "Login failed. Please try again."
 msgstr "Sikertelen bejelentkezés. Próbáld újra."
 
+msgid "parse json failed"
+msgstr ""
+
 msgid "[Action Required] "
 msgstr "[Művelet szükséges] "
 
@@ -10652,6 +11209,9 @@ msgstr "Nyomtathatóság váltása objektumhoz/alkatrészhez"
 msgid "Switch between Prepare/Preview"
 msgstr "Váltás előkészítés/előnézet között"
 
+msgid "Open actions speed dial"
+msgstr ""
+
 msgid "Plater"
 msgstr "Tálca"
 
@@ -10783,6 +11343,9 @@ msgstr "Nyomtató neve"
 msgid "Where to find your printer's IP and Access Code?"
 msgstr "Hol találom a nyomtató IP címét és a hozzáférési kódot?"
 
+msgid "How to trouble shooting"
+msgstr ""
+
 msgid "Connect"
 msgstr "Csatlakozás"
 
@@ -10847,6 +11410,9 @@ msgstr "Vágómodul"
 msgid "Auto Fire Extinguishing System"
 msgstr "Automatikus tűzoltó rendszer"
 
+msgid "Filament Track Switch"
+msgstr ""
+
 msgid "Beta"
 msgstr "Beta"
 
@@ -10864,6 +11430,9 @@ msgstr "A frissítés nem sikerült"
 
 msgid "Update successful"
 msgstr "Sikeres frissítés"
+
+msgid "Hotends on Rack"
+msgstr "Hotendek a tartón"
 
 msgid "Are you sure you want to update? This will take about 10 minutes. Do not turn off the power while the printer is updating."
 msgstr "Biztos, hogy frissíteni akarsz? Ez körülbelül 10 percet vesz igénybe. Ne kapcsold ki a nyomtatót, amíg a frissítés tart."
@@ -10973,6 +11542,9 @@ msgstr "Csoportosítási hiba: "
 
 msgid " can not be placed in the "
 msgstr " nem helyezhető ide: "
+
+msgid "Group error in manual mode. Please check nozzle count or regroup."
+msgstr ""
 
 msgid "Internal Bridge"
 msgstr "Belső híd"
@@ -11502,6 +12074,9 @@ msgid "API key"
 msgstr "API-kulcs"
 
 msgid "HTTP digest"
+msgstr ""
+
+msgid "Configuration for the plugin capabilities this preset uses, overriding the global Capabilities configuration. Stored as a raw JSON array and edited through the dialog behind the button, never typed in directly."
 msgstr ""
 
 msgid "Avoid crossing walls"
@@ -12153,9 +12728,6 @@ msgstr ""
 "Az éles szögek észlelése előtt a geometria egyszerűsítve lesz. Ez a paraméter a leegyszerűsítésnél figyelembe vett eltérés minimális hosszát adja meg.\n"
 "0 értékkel kikapcsolható."
 
-msgid "Select printers"
-msgstr "Nyomtatók kiválasztása"
-
 msgid "upward compatible machine"
 msgstr "felfelé kompatibilis gép"
 
@@ -12165,9 +12737,6 @@ msgstr "Feltétel"
 # TODO: Review, changed by lang refactor. PR 14254
 msgid "A Boolean expression using the configuration values of an active printer profile. If this expression evaluates to true, this profile is considered compatible with the active printer profile."
 msgstr "Logikai kifejezés, amely egy aktív nyomtatóprofil konfigurációs értékeit használja. Ha ez a kifejezés igaz, akkor ez a profil kompatibilis az aktív nyomtatóprofillal."
-
-msgid "Select profiles"
-msgstr "Profilok kiválasztása"
 
 # TODO: Review, changed by lang refactor. PR 14254
 msgid "A Boolean expression using the configuration values of an active print profile. If this expression evaluates to true, this profile is considered compatible with the active print profile."
@@ -12492,6 +13061,24 @@ msgstr ""
 "Az alsó felületi réteg sűrűsége. Esztétikai vagy funkcionális célokra szolgál, nem pedig olyan problémák javítására, mint a túlextrudálás.\n"
 "FIGYELMEZTETÉS: Ennek az értéknek a csökkentése kedvezőtlenül befolyásolhatja a tárgyasztalhoz való tapadást."
 
+msgid "Top surface fill order"
+msgstr ""
+
+msgid ""
+"Direction in which top surfaces are filled when using a center-based pattern (Concentric, Archimedean Chords, Octagram Spiral).\n"
+"Outward starts at the center of the surface, so any excess material is pushed towards the edge where it is least visible. Inward starts at the edge and ends with the tight curves at the center.\n"
+"Default uses shortest-path ordering, which may run in either direction."
+msgstr ""
+
+msgid "Bottom surface fill order"
+msgstr ""
+
+msgid ""
+"Direction in which bottom surfaces are filled when using a center-based pattern (Concentric, Archimedean Chords, Octagram Spiral).\n"
+"Inward starts each surface with the wider outer curves, which improves first layer adhesion on build plates where the tight curves at the center may not stick. Outward starts at the center, pushing any excess material towards the edge.\n"
+"Default uses shortest-path ordering, which may run in either direction."
+msgstr ""
+
 msgid "Internal solid infill pattern"
 msgstr "Belső tömör kitöltés mintája"
 
@@ -12807,11 +13394,17 @@ msgstr "Automatikus öblítéshez"
 msgid "Auto For Match"
 msgstr "Automatikus egyeztetéshez"
 
+msgid "Nozzle Manual"
+msgstr ""
+
 msgid "Flush temperature"
 msgstr "Öblítési hőmérséklet"
 
 msgid "Temperature when flushing filament. 0 indicates the upper bound of the recommended nozzle temperature range."
 msgstr "A filament öblítésekor használt hőmérséklet. A 0 az ajánlott fúvókahőmérséklet-tartomány felső határát jelenti."
+
+msgid "Flush temperature used in fast purge mode."
+msgstr ""
 
 msgid "Flush volumetric speed"
 msgstr "Öblítési volumetrikus sebesség"
@@ -13079,6 +13672,12 @@ msgstr "Filament nyomtatható"
 
 msgid "The filament is printable in extruder."
 msgstr "A filament nyomtatható az extruderben."
+
+msgid "Filament-extruder compatibility"
+msgstr ""
+
+msgid "A single 32-bit int encoding the compatibility level of a filament across all extruders (up to 10). Every 3 bits represent one extruder (bits [3*i, 3*i+2] for extruder i). 0: printable, 1: error, 2: critical warning, 3: warning, 4-7: reserved."
+msgstr ""
 
 msgid "Softening temperature"
 msgstr "Lágyulási hőmérséklet"
@@ -13686,6 +14285,15 @@ msgstr "A legjobb automatikus elrendezés tartománya [0,1] a tárgyasztal alakj
 msgid "Enable this option if machine has auxiliary part cooling fan. G-code command: M106 P2 S(0-255)."
 msgstr "Engedélyezd ezt az opciót, ha a gép rendelkezik kiegészítő tárgyhűtő ventilátorral. G-kód parancs: M106 P2 S(0-255)."
 
+msgid "Fan direction"
+msgstr ""
+
+msgid "Cooling fan direction of the printer"
+msgstr ""
+
+msgid "Both"
+msgstr ""
+
 msgid ""
 "Start the fan this number of seconds earlier than its target start time (you can use fractional seconds). It assumes infinite acceleration for this time estimation, and will only take into account G1 and G0 moves (arc fitting is unsupported).\n"
 "It won't move fan commands from custom G-code (they act as a sort of 'barrier').\n"
@@ -13727,9 +14335,6 @@ msgstr ""
 "Ha a firmware már letiltja a ventilátort egy küszöbérték alatt (például a Klipper [fan] off_below: 0.10 értéke kikapcsolja a ventilátort, ha a parancsolt munkaciklus 10% alatt van), akkor ezt az opciót és a firmware küszöbértékét ideális esetben ugyanarra az értékre kell állítani. Ezek megfeleltetése (pl. off_below: 0,10 a Klipperben és 10% itt) garantálja, hogy a szeletelő soha nem ad ki olyan nullától eltérő értéket, amelyet a firmware csendben ejtene, és a ventilátor soha nem kap olyan értéket, amely alacsonyabb, mint amiről tudod, hogy ténylegesen képes forogni.\n"
 "A deaktiváláshoz állítsd 0-ra."
 
-msgid "%"
-msgstr "%"
-
 msgid "Time cost"
 msgstr "Időköltség"
 
@@ -13759,6 +14364,12 @@ msgid ""
 msgstr ""
 "Engedélyezd ezt, ha a nyomtató támogatja a légszűrést.\n"
 "G-kód parancs: M106 P3 S(0-255)"
+
+msgid "Use cooling filter"
+msgstr "Hűtőszűrő használata"
+
+msgid "Enable this if printer support cooling filter"
+msgstr "Engedélyezd a beállítást, ha a nyomtató támogatja a hűtőszűrőt"
 
 msgid "G-code flavor"
 msgstr "G-kód változat"
@@ -14292,6 +14903,30 @@ msgstr "Minimum mozgási sebesség"
 msgid "Minimum travel speed (M205 T)"
 msgstr "Minimum mozgási sebesség (M205 T)"
 
+msgid "Maximum force of the Y axis"
+msgstr "Az Y tengely maximális ereje"
+
+msgid "The allowed maximum output force of Y axis"
+msgstr "Az Y tengely megengedett maximális kimeneti ereje"
+
+msgid "N"
+msgstr ""
+
+msgid "Bed mass of the Y axis"
+msgstr "Az Y tengely asztaltömege"
+
+msgid "The machine bed mass load of Y axis"
+msgstr "Az Y tengely gépasztaltömeg-terhelése"
+
+msgid "g"
+msgstr ""
+
+msgid "The allowed max printed mass"
+msgstr "A megengedett maximális nyomtatott tömeg"
+
+msgid "The allowed max printed mass on a plate"
+msgstr "A megengedett maximális nyomtatott tömeg egy lemezen"
+
 msgid "Maximum acceleration for extruding"
 msgstr "Maximális gyorsulás extrudáláshoz"
 
@@ -14400,6 +15035,9 @@ msgstr ""
 "A nulla érték firmware frekvenciáját fogja használni.\n"
 "A rezgéskompenzáció letiltásához használd a Letiltás típust.\n"
 "RRF: X és Y értékek egyenlőek."
+
+msgid "Hz"
+msgstr "Hz"
 
 msgid "Y"
 msgstr "Y"
@@ -14689,6 +15327,15 @@ msgstr "Extrudálási szerepkör G-kód módosítása (folyamat)"
 msgid "This G-code is inserted when the extrusion role is changed. It runs after the machine and filament extrusion role G-code."
 msgstr "Ez a G-kód akkor kerül beillesztésre, amikor az extrudálási szerep megváltozik. A gép és a filament extrudálási szerepkör G-kódja után fut."
 
+msgid "Plugins Used"
+msgstr ""
+
+msgid "Plugin capabilities referenced by this preset, stored as name;uuid;capability."
+msgstr ""
+
+msgid "Python plugin(s) invoked at each slicing pipeline step to read and modify intermediate slicing data, including a final G-code post-processing step. Research/experimental."
+msgstr ""
+
 msgid "Printer type"
 msgstr "Nyomtató típusa"
 
@@ -14756,6 +15403,15 @@ msgstr "Visszahúzott mennyiség törlés előtt"
 # TODO: Review, changed by lang refactor. PR 14254
 msgid "This is the length of fast retraction before a wipe, relative to retraction length."
 msgstr "Ez a törlés előtti gyors visszahúzás hossza a visszahúzási hosszhoz viszonyítva."
+
+msgid "Retract amount after wipe"
+msgstr ""
+
+#, c-format
+msgid ""
+"The length of fast retraction after wipe, relative to retraction length.\n"
+"The value will be clamped by 100% minus the retract amount before the wipe value."
+msgstr ""
 
 # TODO: Review, changed by lang refactor. PR 14254
 msgid "Retract on layer change"
@@ -14863,6 +15519,9 @@ msgstr "Direct Drive"
 msgid "Bowden"
 msgstr "Bowden"
 
+msgid "Hybrid"
+msgstr "Hibrid"
+
 msgid "Enable filament dynamic map"
 msgstr "Filament dinamikus leképezés engedélyezése"
 
@@ -14897,6 +15556,12 @@ msgstr "Betöltési sebesség"
 
 msgid "Speed for reloading filament into the nozzle. Zero means same speed of retraction."
 msgstr "A filament visszatöltésének sebessége a fúvókába. A 0 ugyanazt a sebességet jelenti, mint a visszahúzásnál."
+
+msgid "Deretraction speed (extruder change)"
+msgstr ""
+
+msgid "Speed for reloading filament into the nozzle when switching extruder."
+msgstr ""
 
 msgid "Use firmware retraction"
 msgstr "Firmware-ben megadott visszahúzás használata"
@@ -15209,6 +15874,12 @@ msgstr "Ha a sima vagy a hagyományos mód van kiválasztva, minden nyomtatásn�
 
 msgid "Traditional"
 msgstr "Hagyományos"
+
+msgid "Farthest point timelapse"
+msgstr ""
+
+msgid "When enabled, the timelapse snapshot is taken at the farthest point from camera instead of traveling to the wipe tower or excess chute. Only effective in traditional timelapse mode on non-I3 printers."
+msgstr ""
 
 msgid "Temperature variation"
 msgstr "Hőmérséklet változás"
@@ -15701,7 +16372,7 @@ msgstr ""
 "Bekapcsolva ez a paraméter egy chamber_temperature nevű G-code változót is beállít, amely felhasználható a kívánt kamrahőmérséklet átadására a nyomtatásindító makrónak, vagy egy ilyen hőkiegyenlítő makrónak: PRINT_START (egyéb változók) CHAMBER_TEMP=[chamber_temperature]. Ez akkor lehet hasznos, ha a nyomtatód nem támogatja az M141/M191 parancsokat, vagy ha az aktív kamrafűtés hiányában a hőkiegyenlítést a nyomtatásindító makróban szeretnéd kezelni."
 
 msgid ""
-"This is the chamber temperature at which printing should start, while the chamber continues heating toward the \"Target\" chamber temperature. For example, set the Target to 60 and the Minimal to 50 to begin printing once the chamber reaches 50°C, without waiting for the full 60°C.\n"
+"This is the chamber temperature at which printing should start, while the chamber continues heating toward the \"Target\" chamber temperature. For example, set the Target to 60 and the Minimal to 50 to begin printing once the chamber reaches 50℃, without waiting for the full 60℃.\n"
 "\n"
 "It sets a G-code variable named chamber_minimal_temperature, which can be passed to your print start macro or a heat soak macro, like this: PRINT_START (other variables) CHAMBER_MIN_TEMP=[chamber_minimal_temperature].\n"
 "\n"
@@ -15755,16 +16426,6 @@ msgstr "Felső héj vastagság"
 # TODO: Review, changed by lang refactor. PR 14254
 msgid "The number of top solid layers is increased when slicing if the thickness calculated by top shell layers is thinner than this value. This can avoid having too thin a shell when layer height is small. 0 means that this setting is disabled and thickness of top shell is determined simply by the number of top shell layers."
 msgstr "A felső szilárd rétegek száma szeleteléskor megnő, ha a felső héjrétegekből számított vastagság kisebb ennél az értéknél. Ezzel elkerülhető, hogy túl vékony legyen a héj kis rétegmagasságnál. A 0 azt jelenti, hogy ez a beállítás ki van kapcsolva, és a felső héj vastagságát egyszerűen a felső héjrétegek száma határozza meg."
-
-msgid "Anisotropic surfaces"
-msgstr ""
-
-msgid ""
-"Anisotropic patterns on the top and bottom surfaces.\n"
-"Co-directional printing mode will be applied. For certain patterns, omni-directional filling provides color dispersion when using multi-colored or silk plastics.\n"
-"This option disable the gap fill.\n"
-"This option can increase a printing time."
-msgstr ""
 
 msgid "Separated infills"
 msgstr ""
@@ -15842,12 +16503,30 @@ msgstr "Öblítési szorzó"
 msgid "The actual flushing volumes is equal to the flush multiplier value multiplied by the flushing volumes in the table."
 msgstr "A tényleges öblítési mennyiségek megegyeznek az öblítési szorzó értékével, szorozva a táblázatban szereplő öblítési mennyiségekkel."
 
+msgid "Flush multiplier (Fast mode)"
+msgstr ""
+
+msgid "The flush multiplier used in fast purge mode."
+msgstr ""
+
 msgid "Prime volume"
 msgstr "Előkészítési mennyiség"
 
 # TODO: Review, changed by lang refactor. PR 14254
 msgid "This is the volume of material to prime the extruder with on the tower."
 msgstr "Az extruder toronyban történő előkészítéséhez szükséges anyagmennyiség."
+
+msgid "Prime volume mode"
+msgstr ""
+
+msgid "Selects how the wipe-tower prime and flush volumes are computed on multi-extruder printers."
+msgstr ""
+
+msgid "Saving"
+msgstr ""
+
+msgid "Fast"
+msgstr ""
 
 # TODO: Review, changed by lang refactor. PR 14254
 msgid "This is the width of prime towers."
@@ -16142,6 +16821,57 @@ msgstr "Minimális falszélesség"
 
 msgid "Width of the wall that will replace thin features (according to the Minimum feature size) of the model. If the Minimum wall width is thinner than the thickness of the feature, the wall will become as thick as the feature itself. It's expressed as a percentage over nozzle diameter."
 msgstr "A fal szélessége, amely lecseréli a modell vékony részeit (a Minimális méretben megadott érték szerint). Ha a minimális falszélesség vékonyabb, mint a nyomtatandó elem vastagsága, akkor a fal olyan vastag lesz, mint maga a nyomtatott elem. A fúvóka átmérőjének százalékában van kifejezve"
+
+msgid "Hotend change time"
+msgstr "Hotendváltás ideje"
+
+msgid "Time to change hotend."
+msgstr "A hotendváltás ideje."
+
+msgid "Hotend change"
+msgstr "Hotendváltás"
+
+msgid "When changing the hotend, it is recommended to extrude a certain length of filament from the original nozzle. This helps minimize nozzle oozing."
+msgstr "A hotend cseréjekor ajánlott egy bizonyos hosszúságú filamentet extrudálni az eredeti fúvókából. Ez segít minimalizálni a fúvóka szivárgását."
+
+msgid "Extruder change"
+msgstr "Extruderváltás"
+
+msgid "To prevent oozing, the nozzle will perform a reverse travel movement for a certain period after the ramming is complete. The setting define the travel time."
+msgstr "A szivárgás elkerülése érdekében a fúvóka a betolás befejezése után egy bizonyos ideig visszafelé mozog. A beállítás határozza meg a mozgás idejét."
+
+msgid "To prevent oozing, the nozzle temperature will be cooled during ramming. Therefore, the ramming time must be greater than the cooldown time. 0 means disabled."
+msgstr "A szivárgás elkerülése érdekében a fúvóka lehűl betolás közben. Ezért a betolási időnek hosszabbnak kell lennie, mint a lehűlési időnek. A 0 kikapcsolja ezt az opciót."
+
+msgid "The maximum volumetric speed for ramming before extruder change, where -1 means using the maximum volumetric speed."
+msgstr "Az extruderváltás előtti betolás maximális áramlási sebessége, ahol -1 a maximális sebesség használatát jelenti."
+
+msgid "To prevent oozing, the nozzle temperature will be cooled during ramming. Note: only a cooldown command and fan activation are triggered, reaching the target temperature is not guaranteed. 0 means disabled."
+msgstr "A szivárgás megakadályozása érdekében a fúvóka a betolás során lehűl. Megjegyzés: csak a hűtési parancs és a ventilátor bekapcsolása kerül elküldésre, a célhőmérséklet elérése nem garantált. A 0 letiltást jelent."
+
+msgid "The maximum volumetric speed for ramming before a hotend change, where -1 means using the maximum volumetric speed."
+msgstr "A hotendváltás előtti betolás maximális áramlási sebessége, ahol -1 a maximális sebesség használatát jelenti."
+
+msgid "length when change hotend"
+msgstr "hossz hotendcsere esetén"
+
+msgid "When this retraction value is modified, it will be used as the amount of filament retracted inside the hotend before changing hotends."
+msgstr "Ha ezt a visszahúzási értéket módosítod, akkor ezt az értéket használja a nyomtató a filament hotend belsejéből történő visszahúzásakor, mielőtt hotendet cserélne."
+
+msgid "Support fast purge mode"
+msgstr ""
+
+msgid "Whether this printer supports fast purge mode with optimized temperature and multiplier."
+msgstr ""
+
+msgid "The volume of material required to prime the extruder for a hotend change on the tower."
+msgstr "Az extruder átöblítéséhez szükséges anyagmennyiség a hotend cseréjekor."
+
+msgid "Preheat temperature delta"
+msgstr "Előmelegítési hőmérséklet delta"
+
+msgid "Temperature delta applied during pre-heating before tool change."
+msgstr "Hőmérséklet-különbség alkalmazása az eszközcsere előtti előmelegítés során."
 
 # TODO: Review, changed by lang refactor. PR 14254
 msgid "Detect narrow internal solid infills"
@@ -16897,12 +17627,6 @@ msgstr ""
 msgid "Calibration not supported"
 msgstr "Kalibrálás nem támogatott"
 
-msgid "Error desc"
-msgstr "Hibaleírás"
-
-msgid "Extra info"
-msgstr "Extra infó"
-
 msgid "Flow Dynamics"
 msgstr "Áramlásdinamika"
 
@@ -17109,6 +17833,12 @@ msgstr "Kérlek, add meg a nevet."
 msgid "The name cannot exceed 40 characters."
 msgstr "A név nem haladhatja meg a 40 karaktert."
 
+msgid "Nozzle ID"
+msgstr "Fúvókaazonosító"
+
+msgid "Standard Flow"
+msgstr "Normál áramlás"
+
 msgid "Please find the best line on your plate"
 msgstr "Keresd meg a legjobb vonalat a tálcán"
 
@@ -17199,9 +17929,6 @@ msgstr "Az AMS- és fúvókainformációk szinkronizálva vannak"
 msgid "Nozzle Flow"
 msgstr "Fúvóka anyagáramlása"
 
-msgid "Nozzle Info"
-msgstr "Fúvókaadatok"
-
 msgid "Filament position"
 msgstr "filamentpozíció"
 
@@ -17275,6 +18002,10 @@ msgstr "Előzmények sikeresen lekérdezve"
 # TODO: Review, changed by lang refactor. PR 14254
 msgid "Refreshing the previous Flow Dynamics Calibration records"
 msgstr "Az előző anyagáramlás-dinamikai kalibrációs rekordok frissítése"
+
+#, c-format, boost-format
+msgid "Note: The hotend number on the %s is tied to the holder. When the hotend is moved to a new holder, its number will update automatically."
+msgstr "Megjegyzés: A hotend száma a tartóhoz van rendelve ezen: %s. Amikor a hotendet áthelyezed egy új tartóra, a száma automatikusan frissül."
 
 msgid "Action"
 msgstr "Művelet"
@@ -17528,9 +18259,6 @@ msgstr "Kezdés / Vég"
 
 msgid "Frequency settings"
 msgstr "Frekvenciabeállítások"
-
-msgid "Hz"
-msgstr "Hz"
 
 msgid "RepRap firmware uses the same frequency range for both axes."
 msgstr "A RepRap firmware mindkét tengelyhez ugyanazt a frekvenciatartományt használja."
@@ -19022,6 +19750,12 @@ msgstr "Nyomtatás sikertelen"
 msgid "Removed"
 msgstr "Eltávolítva"
 
+msgid "Enable smart filament assign: Assign one filament to multiple nozzles to maximize savings"
+msgstr ""
+
+msgid "Fila Saving"
+msgstr ""
+
 msgid "Don't remind me again"
 msgstr "Ne emlékeztessen újra"
 
@@ -19055,11 +19789,24 @@ msgstr "Videós útmutató"
 msgid "(Sync with printer)"
 msgstr "(Szinkronizálás a nyomtatóval)"
 
+#, c-format, boost-format
+msgid "Error: %s extruder has no available %s nozzle, current group result is invalid."
+msgstr ""
+
 msgid "We will slice according to this grouping method:"
 msgstr "A szeletelés a következő csoportosítási módszer szerint történik:"
 
 msgid "Tip: You can drag the filaments to reassign them to different nozzles."
 msgstr "Tipp: A filamenteket húzással másik fúvókához rendelheted."
+
+msgid "Please adjust your grouping or click "
+msgstr ""
+
+msgid " to set nozzle count"
+msgstr ""
+
+msgid "Set the physical nozzle count..."
+msgstr ""
 
 msgid "The filament grouping method for current plate is determined by the dropdown option at the slicing plate button."
 msgstr "Az aktuális tálca filamentcsoportosítási módját a szeletelési tálca gomb legördülő beállítása határozza meg."
@@ -19292,9 +20039,6 @@ msgstr "Ez a művelet nem vonható vissza. Folytatod?"
 msgid "Skipping objects."
 msgstr "Objektumok kihagyása."
 
-msgid "Select Filament"
-msgstr "Filament kiválasztása"
-
 msgid "Null Color"
 msgstr "Nincs szín"
 
@@ -19489,6 +20233,145 @@ msgid "Archive preview"
 msgstr ""
 
 msgid "Open File"
+msgstr ""
+
+msgid "AMS Dryness Control"
+msgstr ""
+
+msgid "Filament Drying Settings"
+msgstr ""
+
+msgid "Stopping"
+msgstr ""
+
+msgid "Unable to dry temporarily due to ..."
+msgstr ""
+
+msgid "Drying Error"
+msgstr ""
+
+msgid "Please check the Assistant for troubleshooting"
+msgstr ""
+
+msgid "Please remove and store the filament (as shown)."
+msgstr ""
+
+msgid "The AMS can rotate the filament which is properly stored, providing better drying results."
+msgstr ""
+
+msgid "Rotate spool when drying"
+msgstr ""
+
+msgctxt "amsdrying"
+msgid "Back"
+msgstr ""
+
+msgid "Drying-Heating"
+msgstr ""
+
+msgid "Drying-Dehumidifying"
+msgstr ""
+
+msgid " maximum drying temperature is "
+msgstr ""
+
+msgid " minimum drying temperature is "
+msgstr ""
+
+msgid "This filament may not be completely dried."
+msgstr ""
+
+msgid "This AMS is currently printing. To ensure print quality, the drying temperature cannot exceed the recommended drying temperature."
+msgstr ""
+
+msgid "The temperature shall not exceed the filament's heat distortion temperature"
+msgstr ""
+
+msgid "Minimum time value cannot be less than 1."
+msgstr ""
+
+msgid "Maximum time value cannot be greater than 24."
+msgstr ""
+
+msgid "Insufficient power"
+msgstr ""
+
+msgid "  Too many AMS drying simultaneously. Please plug in the power or stop other drying processes before starting."
+msgstr ""
+
+msgid "AMS is busy"
+msgstr ""
+
+msgid "  AMS is calibrating | reading RFID | loading/unloading material, please wait."
+msgstr ""
+
+msgid "Filament in AMS outlet"
+msgstr ""
+
+msgid "  The high drying temperature may cause AMS blockage, please unload first."
+msgstr ""
+
+msgid "Initiating AMS drying"
+msgstr ""
+
+msgid "Not supported in 2D mode"
+msgstr ""
+
+msgid "Task in progress"
+msgstr ""
+
+msgid "  The AMS might be in use during Task."
+msgstr ""
+
+msgid "  Firmware update in progress, please wait..."
+msgstr ""
+
+msgid "  Please plug in the power and then use the drying function."
+msgstr ""
+
+msgid "  The high drying temperature may cause AMS blockage. Please unload the filament manually before proceeding."
+msgstr ""
+
+msgid "System is busy"
+msgstr ""
+
+msgid "  Initiating other drying processes, please wait a few seconds..."
+msgstr ""
+
+msgid "For better drying results, remove the filament and allow it to rotate."
+msgstr ""
+
+msgid "The AMS will automatically rotate the stored filament slots to enhance the drying performance."
+msgstr ""
+
+msgid "Alternatively, you can dry the filament without removing it."
+msgstr ""
+
+msgid "Unknown filaments will be treated as PLA."
+msgstr ""
+
+msgid "Please store the filament marked with an exclamation mark."
+msgstr ""
+
+msgid "Filament left in the feeder during drying may soften because the drying temperature exceeds the softening point of materials like PLA and TPU."
+msgstr ""
+
+msgid "Starting: Checking adapter connection"
+msgstr ""
+
+msgid "Starting: Checking filament status"
+msgstr ""
+
+msgid "Starting: Checking drying presets"
+msgstr ""
+
+msgid "Starting: Checking filament location"
+msgstr ""
+
+msgid "Starting: Checking air intake"
+msgstr ""
+
+msgid "Starting: Checking air vent"
 msgstr ""
 
 msgid "The filament may not be compatible with the current machine settings. Generic filament presets will be used."
@@ -19815,6 +20698,12 @@ msgid ""
 msgstr ""
 "Kunkorodás elkerülése\n"
 "Tudtad, hogy a kunkorodásra hajlamos anyagok (például ABS) nyomtatásakor a tárgyasztal hőmérsékletének növelése csökkentheti a kunkorodás valószínűségét?"
+
+#~ msgid "°C"
+#~ msgstr "°C"
+
+#~ msgid "%"
+#~ msgstr "%"
 
 #~ msgid "Continue to sync filaments"
 #~ msgstr "Filamentek szinkronizálásának folytatása"
