@@ -605,6 +605,13 @@ void BBLTopbar::Rescale() {
     item->SetBitmap(create_scaled_bitmap("topbar_close", this, TOPBAR_ICON_SIZE));
 
     Realize();
+
+#ifdef __WXMSW__
+    // Update menus
+    msw_rescale_menu(GetTopMenu());
+    msw_rescale_menu(GetCalibMenu());
+    msw_rescale_menu(m_file_menu);
+#endif
 }
 
 void BBLTopbar::OnIconize(wxAuiToolBarEvent& event)
