@@ -9,7 +9,7 @@ LabeledStaticBox::LabeledStaticBox()
 {
     m_radius       = 3;
     m_border_width = 1;
-    m_font         = Label::Head_14;
+    SetFont(Label::Head_14);
     text_color = StateColor(
         std::make_pair(0x363636, (int) StateColor::Normal),
         std::make_pair(0x6B6B6B, (int) StateColor::Disabled)
@@ -52,18 +52,13 @@ bool LabeledStaticBox::Create(
 #endif
 
     m_label = label;
-    m_scale = FromDIP(100) / 100.f;
     m_pos   = this->GetPosition();
 
-    int tW,tH,descent,externalLeading;
-    // empty label sets m_label_height as 0 that causes extra spacing at top
-    GetTextExtent(m_label.IsEmpty() ? "Orca" : m_label, &tW, &tH, &descent, &externalLeading, &m_font);
-    m_label_height = tH - externalLeading;
-    m_label_width  = tW;
+    update_label_size();
 
-    Bind(wxEVT_PAINT,([this](wxPaintEvent e) {
-        wxPaintDC dc(this);
-        PickDC(dc);
+    Bind(wxEVT_PAINT,([this](wxPaintEvent& e) {
+        wxAutoBufferedPaintDC dc(this);
+        DrawBorderAndLabel(dc);
     }));
 
     state_handler.attach({&text_color, &background_color, &border_color});
@@ -77,6 +72,15 @@ bool LabeledStaticBox::Create(
     SetCanFocus(false);
     DisableFocusFromKeyboard();
     return true;
+}
+
+void LabeledStaticBox::update_label_size()
+{
+    int tW,tH,descent,externalLeading;
+    // empty label sets m_label_height as 0 that causes extra spacing at top
+    GetTextExtent(m_label.IsEmpty() ? "Orca" : m_label, &tW, &tH, &descent, &externalLeading);
+    m_label_height = tH - externalLeading;
+    m_label_width  = tW;
 }
 
 void LabeledStaticBox::SetCornerRadius(int radius)
@@ -98,19 +102,6 @@ void LabeledStaticBox::SetBorderColor(StateColor const &color)
     Refresh();
 }
 
-void LabeledStaticBox::SetFont(wxFont set_font)
-{
-    m_font = set_font;
-
-    int tW,tH,descent,externalLeading;
-    // empty label sets m_label_height as 0 that causes extra spacing at top
-    GetTextExtent(m_label.IsEmpty() ? "Orca" : m_label, &tW, &tH, &descent, &externalLeading, &m_font);
-    m_label_height = tH - externalLeading;
-    m_label_width  = tW;
-
-    Refresh();
-}
-
 bool LabeledStaticBox::Enable(bool enable)
 {
     bool result = this->wxStaticBox::Enable(enable);
@@ -124,72 +115,34 @@ bool LabeledStaticBox::Enable(bool enable)
     return result;
 }
 
-void LabeledStaticBox::PickDC(wxDC& dc)
-{
-#ifdef __WXMSW__
-    wxSize size = GetSize();
-    if (size.x <= 0 || size.y <= 0)
-        return;
-    wxMemoryDC memdc(&dc);
-    if (!memdc.IsOk()) {
-        DrawBorderAndLabel(dc);
-        return;
-    }
-    wxBitmap bmp(size.x, size.y);
-    memdc.SelectObject(bmp);
-    memdc.SetBackground(wxBrush(GetBackgroundColour()));
-    memdc.Clear();
-    {
-        wxGCDC dc2(memdc);
-        DrawBorderAndLabel(dc2);
-    }
-
-    memdc.SelectObject(wxNullBitmap);
-    dc.DrawBitmap(bmp, 0, 0);
-#else
-    DrawBorderAndLabel(dc);
-#endif
-}
-
 void LabeledStaticBox::DrawBorderAndLabel(wxDC& dc)
 {
     // fill full background
     dc.SetBackground(wxBrush(background_color.colorForStates(0)));
     dc.Clear();
 
+    update_label_size();
+
     wxSize wSz = GetSize();
-
-    int tW = 0;
-    int tH = 0;
-
-    if (!m_label.IsEmpty()) {
-        #ifdef __WXMSW__ 
-            dc.SetFont(m_font.Scaled(m_parent->GetDPIScaleFactor()));
-        #else
-            dc.SetFont(m_font);
-        #endif
-        wxSize textSize = dc.GetTextExtent(m_label);
-        tW = textSize.GetWidth();
-        tH = textSize.GetHeight();
-    }
 
     dc.SetBrush(*wxTRANSPARENT_BRUSH);
     dc.SetPen(wxPen(border_color.colorForStates(state_handler.states()), m_border_width, wxPENSTYLE_SOLID));
     dc.DrawRoundedRectangle( // Border
         std::max(0, m_pos.x),
-        std::max(0, m_pos.y) + tH * .5,
+        std::max(0, m_pos.y) + m_label_height * .5,
         wSz.GetWidth(),
-        wSz.GetHeight() - tH * .5,
+        wSz.GetHeight() - m_label_height * .5,
         m_radius
     );
 
     if (!m_label.IsEmpty()) {
+        dc.SetFont(GetFont());
         dc.SetPen(*wxTRANSPARENT_PEN);
         dc.SetBrush(wxBrush(background_color.colorForStates(0)));
-        dc.DrawRectangle(wxRect(7 * m_scale,0 , tW + 7 * m_scale, tH)); // text background
+        dc.DrawRectangle(wxRect(FromDIP(7) ,0 , m_label_width + FromDIP(7), m_label_height)); // text background
         // NEEDFIX if text lenght > client size 
         dc.SetTextForeground(text_color.colorForStates(state_handler.states()));
-        dc.DrawText(m_label, wxPoint(10 * m_scale, 0));
+        dc.DrawText(m_label, FromDIP(wxPoint(10, 0)));
     }
 }
 

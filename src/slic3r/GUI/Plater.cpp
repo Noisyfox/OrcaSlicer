@@ -612,8 +612,11 @@ struct ExtruderGroup : StaticGroup
 
     void sync_ams(MachineObject const *obj, std::vector<DevAms *> const &ams4, std::vector<DevAms *> const &ams1);
 
-    void Rescale()
+    void Rescale() override
     {
+        StaticGroup::Rescale();
+
+        SetCornerRadius(FromDIP(PRINTER_PANEL_RADIUS)); // ORCA match radius with other boxes
         if (hover_label)
             hover_label->Rescale();
         if (btn_edit)
