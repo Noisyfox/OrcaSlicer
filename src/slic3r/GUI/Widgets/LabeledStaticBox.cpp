@@ -74,13 +74,18 @@ bool LabeledStaticBox::Create(
     return true;
 }
 
-void LabeledStaticBox::update_label_size()
+void LabeledStaticBox::calc_label_size(int& w, int& h) const
 {
     int tW,tH,descent,externalLeading;
     // empty label sets m_label_height as 0 that causes extra spacing at top
     GetTextExtent(m_label.IsEmpty() ? "Orca" : m_label, &tW, &tH, &descent, &externalLeading);
-    m_label_height = tH - externalLeading;
-    m_label_width  = tW;
+    h = tH - externalLeading;
+    w = tW;
+}
+
+void LabeledStaticBox::update_label_size()
+{
+    calc_label_size(m_label_width, m_label_height);
 }
 
 void LabeledStaticBox::SetCornerRadius(int radius)
@@ -148,6 +153,11 @@ void LabeledStaticBox::DrawBorderAndLabel(wxDC& dc)
 
 void LabeledStaticBox::GetBordersForSizer(int* borderTop, int* borderOther) const {
     wxStaticBox::GetBordersForSizer(borderTop, borderOther);
+#ifdef __WXMSW__
+    int lw, lh;
+    calc_label_size(lw, lh);
+    *borderTop = lh;
+#endif
 #ifdef __WXOSX__
     *borderOther = 5; // Make sure macOS uses the same border padding as other platforms
 #endif

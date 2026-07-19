@@ -45,6 +45,7 @@ public:
     bool Enable(bool enable) override;
 
 private:
+    void calc_label_size(int& w, int& h) const;
     void update_label_size();
 
 protected:
