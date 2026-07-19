@@ -1608,6 +1608,9 @@ void Tab::msw_rescale()
     if (m_detach_preset_btn)
         m_detach_preset_btn->msw_rescale();
 
+    if (m_extruder_sync)
+        m_extruder_sync->msw_rescale();
+
     if (m_search_item){
         m_search_item->SetSize(wxSize(-1, 3 * m_em_unit)); // ensure height matches with preset combo
     }
