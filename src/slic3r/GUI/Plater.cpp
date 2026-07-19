@@ -3710,7 +3710,9 @@ void Sidebar::update_filaments_counter(bool force_layout)
 void Sidebar::msw_rescale()
 {
     SetMinSize(wxSize(39 * wxGetApp().em_unit(), -1));
+    p->m_panel_printer_title->Rescale();
     p->m_panel_printer_title->GetSizer()->SetMinSize(-1, 3 * wxGetApp().em_unit());
+    p->m_panel_filament_title->Rescale();
     p->m_panel_filament_title->GetSizer()
         ->SetMinSize(-1, 3 * wxGetApp().em_unit());
     p->m_printer_icon->msw_rescale();
@@ -3719,6 +3721,7 @@ void Sidebar::msw_rescale()
     p->m_printer_icon->msw_rescale();
     p->m_printer_setting->msw_rescale();
 
+    p->panel_printer_preset->Rescale();
     p->panel_printer_preset->SetMinSize(FromDIP(PRINTER_PANEL_SIZE));
     p->panel_printer_preset->SetCornerRadius(FromDIP(PRINTER_PANEL_RADIUS));
     p->image_printer->SetSize(FromDIP(PRINTER_THUMBNAIL_SIZE));
@@ -3727,10 +3730,12 @@ void Sidebar::msw_rescale()
     p->combo_printer->SetMaxSize(wxSize(-1, FromDIP(30))); // limiting height makes badge visible
     p->btn_edit_printer->msw_rescale();
 
+    p->panel_nozzle_dia->Rescale();
     p->panel_nozzle_dia->SetMinSize(FromDIP(PRINTER_PANEL_SIZE));
     p->panel_nozzle_dia->SetCornerRadius(FromDIP(PRINTER_PANEL_RADIUS));
     p->combo_nozzle_dia->Rescale();
 
+    p->panel_printer_bed->Rescale();
     p->panel_printer_bed->SetMinSize(FromDIP(PRINTER_PANEL_SIZE));
     p->panel_printer_bed->SetCornerRadius(FromDIP(PRINTER_PANEL_RADIUS));
     p->combo_printer_bed->Rescale();
@@ -3791,6 +3796,7 @@ void Sidebar::msw_rescale()
     p->m_search_bar->SetSize(wxSize(-1, 3 * wxGetApp().em_unit()));
     p->m_search_item->Rescale();
     p->m_search_item->GetTextCtrl()->SetSize(wxSize(-1, FromDIP(16)));
+    p->m_search_bar->Rescale();
     p->m_search_bar->Layout();
 
     // BBS
