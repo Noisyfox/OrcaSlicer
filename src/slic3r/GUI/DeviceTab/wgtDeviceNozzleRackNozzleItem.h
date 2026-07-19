@@ -56,7 +56,7 @@ public:
     bool IsDisabled() const { return m_is_disabled; }
     void SetDisable(bool disabled);
 
-    void Rescale();
+    void Rescale() override;
 
 private:
     void CreateGui();

@@ -252,6 +252,8 @@ void wgtDeviceNozzleRackNozzleItem::OnBtnNozzleStatus(wxMouseEvent& evt)
 
 void wgtDeviceNozzleRackNozzleItem::Rescale()
 {
+    StaticBox::Rescale();
+
     if (m_nozzle_normal_image) { m_nozzle_normal_image->msw_rescale(); }
     if (m_nozzle_empty_image) { m_nozzle_empty_image->msw_rescale(); }
     if (m_nozzle_unknown_image) { m_nozzle_unknown_image->msw_rescale(); }

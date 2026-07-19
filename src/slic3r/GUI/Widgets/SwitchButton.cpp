@@ -290,6 +290,7 @@ void ModeSwitchButton::SelectAndNotify(int selection)
 
 void ModeSwitchButton::Rescale()
 {
+    StaticBox::Rescale();
     const wxSize button_size = FromDIP(wxSize(48, 18));
     SetMinSize(button_size);
     SetMaxSize(button_size);
@@ -792,6 +793,7 @@ void MultiSwitchButton::SetButtonPadding(const wxSize &padding)
 
 void MultiSwitchButton::Rescale()
 {
+    StaticBox::Rescale();
     for (auto *btn : btns){
         btn->Rescale();
         btn->SetCornerRadius(m_parent->FromDIP(m_button_radius));

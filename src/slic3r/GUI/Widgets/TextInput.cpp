@@ -144,6 +144,8 @@ void TextInput::SetTextColor(StateColor const& color)
 
 void TextInput::Rescale()
 {
+    StaticBox::Rescale();
+
     if (!this->icon.name().empty())
         this->icon.msw_rescale();
     if (!this->icon_1.name().empty())

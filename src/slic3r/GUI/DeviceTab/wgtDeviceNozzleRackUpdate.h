@@ -107,7 +107,7 @@ public:
     void UpdateRackNozzleInfo(const std::shared_ptr<DevNozzleRack> rack);
 
     // gui
-    void Rescale();
+    void Rescale() override;
 
 private:
     void CreateGui();

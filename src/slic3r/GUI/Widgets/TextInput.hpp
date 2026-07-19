@@ -56,7 +56,7 @@ public:
 
     void SetTextColor(StateColor const &color);
 
-    virtual void Rescale();
+    virtual void Rescale() override;
 
     virtual bool Enable(bool enable = true) override;
 

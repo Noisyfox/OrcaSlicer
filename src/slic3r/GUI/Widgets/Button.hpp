@@ -90,7 +90,7 @@ public:
 
     void SetVertical(bool vertical = true);
 
-    void Rescale();
+    void Rescale() override;
 
 protected:
 #ifdef __WIN32__
