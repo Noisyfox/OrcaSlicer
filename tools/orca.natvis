@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+
+This file contains visualizers for Visual Studio 2013+ debugger.
+It should be copied into the %USERPROFILE%\My Documents\Visual Studio 2013\Visualizers
+directory (or the corresponding location for newer versions)
+-->
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+    <Type Name="Slic3r::ConfigOptionSingle&lt;*&gt;">
+        <DisplayString>{value}</DisplayString>
+    </Type>
+    <Type Name="Slic3r::ConfigOptionVector&lt;*&gt;">
+        <DisplayString>{values}</DisplayString>
+		<Expand>
+			<ExpandedItem>values</ExpandedItem>
+		</Expand>
+    </Type>
+	<Type Name="Slic3r::DynamicConfig">
+		<DisplayString>{options}</DisplayString>
+		<Expand>
+			<TreeItems>
+				<Size>options._Mypair._Myval2._Myval2._Mysize</Size>
+				<HeadPointer>options._Mypair._Myval2._Myval2._Myhead-&gt;_Parent</HeadPointer>
+				<LeftPointer>_Left</LeftPointer>
+				<RightPointer>_Right</RightPointer>
+				<ValueNode Condition="_Isnil == 0" Name="[{_Myval.first}]">_Myval.second._Mypair._Myval2,na</ValueNode>
+			</TreeItems>
+		</Expand>
+	</Type>
+
+	<Type Name="Slic3r::MultiPoint">
+		<DisplayString>{points}</DisplayString>
+		<Expand>
+			<ExpandedItem>points</ExpandedItem>
+		</Expand>
+	</Type>
+
+	<Type Name="Slic3r::MultiPoint3">
+		<DisplayString>{points}</DisplayString>
+		<Expand>
+			<ExpandedItem>points</ExpandedItem>
+		</Expand>
+	</Type>
+
+	<Type Name="Slic3r::Polyline">
+		<DisplayString>{points}</DisplayString>
+		<Expand>
+			<Item Name="fitting_result">fitting_result</Item>
+			<ExpandedItem>points</ExpandedItem>
+		</Expand>
+	</Type>
+
+	<Type Name="Slic3r::Polyline3">
+		<DisplayString>{points}</DisplayString>
+		<Expand>
+			<Item Name="fitting_result">fitting_result</Item>
+			<ExpandedItem>points</ExpandedItem>
+		</Expand>
+	</Type>
+</AutoVisualizer>
