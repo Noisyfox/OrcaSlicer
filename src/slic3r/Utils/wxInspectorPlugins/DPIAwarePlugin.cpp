@@ -71,9 +71,9 @@ wxVector<wxInspector::PropertyDef> DPIAwarePlugin::GetProperties(
     wxWindow* win = obj.AsWindow();
     if (!win) return props;
 
-    if (auto* frame = dynamic_cast<DPIFrame*>(win)) {
+    if (auto* frame = dynamic_cast<Slic3r::GUI::DPIFrame*>(win)) {
         addDPIProps(frame, props);
-    } else if (auto* dlg = dynamic_cast<DPIDialog*>(win)) {
+    } else if (auto* dlg = dynamic_cast<Slic3r::GUI::DPIDialog*>(win)) {
         addDPIProps(dlg, props);
     }
 
