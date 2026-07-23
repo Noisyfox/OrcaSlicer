@@ -182,6 +182,11 @@ public:
 
     float   scale_factor() const        { return m_scale_factor; }
     float   prev_scale_factor() const   { return m_prev_scale_factor; }
+    // Only meant to be used by inspector, not public API
+    void    set_scale_factor(float v)      { m_scale_factor = v; }
+    void    set_prev_scale_factor(float v) { m_prev_scale_factor = v; }
+    void    set_em_unit(int v)             { m_em_unit = v; }
+    bool    force_rescale() const          { return m_force_rescale; }
 
     int     em_unit() const             { return m_em_unit; }
 //    int     font_size() const           { return m_font_size; }
