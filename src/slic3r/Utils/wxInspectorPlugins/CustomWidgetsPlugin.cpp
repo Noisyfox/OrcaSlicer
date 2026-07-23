@@ -209,12 +209,12 @@ void CustomWidgetsPlugin::addLabelProps(Label* lbl,
 {
     using namespace wxInspector;
 
-    bool isHyperlink = (lbl->GetWindowStyleFlag() & 0x0020) != 0; // LB_HYPERLINK
+    bool isHyperlink = (lbl->GetWindowStyleFlag() & LB_HYPERLINK) != 0;
 
     props.push_back({"Is Hyperlink", "Orca Label", PropertyType::Boolean,
         isHyperlink ? "true" : "false", true, {},
         [lbl]() {
-            return (lbl->GetWindowStyleFlag() & 0x0020) ? "true" : "false";
+            return (lbl->GetWindowStyleFlag() & LB_HYPERLINK) ? "true" : "false";
         },
         nullptr});
 
