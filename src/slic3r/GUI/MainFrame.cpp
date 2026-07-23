@@ -39,7 +39,7 @@
 #include "Plater.hpp"
 #include "WebViewDialog.hpp"
 #include "../Utils/Process.hpp"
-#include "../Utils/wxInspectorPlugins/Registration.hpp"
+
 #include "format.hpp"
 // BBS
 #include "PartPlate.hpp"

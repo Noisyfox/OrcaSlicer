@@ -1,13 +1,9 @@
 #pragma once
 
-namespace wxInspector {
-class wxInspectorPlugin;
-void RegisterPlugin(wxInspectorPlugin* plugin);
-}
+#include "DPIAwarePlugin.hpp"
+#include "CustomWidgetsPlugin.hpp"
 
-// Forward declare our plugins
-class DPIAwarePlugin;
-class CustomWidgetsPlugin;
+#include <wx/inspector/inspector.h>
 
 inline void RegisterOrcaInspectorPlugins()
 {
