@@ -20,6 +20,7 @@
 #include <wx/settings.h>
 #include <wx/dataview.h>
 #include <wx/statbox.h>
+#include <wx/inspector/inspector.h>
 
 #include <chrono>
 #include "Event.hpp"
@@ -272,10 +273,18 @@ private:
 };
 
 typedef DPIAware<wxFrame> DPIFrame;
-class DPIDialog : public DPIAware<wxDialog>
+class DPIDialog : public DPIAware<wxDialog>, public wxInspector::wxInspectable
 {
 public:
-    using DPIAware<wxDialog>::DPIAware;
+    DPIDialog(wxWindow *parent, wxWindowID id, const wxString &title,
+              const wxPoint &pos = wxDefaultPosition,
+              const wxSize &size = wxDefaultSize,
+              long style = wxDEFAULT_DIALOG_STYLE,
+              const wxString &name = wxDialogNameStr)
+        : DPIAware<wxDialog>(parent, id, title, pos, size, style, name)
+    {
+        SetupInspectorAccelerator(this);
+    }
 
 public:
     void EndModal(int retCode) override
