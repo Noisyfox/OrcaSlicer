@@ -302,7 +302,6 @@ DPIFrame(NULL, wxID_ANY, "", wxDefaultPosition, wxDefaultSize, BORDERLESS_FRAME_
     , diff_dialog(this)
 {
     SetupInspectorAccelerator(this);
-    RegisterOrcaInspectorPlugins();
 #ifdef __WXOSX__
     set_miniaturizable(GetHandle());
 #endif
