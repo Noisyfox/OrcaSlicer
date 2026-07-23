@@ -301,7 +301,6 @@ DPIFrame(NULL, wxID_ANY, "", wxDefaultPosition, wxDefaultSize, BORDERLESS_FRAME_
     , m_settings_dialog(this)
     , diff_dialog(this)
 {
-    SetupInspectorAccelerator(this);
 #ifdef __WXOSX__
     set_miniaturizable(GetHandle());
 #endif

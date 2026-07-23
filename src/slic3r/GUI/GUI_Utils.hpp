@@ -89,7 +89,7 @@ void update_dark_ui(wxWindow* window);
 
 extern std::deque<wxDialog*> dialogStack;
 
-template<class P> class DPIAware : public P
+template<class P> class DPIAware : public P, public wxInspector::wxInspectable
 {
 public:
     DPIAware(wxWindow *parent, wxWindowID id, const wxString &title, const wxPoint &pos=wxDefaultPosition,
@@ -108,6 +108,7 @@ public:
         this->SetFont(m_normal_font);
 #endif
         this->CenterOnParent();
+        SetupInspectorAccelerator(this);
 #ifdef _WIN32
         update_dark_ui(this);
 #endif
@@ -273,18 +274,10 @@ private:
 };
 
 typedef DPIAware<wxFrame> DPIFrame;
-class DPIDialog : public DPIAware<wxDialog>, public wxInspector::wxInspectable
+class DPIDialog : public DPIAware<wxDialog>
 {
 public:
-    DPIDialog(wxWindow *parent, wxWindowID id, const wxString &title,
-              const wxPoint &pos = wxDefaultPosition,
-              const wxSize &size = wxDefaultSize,
-              long style = wxDEFAULT_DIALOG_STYLE,
-              const wxString &name = wxDialogNameStr)
-        : DPIAware<wxDialog>(parent, id, title, pos, size, style, name)
-    {
-        SetupInspectorAccelerator(this);
-    }
+    using DPIAware<wxDialog>::DPIAware;
 
 public:
     void EndModal(int retCode) override

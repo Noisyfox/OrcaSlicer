@@ -93,7 +93,7 @@ protected:
     void on_dpi_changed(const wxRect& suggested_rect) override;
 };
 
-class MainFrame : public DPIFrame, public wxInspector::wxInspectable
+class MainFrame : public DPIFrame
 {
 #ifdef __APPLE__
     bool     m_mac_fullscreen{false};
