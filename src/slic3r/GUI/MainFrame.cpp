@@ -39,6 +39,7 @@
 #include "Plater.hpp"
 #include "WebViewDialog.hpp"
 #include "../Utils/Process.hpp"
+#include "../Utils/wxInspectorPlugins/Registration.hpp"
 #include "format.hpp"
 // BBS
 #include "PartPlate.hpp"
@@ -301,6 +302,7 @@ DPIFrame(NULL, wxID_ANY, "", wxDefaultPosition, wxDefaultSize, BORDERLESS_FRAME_
     , diff_dialog(this)
 {
     SetupInspectorAccelerator(this);
+    RegisterOrcaInspectorPlugins();
 #ifdef __WXOSX__
     set_miniaturizable(GetHandle());
 #endif
