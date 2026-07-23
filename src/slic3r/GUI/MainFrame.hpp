@@ -10,6 +10,7 @@
 #ifdef __APPLE__
 #include <wx/taskbar.h>
 #endif // __APPLE__
+#include <wx/inspector/inspector.h>
 
 #include <string>
 #include <map>
@@ -92,7 +93,7 @@ protected:
     void on_dpi_changed(const wxRect& suggested_rect) override;
 };
 
-class MainFrame : public DPIFrame
+class MainFrame : public DPIFrame, public wxInspector::wxInspectable
 {
 #ifdef __APPLE__
     bool     m_mac_fullscreen{false};
