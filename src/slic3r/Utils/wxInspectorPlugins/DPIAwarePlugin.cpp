@@ -3,6 +3,7 @@
 #include "slic3r/GUI/GUI_Utils.hpp" // DPIFrame, DPIDialog, DPIAware<P>
 
 #include <wx/window.h>
+#include <wx/crt.h>
 
 namespace {
 
