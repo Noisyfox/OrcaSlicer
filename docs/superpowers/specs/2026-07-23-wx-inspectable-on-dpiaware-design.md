@@ -21,7 +21,7 @@ Moving `wxInspectable` to `DPIAware` fixes this for all current and future DPIAw
 
 ### Change 1: `GUI_Utils.hpp` — `DPIAware<P>`
 
-Add `wxInspector::wxInspectable` as a second base class:
+Add `wxInspector::wxInspectable` as a second base class, and call `SetupInspectorAccelerator(this)` in the constructor (after `this->CenterOnParent()`):
 
 ```cpp
 // Before:
@@ -31,21 +31,29 @@ template<class P> class DPIAware : public P
 template<class P> class DPIAware : public P, public wxInspector::wxInspectable
 ```
 
-This gives every `DPIAware<T>` widget inspectability automatically. `#include <wx/inspector/inspector.h>` is already present in the file.
+Add in the constructor body (after `this->CenterOnParent()` at line 110):
+```cpp
+SetupInspectorAccelerator(this);
+```
+
+This gives every `DPIAware<T>` widget both inspectability and the Ctrl+Shift+I keyboard shortcut automatically. `#include <wx/inspector/inspector.h>` is already present in the file.
 
 ### Change 2: `GUI_Utils.hpp` — `DPIDialog`
 
-Remove the now-redundant `wxInspector::wxInspectable`:
+Remove the now-redundant `wxInspector::wxInspectable` and the `SetupInspectorAccelerator(this)` call:
 
 ```cpp
 // Before:
 class DPIDialog : public DPIAware<wxDialog>, public wxInspector::wxInspectable
+// ...
+    SetupInspectorAccelerator(this);
 
 // After:
 class DPIDialog : public DPIAware<wxDialog>
+// (SetupInspectorAccelerator call removed — now done in DPIAware constructor)
 ```
 
-`DPIDialog` gets `wxInspectable` through `DPIAware<wxDialog>` now. `SetupInspectorAccelerator(this)` stays in the constructor — the accelerator shortcut is a top-level-window concern, not something every DPIAware widget should register.
+`DPIDialog` gets `wxInspectable` and the accelerator through `DPIAware<wxDialog>` now.
 
 ### Change 3: `MainFrame.hpp` — `MainFrame`
 
@@ -61,6 +69,10 @@ class MainFrame : public DPIFrame
 
 `MainFrame` gets `wxInspectable` through `DPIFrame` → `DPIAware<wxFrame>`.
 
+### Change 4: `MainFrame.cpp` — `MainFrame` constructor
+
+Remove the now-redundant `SetupInspectorAccelerator(this)` call (line 304). It will be called automatically by the `DPIAware` constructor.
+
 ## Impact
 
 | Widget | Before | After |
@@ -74,14 +86,14 @@ class MainFrame : public DPIFrame
 
 | File | Change |
 |------|--------|
-| `src/slic3r/GUI/GUI_Utils.hpp` | `DPIAware<P>` gains `wxInspector::wxInspectable`; `DPIDialog` drops redundant `wxInspector::wxInspectable` |
+| `src/slic3r/GUI/GUI_Utils.hpp` | `DPIAware<P>` gains `wxInspector::wxInspectable` + `SetupInspectorAccelerator(this)` call; `DPIDialog` drops redundant `wxInspector::wxInspectable` and `SetupInspectorAccelerator(this)` |
 | `src/slic3r/GUI/MainFrame.hpp` | `MainFrame` drops redundant `wxInspector::wxInspectable` |
+| `src/slic3r/GUI/MainFrame.cpp` | Remove redundant `SetupInspectorAccelerator(this)` from MainFrame constructor |
 
 ## Non-Goals
 
 - The `DPIAwarePlugin` detection logic (`dynamic_cast<DPIFrame*>` / `dynamic_cast<DPIDialog*>`) is unchanged
-- No new DPI properties — this is purely about tree visibility
-- No changes to `SetupInspectorAccelerator` placement — it stays on top-level windows only
+- No new DPI properties — this is purely about tree visibility and accelerator setup
 
 ## Risk Assessment
 
