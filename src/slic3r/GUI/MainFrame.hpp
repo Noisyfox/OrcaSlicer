@@ -10,7 +10,6 @@
 #ifdef __APPLE__
 #include <wx/taskbar.h>
 #endif // __APPLE__
-#include <wx/inspector/inspector.h>
 
 #include <string>
 #include <map>
