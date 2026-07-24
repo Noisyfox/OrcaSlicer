@@ -137,6 +137,23 @@ modules:
         tag: orca-3.3.2
         commit: db1005db3dea2c37a46fb455a9a02e37aa360751
 
+  # wxInspector built as a separate module for Flathub (no network at build time)
+  - name: wxInspector
+    buildsystem: cmake-ninja
+    build-options:
+      env:
+        CMAKE_POLICY_VERSION_MINIMUM: "3.5"
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+      - -DCMAKE_CXX_FLAGS="-DwxDEBUG_LEVEL=0"
+      - -DCMAKE_EXE_LINKER_FLAGS="-fuse-ld=lld"
+      - -DCMAKE_SHARED_LINKER_FLAGS="-fuse-ld=lld"
+      - -DCMAKE_MODULE_LINKER_FLAGS="-fuse-ld=lld"
+    sources:
+      - type: git
+        url: https://github.com/Noisyfox/wxInspector.git
+        commit: e27ed8eca4e68cd1e64e20328a9706d97668eb65
+
   # OrcaSlicer C++ dependencies (built offline with pre-downloaded archives)
   - name: orca_deps
     buildsystem: simple
