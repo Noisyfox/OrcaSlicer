@@ -453,7 +453,12 @@ Step::Step_Status Step::load()
     bool cb_cancel = false;
     int progress = 0;
     bool load_result = false;
+#ifdef __EMSCRIPTEN__
+    boost::thread* task = nullptr;
+    auto task_body = [&]() -> void {
+#else
     auto task = new boost::thread(Slic3r::create_thread([&]() -> void {
+#endif
 
         STEPCAFControl_Reader reader;
         reader.SetNameMode(true);
@@ -479,9 +484,18 @@ Step::Step_Status Step::load()
         progress = 10;
         load_result = true;
         task_result = true;
+#ifdef __EMSCRIPTEN__
+    };
+    task_body();
+#else
     }));
+#endif
     while (!task_result) {
+#ifdef __EMSCRIPTEN__
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+#else
         boost::this_thread::sleep_for(boost::chrono::milliseconds(200));
+#endif
         update_process(LOAD_STEP_STAGE_READ_FILE, progress, 10, cb_cancel);
         if (cb_cancel) {
             stop_load_flag.store(true);
@@ -526,7 +540,12 @@ Step::Step_Status Step::mesh(Model* model,
     new_object->name.assign((last_slash == nullptr) ? m_path.c_str() : last_slash + 1);
     new_object->input_file = m_path.c_str();
 
+#ifdef __EMSCRIPTEN__
+    boost::thread* task = nullptr;
+    auto task_body = [&]() -> void {
+#else
     auto task = new boost::thread(Slic3r::create_thread([&]() -> void {
+#endif
         TDF_LabelSequence topLevelShapes;
         m_shape_tool->GetFreeShapes(topLevelShapes);
         unsigned int id{ 1 };
@@ -636,10 +655,19 @@ Step::Step_Status Step::mesh(Model* model,
             }
         }
         task_result = true;
+#ifdef __EMSCRIPTEN__
+    };
+    task_body();
+#else
     }));
+#endif
 
     while (!task_result) {
+#ifdef __EMSCRIPTEN__
+        std::this_thread::sleep_for(std::chrono::milliseconds(300));
+#else
         boost::this_thread::sleep_for(boost::chrono::milliseconds(300));
+#endif
         if (progress_2 > 0) {
             // third progress
             update_process(LOAD_STEP_STAGE_GET_MESH, static_cast<int>(progress_2 * 100), 100, cb_cancel);
