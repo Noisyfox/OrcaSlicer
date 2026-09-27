@@ -3,8 +3,6 @@
 #include <float.h>
 #include <unordered_map>
 
-#include <png.h>
-
 #include "libslic3r.h"
 #include "ClipperUtils.hpp"
 #include "EdgeGrid.hpp"
