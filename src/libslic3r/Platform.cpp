@@ -82,6 +82,10 @@ void detect_platform()
 			::fclose(f);
 		}
 	}
+#elif defined(__EMSCRIPTEN__)
+    BOOST_LOG_TRIVIAL(info) << "Platform: Emscripten";
+    s_platform         = Platform::Linux;
+    s_platform_flavor  = PlatformFlavor::GenericLinux;
 #elif defined(__OpenBSD__)
     BOOST_LOG_TRIVIAL(info) << "Platform: OpenBSD";
 	s_platform 		  = Platform::BSDUnix;
