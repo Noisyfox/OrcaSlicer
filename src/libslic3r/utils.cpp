@@ -51,7 +51,9 @@
 #include <boost/log/core.hpp>
 #include <boost/log/trivial.hpp>
 #include <boost/log/expressions.hpp>
+#if !defined(__EMSCRIPTEN__)
 #include <boost/log/sinks/async_frontend.hpp>
+#endif
 #include <boost/log/sinks/text_file_backend.hpp>
 #include <boost/log/sinks/text_ostream_backend.hpp>
 #include <boost/log/utility/setup/file.hpp>
@@ -183,8 +185,10 @@ unsigned get_logging_level()
     }
 }
 
+#if !defined(__EMSCRIPTEN__)
 boost::shared_ptr<boost::log::sinks::synchronous_sink<boost::log::sinks::text_file_backend>> g_log_sink;
 boost::shared_ptr<boost::log::sinks::asynchronous_sink<boost::log::sinks::text_ostream_backend>> g_console_log_sink;
+#endif
 
 // Force set_logging_level(<=error) after loading of the DLL.
 // This is currently only needed if libslic3r is loaded as a shared library into Perl interpreter
@@ -361,6 +365,8 @@ namespace sinks = boost::log::sinks;
 
 void shutdown_console_logging()
 {
+#if !defined(__EMSCRIPTEN__)
+
 	if (!g_console_log_sink)
 		return;
 
@@ -368,10 +374,13 @@ void shutdown_console_logging()
 	boost::log::core::get()->remove_sink(console_sink);
 	console_sink->stop();
 	g_console_log_sink.reset();
+#endif
 }
 
 void set_log_path_and_level(const std::string& file, unsigned int level)
 {
+#if !defined(__EMSCRIPTEN__)
+
 #ifdef __APPLE__
 	//currently on old macos, the boost::log::add_file_log will crash
 	//TODO: need to be fixed
@@ -424,22 +433,33 @@ void set_log_path_and_level(const std::string& file, unsigned int level)
 	set_logging_level(level);
 
 	return;
+#endif
 }
 
 void flush_logs()
 {
+#if !defined(__EMSCRIPTEN__)
+
 	if (g_log_sink)
 		g_log_sink->flush();
 
 	return;
+#endif
 }
 
 // ORCA
 boost::filesystem::path get_log_file_name()
 {
+#if !defined(__EMSCRIPTEN__)
+
     if (g_log_sink)
         return g_log_sink->locked_backend()->get_current_file_name();
     return {};
+#else
+    // Logging is compiled out on Emscripten; still return a valid empty path
+    // so the function has a well-defined return on all platforms.
+    return {};
+#endif
 }
 
 #ifdef _WIN32
