@@ -77,7 +77,7 @@ bool
 ExPolygonCollection::contains_b(const Point &point) const
 {
     for (ExPolygons::const_iterator it = this->expolygons.begin(); it != this->expolygons.end(); ++it) {
-        if (it->contains_b(point)) return true;
+        if (it->contains(point)) return true;
     }
     return false;
 }
