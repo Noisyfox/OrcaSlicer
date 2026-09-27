@@ -694,7 +694,9 @@ public:
                 }
             } else {
                 // Resize by duplicating the last value.
-                this->values.resize(n, this->values./*back*/front());
+                // resize may reallocate and invalidate a reference into values.
+                const T first_value = this->values./*back*/front();
+                this->values.resize(n, first_value);
             }
         }
     }
