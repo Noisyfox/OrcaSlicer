@@ -9692,20 +9692,16 @@ size_t DynamicPrintConfig::get_parameter_size(const std::string& param_name, siz
 static void extend_extruder_variant(DynamicPrintConfig& config, const unsigned int num_extruders)
 {
     // 1. Make sure the `extruder_variant_list` is the same length as extruder cnt
-    if (!config.has("extruder_variant_list")) {
-        config.set_key_value("extruder_variant_list",
-                             new ConfigOptionStrings(std::vector<std::string>(num_extruders, "Direct Drive Standard")));
-    }
-    auto extruder_variant_opt = dynamic_cast<ConfigOptionStrings*>(config.option("extruder_variant_list"));
-    assert(extruder_variant_opt != nullptr);
-    extruder_variant_opt->resize(num_extruders, extruder_variant_opt); // Use the first option as the default value, so all extruders have the same variant
+    auto* extruder_variant_opt = config.option<ConfigOptionStrings>("extruder_variant_list", true);
+    if (extruder_variant_opt->values.empty())
+        extruder_variant_opt->values.assign(num_extruders, "Direct Drive Standard");
+    else
+        extruder_variant_opt->resize(num_extruders, extruder_variant_opt); // Use the first option as the default value, so all extruders have the same variant
 
     // 2. Update `printer_extruder_variant` and `printer_extruder_id` based on `extruder_variant_list`
-    auto printer_extruder_id_opt = dynamic_cast<ConfigOptionInts*>(config.option("printer_extruder_id"));
-    assert(printer_extruder_id_opt != nullptr);
+    auto* printer_extruder_id_opt = config.option<ConfigOptionInts>("printer_extruder_id", true);
     printer_extruder_id_opt->values.clear();
-    auto printer_extruder_variant_opt = dynamic_cast<ConfigOptionStrings*>(config.option("printer_extruder_variant"));
-    assert(printer_extruder_variant_opt != nullptr);
+    auto* printer_extruder_variant_opt = config.option<ConfigOptionStrings>("printer_extruder_variant", true);
     printer_extruder_variant_opt->values.clear();
     for (int i = 0; i < num_extruders; i++) {
         // `extruder_variant_list` specifies supported variant of each nozzle/extruder,
