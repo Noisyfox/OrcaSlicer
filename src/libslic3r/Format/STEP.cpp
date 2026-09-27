@@ -561,9 +561,18 @@ Step::Step_Status Step::mesh(Model* model,
 
         std::vector<stl_file> stl;
         stl.resize(namedSolids.size());
+#ifdef __EMSCRIPTEN__
+        for (size_t i = 0; i < namedSolids.size(); i++) {
+#else
         tbb::parallel_for(tbb::blocked_range<size_t>(0, namedSolids.size()), [&](const tbb::blocked_range<size_t>& range) {
             for (size_t i = range.begin(); i < range.end(); i++) {
-                BRepMesh_IncrementalMesh mesh(namedSolids[i].solid, linear_deflection, false, angle_deflection, true);
+#endif
+#ifdef __EMSCRIPTEN__
+                constexpr bool parallel_mesh = false;
+#else
+                constexpr bool parallel_mesh = true;
+#endif
+                BRepMesh_IncrementalMesh mesh(namedSolids[i].solid, linear_deflection, false, angle_deflection, parallel_mesh);
                 // BBS: calculate total number of the nodes and triangles
                 int aNbNodes = 0;
                 int aNbTriangles = 0;
@@ -635,7 +644,9 @@ Step::Step_Status Step::mesh(Model* model,
                 }
                 meshed_solid_num.fetch_add(1, std::memory_order_relaxed);
             }
+#ifndef __EMSCRIPTEN__
         });
+#endif
 
 
         for (size_t i = 0; i < stl.size(); i++) {
