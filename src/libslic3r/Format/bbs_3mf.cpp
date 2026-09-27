@@ -8745,6 +8745,7 @@ static void handle_legacy_project_loaded(unsigned int version_project_file, Dyna
 }
 
 // backup backgroud thread to dispatch tasks and coperate with ui thread
+#ifndef ORCA_WASM_DISABLE_BBS_BACKUP_MANAGER
 class _BBS_Backup_Manager
 {
 public:
@@ -9104,6 +9105,7 @@ private:
     boost::thread m_thread;
 };
 
+#endif // ORCA_WASM_DISABLE_BBS_BACKUP_MANAGER
 
 //BBS: add plate data list related logic
 bool load_bbs_3mf(const char* path, DynamicPrintConfig* config, ConfigSubstitutionContext* config_substitutions, Model* model, PlateDataPtrs* plate_data_list, std::vector<Preset*>* project_presets,
@@ -9171,6 +9173,7 @@ void release_PlateData_list(PlateDataPtrs& plate_data_list)
 
 // backup interface
 
+#ifndef ORCA_WASM_DISABLE_BBS_BACKUP_MANAGER
 void save_object_mesh(ModelObject& object)
 {
     if (!object.get_model() || !object.get_model()->is_need_backup())
@@ -9268,6 +9271,7 @@ SaveObjectGaurd::~SaveObjectGaurd()
 {
     _BBS_Backup_Manager::get().pop_object_gaurd();
 }
+#endif // ORCA_WASM_DISABLE_BBS_BACKUP_MANAGER
 
 namespace{
 
