@@ -3032,6 +3032,8 @@ void ImGuiWrapper::init_font(bool compress)
 
     // Restore state
     glsafe(::glBindTexture(GL_TEXTURE_2D, last_texture));
+    // The texture is on the GPU; retain the glyph metadata but release its CPU pixel buffers.
+    io.Fonts->ClearTexData();
 }
 
 void ImGuiWrapper::load_fonts_texture()
