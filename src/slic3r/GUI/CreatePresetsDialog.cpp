@@ -599,7 +599,9 @@ static char* read_json_file(const std::string &preset_path)
         return NULL;
     }
 
-    fread(json_contents, 1, file_size, json_file);
+    const size_t read_bytes = fread(json_contents, 1, file_size, json_file);
+    if (read_bytes != static_cast<size_t>(file_size))
+        BOOST_LOG_TRIVIAL(error) << "Read " << read_bytes << " of " << file_size << " bytes from the JSON file";
     fclose(json_file);
 
     return json_contents;
@@ -697,7 +699,7 @@ CreateFilamentPresetDialog::CreateFilamentPresetDialog(wxWindow *parent)
     m_scrolled_preset_panel = new wxScrolledWindow(this, wxID_ANY);
     m_scrolled_preset_panel->SetMaxSize(wxSize(-1, FromDIP(350)));
     m_scrolled_preset_panel->SetBackgroundColour(*wxWHITE);
-    m_scrolled_preset_panel->SetScrollRate(5, 5);
+    m_scrolled_preset_panel->SetScrollRate(5, FromDIP(20));
     m_scrolled_sizer = new wxBoxSizer(wxVERTICAL);
     m_scrolled_sizer->Add(create_item(FilamentOptionType::PRESET_FOR_PRINTER), 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, FromDIP(5));
     m_scrolled_sizer->Add(0, 0, 0, wxTOP, FromDIP(5));
@@ -1591,7 +1593,7 @@ CreatePrinterPresetDialog::CreatePrinterPresetDialog(wxWindow *parent)
 
     m_page1 = new wxScrolledWindow(this, wxID_ANY, wxDefaultPosition, wxDefaultSize);
     m_page1->SetBackgroundColour(*wxWHITE);
-    m_page1->SetScrollRate(5, 5);
+    m_page1->SetScrollRate(5, FromDIP(20));
     m_page2 = new wxPanel(this, wxID_ANY, wxDefaultPosition, wxDefaultSize);    m_page2->SetBackgroundColour(*wxWHITE);
 
     create_printer_page1(m_page1);
@@ -1885,7 +1887,7 @@ wxBoxSizer *CreatePrinterPresetDialog::create_nozzle_diameter_item(wxWindow *par
 
     m_custom_nozzle_diameter_ctrl = new wxTextCtrl(parent, wxID_ANY, "", wxDefaultPosition, NAME_OPTION_COMBOBOX_SIZE);
     m_custom_nozzle_diameter_ctrl->SetHint(_L("Input Custom Nozzle Diameter"));
-    m_custom_nozzle_diameter_ctrl->Bind(wxEVT_CHAR, [this](wxKeyEvent &event) {
+    m_custom_nozzle_diameter_ctrl->Bind(wxEVT_CHAR, [](wxKeyEvent &event) {
         int key = event.GetKeyCode();
         if (key != 44 && key != 46 && cannot_input_key.find(key) != cannot_input_key.end()) { // "@" can not be inputed
             event.Skip(false);
@@ -2201,25 +2203,14 @@ bool CreatePrinterPresetDialog::load_system_and_user_presets_with_curr_model(Pre
     } else {
         selected_vendor_id = m_printer_preset_vendor_selected.id;
 
-        if (boost::filesystem::exists(boost::filesystem::path(Slic3r::data_dir()) / PRESET_SYSTEM_DIR / selected_vendor_id)) {
-            preset_path = (boost::filesystem::path(Slic3r::data_dir()) / PRESET_SYSTEM_DIR).string();
-        } else if (boost::filesystem::exists(boost::filesystem::path(Slic3r::resources_dir()) / "profiles" / selected_vendor_id)) {
-            preset_path = (boost::filesystem::path(Slic3r::resources_dir()) / "profiles").string();
-        }
-
-        if (preset_path.empty()) {
-            BOOST_LOG_TRIVIAL(info) << "Preset path was not found";
-            MessageDialog dlg(this, _L("Preset path was not found; please reselect vendor."), wxString(SLIC3R_APP_FULL_NAME) + " - " + _L("Info"),
-                              wxYES_NO | wxYES_DEFAULT | wxCENTRE);
-            dlg.ShowModal();
-            return false;
-        }
-
         try {
             // Pass the app's preset bundle (which already holds OrcaFilamentLibrary) as the base
             // bundle so vendor filaments that inherit OFL bases resolve via the existing
             // cross-vendor inheritance path.
-            temp_preset_bundle.load_vendor_configs_from_json(preset_path, selected_vendor_id,
+            // Orca: served from the vendor's preset cache where one covers it — a shipped
+            // build carries that instead of the raw preset JSONs — and parsed otherwise.
+            temp_preset_bundle.load_vendor_configs_from_json((boost::filesystem::path(Slic3r::data_dir()) / PRESET_SYSTEM_DIR).string(),
+                                                             selected_vendor_id,
                                                              PresetBundle::LoadConfigBundleAttribute::LoadSystem,
                                                              ForwardCompatibilitySubstitutionRule::EnableSilent,
                                                              wxGetApp().preset_bundle);
@@ -2661,7 +2652,7 @@ wxBoxSizer *CreatePrinterPresetDialog::create_presets_template_item(wxWindow *pa
     wxBoxSizer *vertical_sizer = new wxBoxSizer(wxVERTICAL);
 
     m_scrolled_preset_window = new wxScrolledWindow(parent);
-    m_scrolled_preset_window->SetScrollRate(5, 5);
+    m_scrolled_preset_window->SetScrollRate(5, FromDIP(20));
     m_scrolled_preset_window->SetBackgroundColour(*wxWHITE);
     //m_scrolled_preset_window->SetMinSize(wxSize(FromDIP(1500), FromDIP(-1)));
     m_scrolled_preset_window->SetMaxSize(wxSize(FromDIP(1500), FromDIP(-1)));
@@ -3878,14 +3869,14 @@ void ExportConfigsDialog::select_curr_radiobox(std::vector<std::pair<RadioBox *,
                     m_preset_sizer->Add(create_checkbox(m_presets_window, preset.second, printer_name, m_preset), 0, wxEXPAND | wxTOP | wxLEFT | wxRIGHT,
                                         FromDIP(5));
                 }
-                m_serial_text->SetLabel(_L("Only printer names with user printer presets will be displayed, and each preset you choose will be exported as a zip."));
+                m_serial_text->SetLabel(_L("Only printer names with user printer presets will be displayed, and each preset you choose will be exported as a ZIP archive."));
             } else if (export_type == m_exprot_type.filament_preset) {
                 for (std::pair<std::string, std::vector<std::pair<std::string, Preset *>>> filament_name_to_preset : m_filament_name_to_presets) {
                     if (filament_name_to_preset.second.empty()) continue;
                     wxString filament_name = wxString::FromUTF8(filament_name_to_preset.first);
                     m_preset_sizer->Add(create_checkbox(m_presets_window, filament_name, m_printer_name), 0, wxEXPAND | wxTOP | wxLEFT | wxRIGHT, FromDIP(5));
                 }
-                m_serial_text->SetLabel(_L("Only the filament names with user filament presets will be displayed, \nand all user filament presets in each filament name you select will be exported as a zip."));
+                m_serial_text->SetLabel(_L("Only the filament names with user filament presets will be displayed, \nand all user filament presets in each filament name you select will be exported as a ZIP archive."));
             } else if (export_type == m_exprot_type.process_preset) {
                 for (std::pair<std::string, std::vector<Preset *>> presets : m_process_presets) {
                     Preset *      printer_preset = preset_bundle->printers.find_preset(presets.first, false);
@@ -3901,7 +3892,7 @@ void ExportConfigsDialog::select_curr_radiobox(std::vector<std::pair<RadioBox *,
                     }
 
                 }
-                m_serial_text->SetLabel(_L("Only printer names with changed process presets will be displayed, \nand all user process presets in each printer name you select will be exported as a zip."));
+                m_serial_text->SetLabel(_L("Only printer names with changed process presets will be displayed, \nand all user process presets in each printer name you select will be exported as a ZIP archive."));
             }
             //m_presets_window->SetSizerAndFit(m_preset_sizer);
             m_presets_window->Layout();
@@ -4306,7 +4297,7 @@ wxBoxSizer *ExportConfigsDialog::create_select_printer(wxWindow *parent)
     optionSizer->SetMinSize(OPTION_SIZE);
     horizontal_sizer->Add(optionSizer, 0, wxEXPAND | wxALL, FromDIP(10));
     m_scrolled_preset_window = new wxScrolledWindow(parent);
-    m_scrolled_preset_window->SetScrollRate(5, 5);
+    m_scrolled_preset_window->SetScrollRate(5, FromDIP(20));
     m_scrolled_preset_window->SetBackgroundColour(*wxWHITE);
     m_scrolled_preset_window->SetMaxSize(wxSize(FromDIP(660), FromDIP(400)));
     m_scrolled_preset_window->SetSize(wxSize(FromDIP(660), FromDIP(400)));
@@ -4745,7 +4736,7 @@ wxBoxSizer *EditFilamentPresetDialog::create_preset_tree_sizer()
 {
     wxBoxSizer *filament_preset_tree_sizer = new wxBoxSizer(wxHORIZONTAL);
     m_preset_tree_window = new wxScrolledWindow(this);
-    m_preset_tree_window->SetScrollRate(5, 5);
+    m_preset_tree_window->SetScrollRate(5, FromDIP(20));
     m_preset_tree_window->SetBackgroundColour(PRINTER_LIST_COLOUR);
     m_preset_tree_window->SetMinSize(wxSize(-1, FromDIP(400)));
     m_preset_tree_window->SetMaxSize(wxSize(-1, FromDIP(300)));

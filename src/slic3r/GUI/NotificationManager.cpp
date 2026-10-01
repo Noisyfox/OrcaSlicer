@@ -11,6 +11,7 @@
 #include "MainFrame.hpp"
 #include "Tab.hpp"
 #include "libslic3r/Config.hpp"
+#include "libslic3r/PrintBase.hpp"
 #include "format.hpp"
 
 #include <boost/algorithm/string.hpp>
@@ -1918,7 +1919,7 @@ void NotificationManager::push_validate_error_notification(StringObjectException
 				wxGetApp().sidebar().jump_to_option(opt, Preset::TYPE_PRINT, L"");
 			}
 			else {
-				wxGetApp().mainframe->select_tab(MainFrame::tp3DEditor);
+				wxGetApp().mainframe->select_tab(TAB_ID_PREPARE);
 			}
 			return false;
 		};
@@ -1985,7 +1986,7 @@ void NotificationManager::push_validate_error_notification(StringObjectException
 				wxGetApp().sidebar().jump_to_option(opt, opt_type, L"");
 			}
 			else {
-				wxGetApp().mainframe->select_tab(MainFrame::tp3DEditor);
+				wxGetApp().mainframe->select_tab(TAB_ID_PREPARE);
 			}
 			return false;
 		};
@@ -2015,7 +2016,7 @@ void NotificationManager::push_slicing_error_notification(const std::string &tex
 				if (iter != objects.end()) { ovs.push_back({ *iter, nullptr }); }
 			}
 			if (!ovs.empty()) {
-				wxGetApp().mainframe->select_tab(MainFrame::tp3DEditor);
+				wxGetApp().mainframe->select_tab(TAB_ID_PREPARE);
 				wxGetApp().obj_list()->select_items(ovs);
 			}
 			return false;
@@ -2046,7 +2047,7 @@ void NotificationManager::push_slicing_warning_notification(const std::string& t
 			auto& objects = wxGetApp().model().objects;
 			auto iter = std::find_if(objects.begin(), objects.end(), [id](auto o) { return o->id() == id; });
 			if (iter != objects.end()) {
-				wxGetApp().mainframe->select_tab(MainFrame::tp3DEditor);
+				wxGetApp().mainframe->select_tab(TAB_ID_PREPARE);
 				wxGetApp().obj_list()->select_items({ {*iter, nullptr} });
 			}
 			return false;
@@ -2693,7 +2694,7 @@ void NotificationManager::push_slicing_serious_warning_notification(const std::s
 				if (iter != objects.end()) { ovs.push_back({ *iter, nullptr }); }
 			}
 			if (!ovs.empty()) {
-				wxGetApp().mainframe->select_tab(MainFrame::tp3DEditor);
+				wxGetApp().mainframe->select_tab(TAB_ID_PREPARE);
 				wxGetApp().obj_list()->select_items(ovs);
 				wxGetApp().obj_list()->update_selections_on_canvas();
 			}
@@ -2777,7 +2778,7 @@ void NotificationManager::push_slicing_serious_warning_notification(const std::s
                 }
             }
             
-            wxGetApp().mainframe->select_tab(MainFrame::tp3DEditor);
+            wxGetApp().mainframe->select_tab(TAB_ID_PREPARE);
             
             if (!sel_items.empty()) {
                 obj_list->select_items(sel_items);
@@ -3083,8 +3084,10 @@ bool NotificationManager::push_notification_data(std::unique_ptr<NotificationMan
     }
 	bool retval = false;
 	if (this->activate_existing(notification.get())) {
-		if (m_initialized) { // ignore update action - it cant be initialized if canvas and imgui context is not ready
-			if (notification->get_type() == NotificationType::SlicingWarning) {
+		if (m_initialized && m_imgui_ready) {
+			// Precise Seam already aggregates all causes; replace it on repeated warning events.
+			if (notification->get_type() == NotificationType::SlicingWarning &&
+                notification->get_data().sub_msg_id != PrintStateBase::SlicingPreciseSeamWarning) {
 				m_pop_notifications.back()->append(notification->get_data().ori_text);
 			} else {
                 m_pop_notifications.back()->update(notification->get_data());
@@ -3129,6 +3132,10 @@ void NotificationManager::stop_delayed_notifications_of_type(const NotificationT
 
 void NotificationManager::render_notifications(GLCanvas3D &canvas, float overlay_width, float bottom_margin, float right_margin)
 {
+	// Notifications render inside an ImGui frame, so the font atlas is built from this point on
+	// and pushed notifications may safely measure their text.
+	m_imgui_ready = true;
+
 	sort_notifications();
 
 	float bottom_up_last_y = bottom_margin; // ORCA dont scale margins
@@ -3339,17 +3346,7 @@ size_t NotificationManager::get_notification_count() const
 void NotificationManager::bbl_show_plateinfo_notification(const std::string &text)
 {
     NotificationData data{NotificationType::BBLPlateInfo, NotificationLevel::PrintInfoNotificationLevel, BBL_NOTICE_MAX_INTERVAL, text};
-
-    for (std::unique_ptr<PopNotification> &notification : m_pop_notifications) {
-        if (notification->get_type() == NotificationType::BBLPlateInfo) {
-            notification->reinit();
-            notification->update(data);
-            return;
-        }
-    }
-
-    auto notification = std::make_unique<NotificationManager::PopNotification>(data, m_id_provider, m_evt_handler);
-    push_notification_data(std::move(notification), 0);
+    push_notification_data(data, 0);
 }
 
 void NotificationManager::bbl_close_3mf_warn_notification()
@@ -3360,20 +3357,10 @@ void NotificationManager::bbl_close_3mf_warn_notification()
         }
 }
 
-void NotificationManager::bbl_show_3mf_warn_notification(const std::string &text)
+void NotificationManager::bbl_show_3mf_warn_notification(const std::string &text, NotificationLevel level)
 {
-    NotificationData data{NotificationType::BBL3MFInfo, NotificationLevel::ErrorNotificationLevel, BBL_NOTICE_MAX_INTERVAL, text};
-
-    for (std::unique_ptr<PopNotification> &notification : m_pop_notifications) {
-        if (notification->get_type() == NotificationType::BBL3MFInfo) {
-            notification->reinit();
-            notification->update(data);
-            return;
-        }
-    }
-
-    auto notification = std::make_unique<NotificationManager::PopNotification>(data, m_id_provider, m_evt_handler);
-    push_notification_data(std::move(notification), 0);
+    NotificationData data{NotificationType::BBL3MFInfo, level, BBL_NOTICE_MAX_INTERVAL, text};
+    push_notification_data(data, 0);
 }
 
 void NotificationManager::bbl_close_plateinfo_notification()
@@ -3388,17 +3375,7 @@ void NotificationManager::bbl_close_plateinfo_notification()
 void NotificationManager::bbl_show_preview_only_notification(const std::string &text)
 {
     NotificationData data{NotificationType::BBLPreviewOnlyMode, NotificationLevel::WarningNotificationLevel, 0, text};
-
-    for (std::unique_ptr<PopNotification> &notification : m_pop_notifications) {
-        if (notification->get_type() == NotificationType::BBLPreviewOnlyMode) {
-            notification->reinit();
-            notification->update(data);
-            return;
-        }
-    }
-
-    auto notification = std::make_unique<NotificationManager::PopNotification>(data, m_id_provider, m_evt_handler);
-    push_notification_data(std::move(notification), 0);
+    push_notification_data(data, 0);
 }
 
 void NotificationManager::bbl_close_preview_only_notification()

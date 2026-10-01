@@ -361,7 +361,8 @@ wxString PresetComboBox::get_preset_item_name(unsigned int index)
                 return GetString(index);
             }
 
-            std::map<std::string, MachineObject *> machine_list = dev->get_my_machine_list();
+            std::map<std::string, MachineObject *> machine_list =
+                dev->get_my_machine_list(dev->get_current_printer_agent_id());
             if (machine_list.empty()) {
                 assert(false);
                 m_selected_dev_id.clear();
@@ -479,7 +480,8 @@ void PresetComboBox::add_connected_printers(std::string selected, bool alias_nam
     if (!dev)
         return;
 
-    std::map<std::string, MachineObject *> machine_list = dev->get_my_machine_list();
+    std::map<std::string, MachineObject *> machine_list =
+        dev->get_my_machine_list(dev->get_current_printer_agent_id());
     if (machine_list.empty())
         return;
 
@@ -873,10 +875,15 @@ PlaterPresetComboBox::PlaterPresetComboBox(wxWindow *parent, Preset::Type preset
             auto fila_type = Preset::remove_suffix_modified(GetValue().ToUTF8().data());
             bool is_official = boost::algorithm::starts_with(fila_type, "Bambu");
             if (is_official) {
-                // Get filament_id from filament_presets
+                // Get filament_id from filament_presets. FilamentPickerDialog looks up
+                // filaments_color_codes.json, which is downloaded from Bambu and keyed by the
+                // printer's own ids, so translate our OF id (the "GFA00" fallback is already one).
                 const std::string& preset_name = m_preset_bundle->filament_presets[m_filament_idx];
                 const Preset* selected_preset = m_collection->find_preset(preset_name);
-                wxString fila_id = selected_preset ? wxString::FromUTF8(selected_preset->filament_id) : "GFA00";
+                auto* agent = wxGetApp().getAgent();
+                wxString fila_id = "GFA00";
+                if (selected_preset)
+                    fila_id = wxString::FromUTF8(agent ? agent->from_orca_filament_id(selected_preset->filament_id) : selected_preset->filament_id);
                 FilamentColor fila_color = get_cur_color_info();
 
                 // Show filament picker dialog
@@ -994,7 +1001,13 @@ void PlaterPresetComboBox::update_badge_according_flag() {
     auto selection   = GetSelection();
     auto select_flag = GetFlag(selection);
     auto ok          = select_flag == (int) PresetComboBox::FilamentAMSType::FROM_AMS;
-    ShowBadge(ok);
+    ShowBadge(m_sync_badge || ok);
+}
+
+void PlaterPresetComboBox::set_sync_badge(bool show)
+{
+    m_sync_badge = show;
+    ShowBadge(show);
 }
 
 bool PlaterPresetComboBox::switch_to_tab()
@@ -1042,7 +1055,7 @@ bool PlaterPresetComboBox::switch_to_tab()
 
     //BBS  Select NoteBook Tab params
     if (tab->GetParent() == wxGetApp().params_panel())
-        wxGetApp().mainframe->select_tab(MainFrame::tp3DEditor);
+        wxGetApp().mainframe->select_tab(TAB_ID_PREPARE);
     else {
         wxGetApp().params_dialog()->Popup();
         tab->OnActivate();
@@ -1653,7 +1666,7 @@ void TabPresetComboBox::OnSelect(wxCommandEvent &evt)
         default: break;
         }
         if (sp != ConfigWizard::SP_WELCOME) {
-            wxTheApp->CallAfter([this, sp]() {
+            wxTheApp->CallAfter([sp]() {
                 run_wizard(sp);
             });
         }
@@ -1949,7 +1962,7 @@ GUI::CalibrateFilamentComboBox::CalibrateFilamentComboBox(wxWindow *parent)
 {
     clr_picker->SetBackgroundColour(StateColor::darkModeColorFor(*wxWHITE));
     clr_picker->SetToolTip("");
-    clr_picker->Bind(wxEVT_BUTTON, [this](wxCommandEvent& e) {});
+    clr_picker->Bind(wxEVT_BUTTON, [](wxCommandEvent& e) {});
 }
 
 GUI::CalibrateFilamentComboBox::~CalibrateFilamentComboBox()

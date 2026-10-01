@@ -17,6 +17,10 @@
 #include "Platform.hpp"
 #include "Time.hpp"
 #include "libslic3r.h"
+// For the vendor-installation helpers: the vendor profile version
+// (get_version_from_json) and the preset cache stamp (VendorCacheFile).
+#include "Preset.hpp"
+#include "PresetCacheFormat.hpp"
 
 #ifdef __APPLE__
 #include "MacUtils.hpp"
@@ -68,6 +72,7 @@
 #include <boost/shared_ptr.hpp>
 
 #include <boost/algorithm/string/predicate.hpp>
+#include <boost/algorithm/string/case_conv.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/path.hpp>
 #include <boost/nowide/fstream.hpp>
@@ -310,7 +315,11 @@ void set_data_dir(const std::string &dir)
 {
     g_data_dir = dir;
     if (!g_data_dir.empty() && !boost::filesystem::exists(g_data_dir)) {
-       boost::filesystem::create_directory(g_data_dir);
+        try {
+            boost::filesystem::create_directories(g_data_dir);
+        } catch (const boost::filesystem::filesystem_error &ex) {
+            BOOST_LOG_TRIVIAL(error) << "set_data_dir: failed to create data directory " << g_data_dir << ": " << ex.what();
+        }
     }
 }
 
@@ -973,7 +982,7 @@ CopyFileResult copy_file(const std::string &from, const std::string &to, std::st
     BOOL result = CopyFileW(src_wstr, dst_wstr, FALSE);
     if (!result) {
         DWORD errCode = GetLastError();
-        error_message = "Error: " + errCode;
+        error_message = "Error: " + std::to_string(errCode);
         ret = FAIL_COPY_FILE;
         goto __finished;
     }
@@ -1098,6 +1107,67 @@ bool is_gcode_file(const std::string &path)
 bool is_json_file(const std::string& path)
 {
 	return boost::iends_with(path, ".json");
+}
+
+bool is_path_within_root(const std::string &rel_path, const boost::filesystem::path &root)
+{
+    auto is_separator = [](char c) { return c == '/' || c == '\\'; };
+    if (rel_path.empty() || is_separator(rel_path.front()) || (rel_path.size() > 1 && rel_path[1] == ':'))
+        return false;
+    // The filesystem calls stop at a NUL, so they would act on a shorter path than the one checked here.
+    if (rel_path.find('\0') != std::string::npos)
+        return false;
+    for (size_t start = 0; start <= rel_path.size();) {
+        size_t end = start;
+        while (end < rel_path.size() && !is_separator(rel_path[end]))
+            ++end;
+        if (rel_path.compare(start, end - start, "..") == 0)
+            return false;
+        start = end + 1;
+    }
+    // Resolve against the canonical root so a symlink inside it cannot lead back out.
+    try {
+        std::string root_str = boost::filesystem::weakly_canonical(root).string();
+        // A trailing separator on root would otherwise fail the prefix match below for every path.
+        while (!root_str.empty() && (root_str.back() == '/' || root_str.back() == boost::filesystem::path::preferred_separator))
+            root_str.pop_back();
+        const std::string full_str = boost::filesystem::weakly_canonical(root / rel_path).string();
+        return full_str.compare(0, root_str.size(), root_str) == 0 &&
+               (full_str.size() == root_str.size() || full_str[root_str.size()] == boost::filesystem::path::preferred_separator);
+    } catch (const boost::filesystem::filesystem_error &) {
+        return false;
+    }
+}
+
+bool is_symlink_target_within_root(const std::string &link_rel_path, const std::string &target, const boost::filesystem::path &root)
+{
+    if (target.empty() || target.front() == '/' || target.front() == '\\' || (target.size() > 1 && target[1] == ':'))
+        return false;
+    // A relative target without ".." only descends from the link's directory, so no chain of such links can leave root.
+    const size_t sep = link_rel_path.find_last_of("/\\");
+    return is_path_within_root((sep == std::string::npos ? std::string() : link_rel_path.substr(0, sep + 1)) + target, root);
+}
+
+bool is_absolute_path_within_root(const boost::filesystem::path &path, const boost::filesystem::path &root)
+{
+    const boost::filesystem::path rel = path.lexically_relative(root);
+    return !rel.empty() && rel != "." && is_path_within_root(rel.string(), root);
+}
+
+bool is_safe_to_open_file_name(const std::string &file_name)
+{
+    // Formats that cannot carry macros or scripts. Legacy and OpenDocument office files, HTML and SVG are left out on purpose.
+    static const std::vector<std::string> safe_extensions = {
+        "jpg", "jpeg", "jfif", "pjpeg", "pjp", "png", "gif", "bmp", "webp", "tif", "tiff",
+        "pdf", "txt", "md", "csv", "docx", "xlsx", "pptx",
+        "stl", "obj", "3mf", "amf", "ply", "step", "stp", "iges", "igs", "dxf",
+        "mp4", "mov", "webm"};
+    // The name must end in the extension itself: Windows drops trailing dots and spaces and reads ':' as a stream separator.
+    const size_t dot = file_name.find_last_of('.');
+    if (dot == std::string::npos || file_name.find_first_of("/\\:") != std::string::npos)
+        return false;
+    const std::string extension = boost::algorithm::to_lower_copy(file_name.substr(dot + 1));
+    return std::find(safe_extensions.begin(), safe_extensions.end(), extension) != safe_extensions.end();
 }
 
 bool is_img_file(const std::string &path)
@@ -1309,6 +1379,31 @@ unsigned get_current_pid()
 #endif
 }
 
+boost::filesystem::path download_marker_path(const boost::filesystem::path &dest_folder, const std::string &filename)
+{
+    return dest_folder / (filename + "." + std::to_string(get_current_pid()) + ".download");
+}
+
+bool find_unused_filename(const boost::filesystem::path &dest_folder, const std::string &filename,
+                          const boost::filesystem::path &ignored_marker, std::string &result)
+{
+    // Probe the name that will be written, so a name the sanitizing maps onto an existing file is versioned too.
+    const std::string sanitized = sanitize_filename(filename);
+    const std::string extension = boost::filesystem::path(sanitized).extension().string();
+    const std::string stem      = sanitized.substr(0, sanitized.size() - extension.size());
+    auto is_used = [&](const std::string &name) {
+        const boost::filesystem::path marker = download_marker_path(dest_folder, name);
+        return boost::filesystem::exists(dest_folder / name) || (marker != ignored_marker && boost::filesystem::exists(marker));
+    };
+    result = sanitized;
+    for (size_t version = 1; is_used(result); ++version) {
+        if (version > 999)
+            return false;
+        result = stem + "(" + std::to_string(version) + ")" + extension;
+    }
+    return true;
+}
+
 std::string per_user_temp_id()
 {
 #ifdef WIN32
@@ -1325,6 +1420,19 @@ std::string per_user_temp_dir(const std::string &base, const std::string &user_i
     // Keep the id at the top level so each user's dir sits directly in the world-writable temp
     // root; a shared parent dir would be owned by whichever user created it first.
     return base + "/orcaslicer_" + user_id;
+}
+
+std::string resolve_cli_input_path(const std::string &path)
+{
+    const boost::filesystem::path input(path);
+    if (path.empty() || is_supported_open_protocol(path) || input.is_absolute())
+        return path;
+
+    boost::system::error_code ec;
+    const boost::filesystem::path resolved = boost::filesystem::system_complete(input, ec);
+    if (ec)
+        return path;
+    return resolved.lexically_normal().make_preferred().string();
 }
 
 // BBS: backup & restore
@@ -1744,6 +1852,85 @@ void copy_directory_recursively(const boost::filesystem::path& source,
     return;
 }
 
+// ---- Vendor installation on disk ------------------------------------------
+
+// Whether a cache stamped `cache_ver` still speaks for a vendor whose profile on
+// disk claims `profile_ver`: it does unless the profile has moved ahead of it. A
+// profile that is missing or carries no judgeable version cannot be ahead of
+// anything. The one rule behind both "which form gets installed" and "which form
+// is installed"; they must not drift apart. Deliberately NOT the serve rule
+// (VendorCacheFile::load), which refuses an unjudgeable profile instead.
+static bool cache_covers(const Semver& cache_ver, const Semver& profile_ver)
+{
+    return cache_ver.valid() && (! profile_ver.valid() || cache_ver >= profile_ver);
+}
+
+bool is_vendor_installed(const std::string& vendor)
+{
+    const boost::filesystem::path dir = boost::filesystem::path(data_dir()) / PRESET_SYSTEM_DIR;
+    // A cache is the whole of a cache-only installation, so a file this build
+    // cannot serve the vendor from is not an installation. Left counted as one,
+    // the updater would never lay a working copy down.
+    return boost::filesystem::exists(dir / (vendor + ".json"))
+        || VendorCacheFile::usable_version((dir / (vendor + ".opc")).string(), vendor).valid();
+}
+
+Semver installed_vendor_version(const std::string& vendor)
+{
+    const boost::filesystem::path dir  = boost::filesystem::path(data_dir()) / PRESET_SYSTEM_DIR;
+    const boost::filesystem::path json = dir / (vendor + ".json");
+    // Guarded: get_version_from_json logs an error and throws-and-catches its way
+    // to an invalid version on a file that is not there, and a cache-only vendor
+    // never has one.
+    const Semver from_json  = boost::filesystem::exists(json) ? get_version_from_json(json.string()) : Semver();
+    const Semver from_cache = VendorCacheFile::usable_version((dir / (vendor + ".opc")).string(), vendor);
+    // Whichever form a load would serve.
+    return cache_covers(from_cache, from_json) ? from_cache : from_json;
+}
+
+void remove_installed_vendor(const std::string& vendor)
+{
+    const boost::filesystem::path dir = boost::filesystem::path(data_dir()) / PRESET_SYSTEM_DIR;
+    boost::filesystem::remove(dir / (vendor + ".json"));
+    boost::filesystem::remove(dir / (vendor + ".opc"));
+    if (boost::filesystem::exists(dir / vendor))
+        boost::filesystem::remove_all(dir / vendor);
+}
+
+std::set<std::string> vendor_names_in(const boost::filesystem::path& dir)
+{
+    std::set<std::string> names;
+    for (auto& dir_entry : boost::filesystem::directory_iterator(dir)) {
+        const auto& path = dir_entry.path();
+        if (Slic3r::is_json_file(path.string()) || path.extension() == ".opc")
+            names.insert(path.stem().string());
+    }
+    return names;
+}
+
+// A vendor's preset cache is the whole of its installation: it carries the presets,
+// the vendor profile and the version they were built at, so where one ships nothing
+// else needs copying. Unless the profile beside it claims a newer version — a cache
+// generated before that profile was bumped is out of date, and a cache that cannot
+// be read is no installation at all — and the vendor is installed the way it was
+// before caches existed, as its profile and the preset JSONs it points at. Returns
+// the version the cache is stamped with, invalid when it is not the form to install.
+static Semver installable_cache_version(const boost::filesystem::path& dir, const std::string& vendor)
+{
+    const auto cache_ver = Semver::parse(VendorCacheFile::peek_version((dir / (vendor + ".opc")).string(), vendor));
+    if (! cache_ver)
+        return Semver::invalid();
+    const Semver profile_ver = get_version_from_json((dir / (vendor + ".json")).string());
+    return cache_covers(*cache_ver, profile_ver) ? *cache_ver : Semver::invalid();
+}
+
+Semver resource_vendor_version(const std::string& vendor)
+{
+    const boost::filesystem::path dir = boost::filesystem::path(resources_dir()) / "profiles";
+    const Semver ver = installable_cache_version(dir, vendor);
+    return ver.valid() ? ver : get_version_from_json((dir / (vendor + ".json")).string());
+}
+
 bool install_vendor_bundles_from_resources(
     const std::vector<std::string>& bundle_names,
     const std::string& resource_subdir,
@@ -1756,37 +1943,82 @@ bool install_vendor_bundles_from_resources(
 
     BOOST_LOG_TRIVIAL(info) << "Installing " << bundle_names.size() << " bundles from resources...";
 
+    // One vendor that cannot be installed is one vendor missing, not a reason to
+    // leave the rest uninstalled. The caller is told, and every bundle that can
+    // be laid down is.
+    bool all_installed = true;
+
     for (const auto &bundle : bundle_names) {
         try {
+            if (bundle.empty()) {
+                BOOST_LOG_TRIVIAL(warning) << "Refusing to install a bundle with no name";
+                all_installed = false;
+                continue;
+            }
+
             // Install the JSON file
             auto path_in_rsrc = (rsrc_path / bundle).replace_extension(".json");
             auto path_in_vendors = (vendor_path / bundle).replace_extension(".json");
+            auto cache_in_rsrc = (rsrc_path / bundle).replace_extension(".opc");
+            auto cache_in_vendors = (vendor_path / bundle).replace_extension(".opc");
 
-            if (!fs::exists(path_in_rsrc)) {
+            // Either form of the vendor will do: a build may ship it as a cache alone.
+            if (!fs::exists(path_in_rsrc) && !fs::exists(cache_in_rsrc)) {
                 BOOST_LOG_TRIVIAL(warning) << "Bundle not found in resources: " << bundle;
-                return false;
+                all_installed = false;
+                continue;
             }
 
             // Create target directory if needed
             if (!fs::exists(vendor_path))
                 fs::create_directories(vendor_path);
 
-            // Copy JSON file
             std::string error_message;
-            CopyFileResult cfr = copy_file(path_in_rsrc.string(), path_in_vendors.string(), error_message, false);
-            if (cfr != CopyFileResult::SUCCESS) {
-                BOOST_LOG_TRIVIAL(error) << "Failed to copy " << bundle << ".json: " << error_message;
-                return false;
+            bool installed_cache = false;
+            if (installable_cache_version(rsrc_path, bundle).valid()) {
+                installed_cache = copy_file(cache_in_rsrc.string(), cache_in_vendors.string(), error_message, false) == CopyFileResult::SUCCESS;
+                if (! installed_cache) {
+                    BOOST_LOG_TRIVIAL(warning) << "Failed to copy " << bundle << ".opc: " << error_message;
+                } else if (! VendorCacheFile::usable_version(cache_in_vendors.string(), bundle).valid()) {
+                    // The copy is what will be loaded, so it — not the kilobyte
+                    // peek that chose this form — decides whether the profile
+                    // beside it can go.
+                    BOOST_LOG_TRIVIAL(warning) << "Installed cache for " << bundle << " cannot be read; installing its profile instead";
+                    boost::system::error_code ec;
+                    fs::remove(cache_in_vendors, ec);
+                    installed_cache = false;
+                }
+            }
+
+            if (! installed_cache) {
+                CopyFileResult cfr = copy_file(path_in_rsrc.string(), path_in_vendors.string(), error_message, false);
+                if (cfr != CopyFileResult::SUCCESS) {
+                    BOOST_LOG_TRIVIAL(error) << "Failed to copy " << bundle << ".json: " << error_message;
+                    all_installed = false;
+                    continue;
+                }
+                // Only now: an earlier install's cache would shadow this profile,
+                // but removing it before the profile lands would leave neither.
+                boost::system::error_code ec;
+                fs::remove(cache_in_vendors, ec);
+            } else {
+                // Left in place, an earlier install's profile would shadow the cache.
+                boost::system::error_code ec;
+                fs::remove(path_in_vendors, ec);
+                if (ec)
+                    BOOST_LOG_TRIVIAL(warning) << "Could not remove the superseded profile " << path_in_vendors.string() << ": " << ec.message();
             }
 
             // Copy the vendor directory (if it exists)
             auto dir_in_rsrc = rsrc_path / bundle;
             auto dir_in_vendors = vendor_path / bundle;
 
-            if (fs::exists(dir_in_rsrc) && fs::is_directory(dir_in_rsrc)) {
-                // Remove existing directory
-                if (fs::exists(dir_in_vendors))
-                    fs::remove_all(dir_in_vendors);
+            // Whatever is installed came from an earlier version of this vendor and
+            // would be parsed in place of the one being installed now.
+            if (fs::exists(dir_in_vendors))
+                fs::remove_all(dir_in_vendors);
+
+            if (! installed_cache && fs::exists(dir_in_rsrc) && fs::is_directory(dir_in_rsrc)) {
                 fs::create_directories(dir_in_vendors);
 
                 // Copy with file filter (same as PresetUpdater::install_bundles_rsrc)
@@ -1807,11 +2039,11 @@ bool install_vendor_bundles_from_resources(
 
         } catch (const std::exception& e) {
             BOOST_LOG_TRIVIAL(error) << "Exception installing bundle " << bundle << ": " << e.what();
-            return false;
+            all_installed = false;
         }
     }
 
-    return true;
+    return all_installed;
 }
 
 void save_string_file(const boost::filesystem::path& p, const std::string& str)

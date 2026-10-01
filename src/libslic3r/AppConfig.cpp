@@ -42,6 +42,9 @@ namespace Slic3r {
 
 static const std::string VERSION_CHECK_URL = "https://check-version.orcaslicer.com/latest";
 static const std::string PROFILE_UPDATE_URL = "https://check-version.orcaslicer.com/profile";
+
+constexpr const char* CONFIG_ORCA_UPDATER_URL = "orca_updater_url";
+
 static const std::string MODELS_STR = "models";
 
 const std::string AppConfig::SECTION_FILAMENTS = "filaments";
@@ -221,6 +224,12 @@ void AppConfig::set_defaults()
         set("preview_dim_previous_layers_brightness", std::to_string(std::max(0, std::min(brightness, 99))));
     }
 
+    // ORCA: view type the G-code preview opens with. "auto" keeps the automatic choice (Filament for
+    // multi material prints, Line Type for single material ones), "last" restores the view type the user
+    // picked last, any other value is a fixed view type name, see GCodeViewer::view_type_to_config_name().
+    if (get("preview_default_view_type").empty())
+        set("preview_default_view_type", "auto");
+
     if (get("filaments_area_preferred_count").empty())
         set("filaments_area_preferred_count", "10");
 
@@ -280,6 +289,17 @@ void AppConfig::set_defaults()
         set(SETTING_OPENGL_FPS_CAP, std::to_string(fps_cap));
     }
 
+    if (get(SETTING_OPENGL_SCENE_CACHE).empty())
+        set_bool(SETTING_OPENGL_SCENE_CACHE, true);
+
+    if (get(SETTING_OPENGL_SKIP_IDENTICAL_FRAMES).empty())
+        set_bool(SETTING_OPENGL_SKIP_IDENTICAL_FRAMES, true);
+
+    // The getter already defaults, parses and clamps; write back what it resolves to.
+    set(SETTING_PLUGIN_PAGES_VISIBLE_COUNT, std::to_string(get_plugin_pages_visible_count()));
+
+    set(SETTING_SPEED_DIAL_RECENT_COUNT, std::to_string(get_speed_dial_recent_count()));
+
     if (get(SETTING_OPENGL_SHOW_FPS_OVERLAY).empty())
         set_bool(SETTING_OPENGL_SHOW_FPS_OVERLAY, false);
 
@@ -288,6 +308,9 @@ void AppConfig::set_defaults()
 
     if (get(SETTING_OPENGL_REALISTIC_PHONG).empty())
         set_bool(SETTING_OPENGL_REALISTIC_PHONG, true);
+
+    if (get(SETTING_OPENGL_REALISTIC_PREVIEW).empty())
+        set_bool(SETTING_OPENGL_REALISTIC_PREVIEW, false);
 
     if (get(SETTING_OPENGL_SHADING_MODEL).empty())
         set(SETTING_OPENGL_SHADING_MODEL, "gouraud");
@@ -306,6 +329,26 @@ void AppConfig::set_defaults()
 
     if (get("zoom_to_mouse").empty())
         set_bool("zoom_to_mouse", false);
+
+#ifdef SLIC3R_CAD
+    // Experimental parametric Design tab. Off by default: the tab is not created at all
+    // until this is turned on, so nothing it builds reaches an unsuspecting user.
+    if (get("enable_cad_feature").empty())
+        set_bool("enable_cad_feature", false);
+
+    // Auto-weld sketch endpoints within kSketchJoinTol when building closed loops.
+    // Default ON: it is what the ~90% case wants; OFF makes the kernel demand an exact
+    // joint. The GUI pushes it into SketchEngine via set_sketch_auto_close().
+    if (get("auto_close_sketch_loops").empty())
+        set_bool("auto_close_sketch_loops", true);
+
+    // Design tab: draw a mate connector as a face rather than as the abstract disc + roll
+    // quadrant. Defaults ON — face orientation is hardwired perception, so the roll and the
+    // verse read without being learned, which no abstract glyph achieves. Turning it off
+    // restores the conventional CAD representation for users who expect it (x0kd).
+    if (get("design_connector_face_glyph").empty())
+        set_bool("design_connector_face_glyph", true);
+#endif
 
 //#ifdef SUPPORT_SHOW_HINTS
     if (get("show_hints").empty())
@@ -466,6 +509,10 @@ void AppConfig::set_defaults()
 
     if (get("enable_high_low_temp_mixed_printing").empty()){
         set_bool("enable_high_low_temp_mixed_printing", false);
+    }
+
+    if (get("remember_print_action").empty()) {
+        set_bool("remember_print_action", false);
     }
 
     if (get("ignore_ext_filament_in_filament_map").empty()){
@@ -630,6 +677,11 @@ void AppConfig::set_defaults()
     {
         // false = legacy behavior using print hosts
         set_bool("use_printer_agents", false);
+    }
+
+    if (get("enable_ota").empty())
+    {
+        set_bool("enable_ota", false);
     }
 
     // Remove legacy window positions/sizes
@@ -853,6 +905,10 @@ std::string AppConfig::load()
                         local_machine.dev_ip = p["dev_ip"].get<std::string>();
                     if (p.contains("printer_type"))
                         local_machine.printer_type = p["printer_type"].get<std::string>();
+                    if (p.contains("printer_agent_id"))
+                        local_machine.printer_agent_id = p["printer_agent_id"].get<std::string>();
+                    if (p.contains("access_code"))
+                        local_machine.access_code = p["access_code"].get<std::string>();
                     m_local_machines[local_machine.dev_id] = local_machine;
                 }
             } else {
@@ -1065,6 +1121,8 @@ void AppConfig::save()
         m_json["dev_name"]         = local_machine.second.dev_name;
         m_json["dev_ip"]           = local_machine.second.dev_ip;
         m_json["printer_type"]     = local_machine.second.printer_type;
+        m_json["printer_agent_id"] = local_machine.second.printer_agent_id;
+        m_json["access_code"]      = local_machine.second.access_code;
 
         j["local_machines"][local_machine.first] = m_json;
     }
@@ -1431,6 +1489,7 @@ void AppConfig::set_mouse_device(const std::string& name, double translation_spe
     it->second["invert_yaw"] = invert_yaw ? "1" : "0";
     it->second["invert_pitch"] = invert_pitch ? "1" : "0";
     it->second["invert_roll"] = invert_roll ? "1" : "0";
+    m_dirty = true;
 }
 
 std::vector<std::string> AppConfig::get_mouse_device_names() const
@@ -1630,6 +1689,38 @@ void AppConfig::set_network_plugin_version(const std::string& version)
     set(SETTING_NETWORK_PLUGIN_VERSION, version);
 }
 
+int AppConfig::get_plugin_pages_visible_count() const
+{
+    std::string value = get(SETTING_PLUGIN_PAGES_VISIBLE_COUNT);
+    if (value.empty())
+        return PLUGIN_PAGES_VISIBLE_COUNT_DEFAULT;
+
+    int visible_count = PLUGIN_PAGES_VISIBLE_COUNT_DEFAULT;
+    try {
+        visible_count = std::stoi(value);
+    }
+    catch (...) {
+        return PLUGIN_PAGES_VISIBLE_COUNT_DEFAULT;
+    }
+    return std::clamp(visible_count, PLUGIN_PAGES_VISIBLE_COUNT_MIN, PLUGIN_PAGES_VISIBLE_COUNT_MAX);
+}
+
+int AppConfig::get_speed_dial_recent_count() const
+{
+    std::string value = get(SETTING_SPEED_DIAL_RECENT_COUNT);
+    if (value.empty())
+        return SPEED_DIAL_RECENT_COUNT_DEFAULT;
+
+    int recent_count = SPEED_DIAL_RECENT_COUNT_DEFAULT;
+    try {
+        recent_count = std::stoi(value);
+    }
+    catch (...) {
+        return SPEED_DIAL_RECENT_COUNT_DEFAULT;
+    }
+    return std::clamp(recent_count, SPEED_DIAL_RECENT_COUNT_MIN, SPEED_DIAL_RECENT_COUNT_MAX);
+}
+
 std::vector<std::string> AppConfig::get_skipped_network_versions() const
 {
     std::vector<std::string> result;
@@ -1789,12 +1880,20 @@ std::string AppConfig::version_check_url() const
 
 std::string AppConfig::profile_update_url() const
 {
-    return PROFILE_UPDATE_URL;
+    std::string orca_updater_url = get(CONFIG_ORCA_UPDATER_URL);
+    if (orca_updater_url.empty())
+        return PROFILE_UPDATE_URL;
+    return orca_updater_url;
 }
 
 bool AppConfig::exists()
 {
     return boost::filesystem::exists(config_path());
+}
+
+std::string AppConfig::load_if_exists()
+{
+    return boost::filesystem::exists(loading_path()) ? load() : std::string();
 }
 
 }; // namespace Slic3r
