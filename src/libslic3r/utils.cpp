@@ -60,7 +60,11 @@
 #endif
 #include <boost/log/sinks/text_file_backend.hpp>
 #include <boost/log/sinks/text_ostream_backend.hpp>
+#if !defined(__EMSCRIPTEN__)
+// File logging is disabled below on WASM. Its synchronous frontend would
+// import native Boost.Thread types alongside the WASM compatibility shim.
 #include <boost/log/utility/setup/file.hpp>
+#endif
 #include <boost/log/utility/setup/common_attributes.hpp>
 #include <boost/log/sources/severity_logger.hpp>
 #include <boost/log/sources/record_ostream.hpp>
@@ -148,7 +152,9 @@ void set_logging_level(unsigned int level)
 
 void set_logging_file(const std::string &file)
 {
+#if !defined(__EMSCRIPTEN__)
 	boost::log::add_file_log(file);
+#endif
 }
 
 unsigned int level_string_to_boost(std::string level)
