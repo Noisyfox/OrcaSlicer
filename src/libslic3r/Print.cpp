@@ -50,7 +50,11 @@
 #include "ArcFitter.hpp"
 #include <cstdio>
 #include <boost/filesystem/operations.hpp>
+#if defined(__EMSCRIPTEN__)
+#include <boost/thread.hpp>
+#else
 #include <boost/thread/lock_types.hpp>
+#endif
 #include <iterator>
 #include "TriangleMesh.hpp"
 #include "Config.hpp"

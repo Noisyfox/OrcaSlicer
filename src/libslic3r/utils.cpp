@@ -4,7 +4,9 @@
 
 #include <atomic>
 #include <boost/smart_ptr/shared_ptr.hpp>
+#if !defined(__EMSCRIPTEN__)
 #include <boost/log/sinks/sync_frontend.hpp>
+#endif
 #include <boost/log/keywords/severity.hpp>
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/exception.hpp>

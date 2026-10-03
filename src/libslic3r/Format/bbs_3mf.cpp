@@ -35,7 +35,11 @@
 #include <cstddef>
 #include <boost/algorithm/string/constants.hpp>
 #include <algorithm>
+#if defined(__EMSCRIPTEN__)
+#include <boost/thread.hpp>
+#else
 #include <boost/thread/lock_types.hpp>
+#endif
 #include <cassert>
 #include <boost/optional/optional.hpp>
 #include <istream>
@@ -54,7 +58,9 @@
 #include <boost/date_time/posix_time/posix_time_duration.hpp>
 #include <boost/date_time/posix_time/posix_time_types.hpp>
 #include <boost/date_time/posix_time/ptime.hpp>
+#if !defined(__EMSCRIPTEN__)
 #include <boost/thread/thread_time.hpp>
+#endif
 #include <boost/core/ref.hpp>
 #include <boost/assign/list_of.hpp>
 #include <cmath>
