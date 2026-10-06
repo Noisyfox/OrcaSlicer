@@ -19,6 +19,7 @@
 #include <wx/webview.h>
 
 #include "GUI_App.hpp"
+#include "GUI_Utils.hpp"
 #include "I18N.hpp"
 #include "libslic3r/AppConfig.hpp"
 
@@ -79,19 +80,22 @@ ColorPickerDialog::ColorPickerDialog(wxWindow* parent, const ColorSelection& ini
     // SetSizeHints may fit the window to the WebView's small initial best size.
     // Restore the intended dialog size only after applying the layout hints.
     position_panel();
-    Bind(wxEVT_SIZE, [this](wxSizeEvent& event) { update_window_shape(); event.Skip(); });
+    Bind(wxEVT_SIZE, [this](wxSizeEvent& event) {
+        event.Skip();
+        apply_rounded_shape();
+    });
     Bind(wxEVT_SHOW, [this](wxShowEvent& event) {
         if (event.IsShown()) {
             position_panel();
             // GTK can require a realized window before applying its shape.
             wxGetApp().CallAfter([this, alive = m_alive] {
                 if (alive->load(std::memory_order_acquire) && !m_closing)
-                    update_window_shape();
+                    apply_rounded_shape();
             });
         }
         event.Skip();
     });
-    update_window_shape();
+    apply_rounded_shape();
 
     Bind(wxEVT_CLOSE_WINDOW, [this](wxCloseEvent&) { finish(wxID_CANCEL); });
     Bind(wxEVT_CHAR_HOOK, [this](wxKeyEvent& event) {
@@ -124,26 +128,41 @@ void ColorPickerDialog::position_panel()
 void ColorPickerDialog::on_dpi_changed(const wxRect&)
 {
     position_panel();
-    m_shape_size = wxSize();
-    update_window_shape();
+    apply_rounded_shape();
     Refresh();
 }
 
-void ColorPickerDialog::update_window_shape()
+void ColorPickerDialog::apply_rounded_shape()
 {
-    const wxSize size = GetSize();
-    if (size == m_shape_size || size.x <= 0 || size.y <= 0)
+    // wxOSX SetShape resizes NSWindow and synchronously fires wxEVT_SIZE.
+    // Like SpeedDial, clip its native layer instead and guard shape re-entry.
+    if (m_applying_shape)
         return;
-    wxBitmap bitmap(size.x, size.y, 32);
-    wxMemoryDC dc(bitmap);
-    dc.SetBackground(wxBrush(*wxBLACK));
-    dc.Clear();
-    dc.SetBrush(wxBrush(*wxWHITE));
-    dc.SetPen(*wxTRANSPARENT_PEN);
-    dc.DrawRoundedRectangle(0, 0, size.x, size.y, FromDIP(8));
-    dc.SelectObject(wxNullBitmap);
-    if (SetShape(wxRegion(bitmap, *wxBLACK)))
-        m_shape_size = size;
+    const wxSize size = GetClientSize();
+    if (size.x <= 0 || size.y <= 0)
+        return;
+    m_applying_shape = true;
+#ifdef __WXOSX__
+    // Reapply after showing: the native view layer may not exist at construction.
+    set_window_corner_radius(this, FromDIP(m_corner_radius));
+#else
+    m_shape_bmp.Create(size.x, size.y, 32);
+    if (m_shape_bmp.IsOk()) {
+        wxMemoryDC dc(m_shape_bmp);
+        if (dc.IsOk()) {
+            dc.SetBackground(wxBrush(*wxBLACK));
+            dc.Clear();
+            dc.SetBrush(wxBrush(*wxWHITE));
+            dc.SetPen(*wxTRANSPARENT_PEN);
+            dc.DrawRoundedRectangle(0, 0, size.x, size.y, FromDIP(m_corner_radius));
+            dc.SelectObject(wxNullBitmap);
+            const wxRegion region(m_shape_bmp, *wxBLACK);
+            if (region.IsOk())
+                SetShape(region);
+        }
+    }
+#endif
+    m_applying_shape = false;
 }
 
 void ColorPickerDialog::add_user_scripts()

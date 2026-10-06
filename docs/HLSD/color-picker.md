@@ -2,7 +2,10 @@
 
 The color picker is a local HTML dialog hosted by `ColorPickerDialog`, a
 `WebViewHostDialog` subclass. Its colors use the existing `ColorRGBA` utility.
-It appears as a rounded, borderless floating panel. The initialized page reports
+It appears as a rounded, borderless floating panel. macOS rounds the native view
+layer instead of calling `SetShape`, which synchronously resizes its window;
+other platforms use a validated shape region with a reentry guard.
+The initialized page reports
 its intrinsic content height; native code validates the current page identifier
 and bounded numeric height, converts CSS pixels to device-independent window
 size, and fits within the display's work area. Identical sizes are ignored. The

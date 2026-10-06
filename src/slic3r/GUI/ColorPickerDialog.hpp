@@ -9,6 +9,7 @@
 #include <string>
 #include <vector>
 #include <wx/gdicmn.h>
+#include <wx/bitmap.h>
 
 class wxWindow;
 
@@ -33,7 +34,7 @@ private:
     void handle_web_command(const nlohmann::json& payload);
     void send_initial_state();
     void finish(int return_code);
-    void update_window_shape();
+    void apply_rounded_shape();
     void position_panel();
     void on_dpi_changed(const wxRect& suggested_rect) override;
 
@@ -48,7 +49,9 @@ private:
     bool m_initialized = false;
     bool m_closing = false;
     bool m_favorites_writable = false;
-    wxSize m_shape_size;
+    int m_corner_radius{8};
+    wxBitmap m_shape_bmp;
+    bool m_applying_shape{false};
     wxRect m_anchor_rect;
     wxRect m_work_area;
     int m_content_height = 520;
