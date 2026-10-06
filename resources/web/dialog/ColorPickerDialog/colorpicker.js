@@ -21,12 +21,29 @@
   const alphaPair = [byId("aSlider"), byId("aValue")];
   const pageId = Date.now().toString(36) + Math.random().toString(36).slice(2);
   let state = model.createState(), favorites = [], dragging = false, initialized = false, favoritesWritable = true;
+  let lastContentHeight = 0, resizePending = false;
 
   function emit(command, data = {}) {
     window.dispatchEvent(new CustomEvent("color-picker-message", {detail: {command, ...data}}));
     if (window.wx && typeof window.wx.postMessage === "function")
       window.wx.postMessage(JSON.stringify({command, page_id: pageId, ...data}));
   }
+
+  // Body height is intrinsic, independent of viewport height. Observing it
+  // catches capabilities, notice, font/theme changes, and wrapped translations.
+  function scheduleResize() {
+    if (!initialized || resizePending) return;
+    resizePending = true;
+    requestAnimationFrame(() => {
+      resizePending = false;
+      const height = Math.min(900, Math.max(300, Math.ceil(document.body.getBoundingClientRect().height)));
+      if (height !== lastContentHeight) {
+        lastContentHeight = height;
+        emit("resize", {height});
+      }
+    });
+  }
+  new ResizeObserver(scheduleResize).observe(document.body);
 
   function setSwatch(element, selection) {
     element.style.setProperty("--swatch-color", model.selectionBackground(selection));
@@ -125,6 +142,7 @@
       if (initialized) return true;
       if (!init(payload)) return false;
       emit("initialized");
+      scheduleResize();
       return true;
     }
     if (payload.command === "favorites" && initialized && validFavorites(payload.favorites)) {

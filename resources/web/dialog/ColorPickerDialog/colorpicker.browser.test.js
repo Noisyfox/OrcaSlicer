@@ -133,3 +133,46 @@ test("Live app theme overrides the opposite system scheme without changing color
     assert.deepEqual(await page.evaluate(() => ({selection: ColorPickerDialog.exportSelection(), spectrum: document.getElementById("spectrum").toDataURL()})), initial);
   }
 });
+
+test("Floating panel fits capabilities and wrapped translations without a resize feedback loop", options, async t => {
+  const strings = {Color: "A long translated color label", Gradient: "A long translated gradient label", Cancel: "A longer translated cancel action", OK: "A longer translated confirmation action",
+    "The current multi-color selection is kept until you choose a different color.": "A translated explanation that wraps across the compact floating panel and keeps the original multi-color selection until another color is chosen."};
+  for (const gradient of [false, true]) for (const alpha of [false, true]) {
+    const {page, ready, send} = await open(t, strings);
+    await page.setViewportSize({width: 550, height: 520});
+    await send({...init(ready, gradient, alpha), preserve_multi_color: true});
+    await page.waitForFunction(() => messages.some(message => message.command === "resize"));
+    const height = await page.evaluate(() => messages.filter(message => message.command === "resize").at(-1).height);
+    assert(height >= 300 && height <= 900);
+    assert.equal(height, await page.locator("body").evaluate(element => Math.ceil(element.getBoundingClientRect().height)));
+    assert(await page.evaluate(() => messages.findIndex(message => message.command === "initialized") < messages.findIndex(message => message.command === "resize")));
+    await page.setViewportSize({width: 550, height});
+    await page.waitForTimeout(100);
+    const resizes = await count(page, "resize");
+    await page.setViewportSize({width: 550, height: height + 100});
+    await page.waitForTimeout(100);
+    assert.equal(await count(page, "resize"), resizes, "extra viewport height never changes intrinsic content height");
+    const controls = await page.evaluate(() => {
+      const body = document.body.getBoundingClientRect();
+      return ["confirmBtn", "cancelBtn", ...(document.getElementById("alphaControls").classList.contains("hidden") ? [] : ["aValue"])].map(id => {
+        const rect = document.getElementById(id).getBoundingClientRect();
+        return rect.left >= body.left && rect.right <= body.right && rect.bottom <= body.bottom;
+      });
+    });
+    assert(controls.every(Boolean), "wrapped buttons and opacity fit inside the panel");
+    const edited = await page.evaluate(() => ColorPickerDialog.exportSelection());
+    await page.evaluate(() => {
+      document.getElementById("selectionNotice").textContent += " Additional wrapped text. ".repeat(15);
+    });
+    await page.waitForFunction(previous => messages.filter(message => message.command === "resize").length > previous, resizes);
+    assert.deepEqual(await page.evaluate(() => ColorPickerDialog.exportSelection()), edited, "content resize leaves the selection untouched");
+    await page.setViewportSize({width: 550, height: 300}); // Native work-area cap keeps long content scrollable.
+    assert(await page.evaluate(() => {
+      const favorites = document.getElementById("userColors").getBoundingClientRect();
+      const preview = document.getElementById("colorPreview").getBoundingClientRect();
+      return favorites.right <= preview.left;
+    }), "scrollbars do not overlap favorites and preview");
+    await page.locator("#confirmBtn").scrollIntoViewIfNeeded();
+    assert.equal(await page.locator("#confirmBtn").isVisible(), true);
+  }
+});

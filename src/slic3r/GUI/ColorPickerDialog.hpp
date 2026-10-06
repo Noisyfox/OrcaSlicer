@@ -8,6 +8,7 @@
 #include <optional>
 #include <string>
 #include <vector>
+#include <wx/gdicmn.h>
 
 class wxWindow;
 
@@ -29,6 +30,7 @@ private:
     void handle_web_command(const nlohmann::json& payload);
     void send_initial_state();
     void finish(int return_code);
+    void update_window_shape();
 
     ColorSelection m_initial;
     ColorPickerOptions m_options;
@@ -41,6 +43,7 @@ private:
     bool m_initialized = false;
     bool m_closing = false;
     bool m_favorites_writable = false;
+    wxSize m_shape_size;
     std::shared_ptr<std::atomic<bool>> m_alive = std::make_shared<std::atomic<bool>>(true);
 };
 

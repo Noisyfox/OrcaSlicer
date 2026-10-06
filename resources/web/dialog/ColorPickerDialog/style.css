@@ -4,12 +4,18 @@
 #pickerEditors:disabled #spectrum { pointer-events: none; }
 
 * { box-sizing: border-box; }
+html { overflow-y: auto; }
 
 body {
   margin: 0;
   font-family: var(--orca-font, system-ui, sans-serif);
   background: var(--bg-color);
   color: var(--fg-color-text);
+  padding: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  overflow: auto;
+  scrollbar-gutter: stable;
 }
 
 .main-wrapper {
@@ -18,9 +24,7 @@ body {
   flex-direction: row;
   gap: 10px;
   background: var(--bg-color);
-  padding: 15px;
-  max-width: 545px;
-  max-height: 580px;
+  padding: 0;
 }
 
 .left-panel {
@@ -95,6 +99,7 @@ body {
 
 .right-panel {
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
 }
@@ -110,9 +115,11 @@ body {
 }
 .tabs-container label {
   display: flex;
-  padding: 0 40px;
+  flex: 1; min-width: 0; justify-content: center;
+  padding: 2px 8px;
   font-size: 1.1em;
-  height: 1.6em;
+  min-height: 1.6em;
+  overflow-wrap: anywhere;
   text-align: center;
   background: var(--bg-color);
   color: var(--fg-color-text);
@@ -298,19 +305,21 @@ input[type="range"]::-webkit-slider-thumb {
 
 .bottom-container{
   display: flex;
+  gap: 6px;
   padding-top: 8px;
   border-top: 1px solid var(--border-color);
 }
         
 .saved-grid {
   display: grid;
-  grid-template-columns: repeat(8, 1fr);
+  flex: 1; min-width: 0;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
   gap: 3px;
 }
 
 .saved-swatch {
   position: relative;
-  width: 30px;
+  width: 100%;
   height: 30px;
   border-radius: 6px;
   border: 1px solid var(--border-color);
@@ -322,7 +331,7 @@ input[type="range"]::-webkit-slider-thumb {
 }
 
 .preview-container {
-  margin-left: auto;
+  flex: 0 0 75px;
 }
 
 #saveColorBtn {
@@ -360,11 +369,12 @@ input[type="range"]::-webkit-slider-thumb {
 .percent-label { color: var(--fg-color-text); }
 .dialog-actions {
   display: flex; justify-content: flex-end; gap: 8px;
-  max-width: 545px; margin: auto; padding: 0 15px 12px; background: var(--bg-color);
+  margin: auto; padding: 12px 0 0; background: var(--bg-color);
 }
 .dialog-actions button {
   color: var(--button-fg-text); background: var(--button-bg-normal);
   border: 1px solid var(--border-color); border-radius: 4px; padding: 6px 20px; cursor: pointer;
+  max-width: 50%; overflow-wrap: anywhere;
 }
 #spectrum { touch-action: none; }
 #alphaControls .slider-label { width: 10px; }

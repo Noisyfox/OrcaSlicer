@@ -2,6 +2,12 @@
 
 The color picker is a local HTML dialog hosted by `ColorPickerDialog`, a
 `WebViewHostDialog` subclass. Its colors use the existing `ColorRGBA` utility.
+It appears as a rounded, borderless floating panel. The initialized page reports
+its intrinsic content height; native code validates the current page identifier
+and bounded numeric height, converts CSS pixels to device-independent window
+size, and fits within the display's work area. Identical sizes are ignored. The
+page observes content rather than viewport height, so resizing does not create
+a feedback loop; oversized content remains scrollable.
 A solid selection contains one color; a gradient contains exactly two ordered
 endpoints. The bridge represents these as `{"type":"solid|gradient",
 "colors":["#RRGGBBAA", ...]}`. RGB input is also accepted and becomes opaque.
