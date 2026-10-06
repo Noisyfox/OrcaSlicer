@@ -2625,8 +2625,8 @@ void PluginConfigField::msw_rescale()
 void ColourPicker::BUILD()
 {
     wxSize size(def_width_wider() * m_em_unit, -1);
-    if (m_opt.height >= 0) size.SetHeight(m_opt.height * m_em_unit);
-    if (m_opt.width >= 0) size.SetWidth(m_opt.width * m_em_unit);
+    if (m_opt.height >= 0) size.SetHeight(m_opt.height*m_em_unit);
+    if (m_opt.width >= 0) size.SetWidth(m_opt.width*m_em_unit);
 
     const wxString clr_str(m_opt.type == coString ? m_opt.get_default_value<ConfigOptionString>()->value :
                                                    m_opt.get_default_value<ConfigOptionStrings>()->get_at(m_opt_idx));

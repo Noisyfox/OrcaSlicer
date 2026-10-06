@@ -611,19 +611,19 @@ private:
 
 class ColourPicker : public Field {
 public:
-    ColourPicker(const ConfigOptionDef& opt, const t_config_option_key& id) : Field(opt, id) {}
-    ColourPicker(wxWindow* parent, const ConfigOptionDef& opt, const t_config_option_key& id) : Field(parent, opt, id) {}
+	ColourPicker(const ConfigOptionDef& opt, const t_config_option_key& id) : Field(opt, id) {}
+	ColourPicker(wxWindow* parent, const ConfigOptionDef& opt, const t_config_option_key& id) : Field(parent, opt, id) {}
 
-    wxWindow* window{nullptr};
-    void BUILD() override;
-    void set_value(const std::string& value, bool change_event = false);
-    void set_value(const boost::any& value, bool change_event = false) override;
-    boost::any& get_value() override;
-    void msw_rescale() override;
-    void sys_color_changed() override;
-    void enable() override { if (window) window->Enable(); }
-    void disable() override { if (window) window->Disable(); }
-    wxWindow* getWindow() override { return window; }
+	wxWindow*		window{ nullptr };
+	void			BUILD()  override;
+	void			set_value(const std::string& value, bool change_event = false);
+	void			set_value(const boost::any& value, bool change_event = false) override;
+	boost::any&		get_value() override;
+    void            msw_rescale() override;
+    void            sys_color_changed() override;
+    void			enable() override { if (window) window->Enable(); }
+    void			disable() override{ if (window) window->Disable(); }
+	wxWindow*		getWindow() override { return window; }
 
 protected:
     // An absent result is cancellation; transparent color is the undefined field.

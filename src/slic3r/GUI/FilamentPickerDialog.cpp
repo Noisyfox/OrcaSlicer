@@ -524,7 +524,6 @@ void FilamentPickerDialog::UpdatePreview(const FilamentColorCode& color_code)
 
 void FilamentPickerDialog::UpdateCustomColorPreview(const std::vector<wxColour>& wx_colors, bool gradient)
 {
-
     // Update preview bitmap
     wxBitmap bmp = create_filament_bitmap(wx_colors, COLOR_DEMO_SIZE, gradient);
 
