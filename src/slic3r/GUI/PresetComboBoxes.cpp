@@ -34,7 +34,6 @@
 #include <wx/image.h>
 #include <wx/anybutton.h>
 #include <wx/app.h>
-#include <wx/colourdata.h>
 #include <wx/sizer.h>
 #include <wx/stattext.h>
 #include <wx/string.h>
@@ -1597,24 +1596,9 @@ void PlaterPresetComboBox::show_default_color_picker()
     const auto value = filament_color_picker_value(wxGetApp().preset_bundle->project_config, m_filament_idx);
     const auto initial = filament_color_picker_initial(value);
     ColorPickerDialog dialog(this, initial, {true, true}, !filament_color_picker_selection(value), clr_picker);
-    if (dialog.is_available()) {
-        if (dialog.ShowModal() == wxID_OK && filament_color_picker_changed(initial, dialog.selection())) {
-            const auto selected = filament_color_picker_result(*dialog.selection());
-            sync_colour_config(selected.colors, selected.gradient);
-        }
-        return;
-    }
-
-    // Backend unavailability is the only reason to open the native fallback.
-    const auto primary = filament_color_picker_result(initial).colors.front();
-    m_clrData.SetColour(wxColour(wxString::FromUTF8(primary)));
-    m_clrData.SetChooseAlpha(true);
-    wxColourData data = show_sys_picker_dialog(this, m_clrData);
-    if (m_clrData.GetColour() != data.GetColour()) {
-        m_clrData.SetColour(data.GetColour());
-        const auto& color = data.GetColour();
-        const auto selected = filament_color_picker_result(ColorRGBA(color.Red(), color.Green(), color.Blue(), color.Alpha()));
-        sync_colour_config(selected.colors, false);
+    if (dialog.ShowModal() == wxID_OK && filament_color_picker_changed(initial, dialog.selection())) {
+        const auto selected = filament_color_picker_result(*dialog.selection());
+        sync_colour_config(selected.colors, selected.gradient);
     }
 }
 

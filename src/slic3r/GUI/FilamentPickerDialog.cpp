@@ -569,16 +569,6 @@ void FilamentPickerDialog::CreateMoreInfoButton()
     m_more_btn->SetStyle(ButtonStyle::Regular, ButtonType::Expanded);
 }
 
-wxColourData FilamentPickerDialog::GetSingleColorData()
-{
-    wxColourData data;
-    data.SetChooseFull(true);
-    if (m_cur_filament_color.ColorCount() > 0) {
-        data.SetColour(*m_cur_filament_color.m_colors.begin());
-    }
-    return data;
-}
-
 void FilamentPickerDialog::BindEvents()
 {
     // Bind mouse events for window dragging
@@ -612,19 +602,8 @@ void FilamentPickerDialog::BindEvents()
             std::optional<ColorSelection> selected;
             {
                 ColorPickerDialog dialog(this, initial, {true, true}, !filament_color_picker_selection(current), m_more_btn);
-                if (dialog.is_available()) {
-                    if (dialog.ShowModal() == wxID_OK)
-                        selected = dialog.selection();
-                } else {
-                    wxColourData original = GetSingleColorData();
-                    original.SetChooseAlpha(true);
-                    original.SetColour(wxColour(wxString::FromUTF8(filament_color_picker_result(initial).colors.front())));
-                    const wxColourData result = show_sys_picker_dialog(this, original);
-                    if (result.GetColour() != original.GetColour()) {
-                        const auto& color = result.GetColour();
-                        selected = ColorRGBA(color.Red(), color.Green(), color.Blue(), color.Alpha());
-                    }
-                }
+                if (dialog.ShowModal() == wxID_OK)
+                    selected = dialog.selection();
             }
             StartClickDetection();
             if (!filament_color_picker_changed(initial, selected))

@@ -22,7 +22,7 @@
 #include <boost/any.hpp>
 #include "I18N.hpp"
 
-#include <wx/colourdata.h>
+#include <wx/colour.h>
 #include <wx/spinctrl.h>
 #include <wx/bmpcbox.h>
 #include <optional>

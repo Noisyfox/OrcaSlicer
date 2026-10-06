@@ -33,7 +33,7 @@ in their stored vector order and apply changes through `sync_colour_config`,
 retaining the existing RGB/RGBA profile/project formats and dirty marking.
 Opaque colors use `#RRGGBB`; nonopaque colors use `#RRGGBBAA`, including fully
 transparent alpha `00`. Initial selections, alpha-only edits and cancellation
-retain stored alpha. Both native fallbacks explicitly allow alpha. Ordered
+retain stored alpha. Ordered
 custom results bypass the official palette's `FilamentColor` set. Choosing an
 official swatch retains its existing palette behavior.
 The Linux sidebar's Change extruder color menu uses this same custom editor and
@@ -42,8 +42,8 @@ the filament swatch anchor, including alpha, ordered gradients and configuration
 Striped colors and gradients with more than two endpoints cannot be represented
 by this editor. A notice explains that the current selection is retained; the
 editor starts from the first color, and unchanged confirmation is a no-op.
-Cancellation is also a no-op. The system color picker is used only when the
-WebView backend is unavailable.
+Cancellation is also a no-op. If the WebView backend cannot initialize, a local
+unavailable panel offers Cancel and Escape, without opening a system color picker.
 
 Generic color option fields use an ordinary color button on every platform and
 open the same panel with gradients and alpha disabled. The panel is anchored to
@@ -51,23 +51,21 @@ the field button. Empty or invalid field values remain undefined (the empty
 string), distinct from opaque black. Right-click resets to undefined. Cancel does
 not notify the field; confirmation and reset notify only when its RGB string
 changes. Programmatic assignments remain silent, and reading a field never
-writes legacy favorites. Only the unavailable-WebView native fallback uses the
-legacy custom-color configuration.
+writes legacy favorites.
 
 AMS material settings retain their fixed/AMS swatches and first-level popup. Only
 its custom-color action opens the solid, opaque editor, anchored to that custom
 control. The transient popup releases its grab while the modal is open and returns
 to the same selection on cancellation. Confirmation uses the existing default-color
 and packed RGBA event path. Device permission/status checks remain at the first-level
-entry. Legacy native custom colors are read and written only in the unavailable-
-WebView fallback.
+entry.
 
 Texture import's color-mapping Add Material action opens a solid, opaque editor
 anchored to the mapping row. The existing filament limit is checked before opening.
 The first-level material popup closes as an action; its callback is copied before
 dismissal, so popup destruction does not invalidate the modal's completion path.
 Confirmation invokes the existing virtual-filament callback once; cancellation
-adds no material. Only backend unavailability opens the positioned native fallback.
+adds no material.
 
 Native gettext strings are installed at document start. Static page labels and
 palette names use stable English keys; RAL codes, channel symbols, and numeric

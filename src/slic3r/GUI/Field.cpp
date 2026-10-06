@@ -47,7 +47,6 @@
 #include <wx/anybutton.h>
 #include <wx/colour.h>
 #include <wx/button.h>
-#include <wx/colourdata.h>
 #include <wx/brush.h>
 #include <wx/pen.h>
 #include <optional>
@@ -2748,17 +2747,11 @@ void ColourPicker::on_button_click(wxCommandEvent& /*event*/)
     const wxColour initial = m_colour == wxTransparentColour ? wxColour(0, 0, 0) : m_colour;
     const ColorRGBA color(initial.Red(), initial.Green(), initial.Blue(), static_cast<unsigned char>(255));
     ColorPickerDialog dialog(m_parent, color, {}, false, window);
-    if (dialog.is_available()) {
-        if (dialog.ShowModal() == wxID_OK && dialog.selection()) {
-            const auto& result = std::get<ColorRGBA>(*dialog.selection());
-            apply_user_color(wxColour(static_cast<unsigned char>(std::lround(result.r() * 255.f)),
-                                      static_cast<unsigned char>(std::lround(result.g() * 255.f)),
-                                      static_cast<unsigned char>(std::lround(result.b() * 255.f))));
-        }
-    } else {
-        wxColourData data;
-        data.SetColour(m_colour);
-        apply_user_color(show_sys_picker_dialog(window, data).GetColour());
+    if (dialog.ShowModal() == wxID_OK && dialog.selection()) {
+        const auto& result = std::get<ColorRGBA>(*dialog.selection());
+        apply_user_color(wxColour(static_cast<unsigned char>(std::lround(result.r() * 255.f)),
+                                  static_cast<unsigned char>(std::lround(result.g() * 255.f)),
+                                  static_cast<unsigned char>(std::lround(result.b() * 255.f))));
     }
 }
 

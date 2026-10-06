@@ -37,9 +37,7 @@
 #include <mutex>
 #include <wx/button.h>
 #include <wx/colour.h>
-#include <wx/colordlg.h>
 #include <wx/dc.h>
-#include <wx/colourdata.h>
 #include <wx/dcclient.h>
 #include <wx/dcbuffer.h>
 #include <wx/dialog.h>
@@ -514,30 +512,6 @@ static wxString auto_mix_mode_label(TextureAutoMixMode mode)
                                              _L("One-click RYBW auto-mix");
 }
 
-static wxPoint constrained_dialog_position(wxWindow* anchor, const wxSize& dialog_size)
-{
-    if (!anchor)
-        return wxDefaultPosition;
-
-    wxSize size = dialog_size;
-    if (size.x <= 0 || size.y <= 0)
-        size = wxSize(anchor->FromDIP(450), anchor->FromDIP(350));
-
-    wxPoint pos = anchor->ClientToScreen(wxPoint(0, anchor->GetSize().y));
-    wxRect display_rect;
-    int display_idx = wxDisplay::GetFromPoint(pos);
-    if (display_idx != wxNOT_FOUND)
-        display_rect = wxDisplay(display_idx).GetClientArea();
-    else
-        display_rect = wxDisplay().GetClientArea();
-
-    pos.x = std::clamp(pos.x, display_rect.GetLeft(),
-                       std::max(display_rect.GetLeft(), display_rect.GetRight() - size.x));
-    pos.y = std::clamp(pos.y, display_rect.GetTop(),
-                       std::max(display_rect.GetTop(), display_rect.GetBottom() - size.y));
-    return pos;
-}
-
 // ============================================================
 // FilamentSelectPopup
 // ============================================================
@@ -664,28 +638,11 @@ public:
                 ColorPickerDialog dlg(popup_parent, ColorRGBA(0.f, 0.f, 0.f, 1.f), {}, false, color_anchor);
                 if (popup) popup->Dismiss();
                 // Dismissal can delete the popup. Only copied locals are used below.
-                if (dlg.is_available()) {
-                    if (dlg.ShowModal() == wxID_OK && dlg.selection()) {
-                        const auto& color = std::get<ColorRGBA>(*dlg.selection());
-                        selected = wxColour(static_cast<unsigned char>(std::lround(color.r() * 255.f)),
-                                            static_cast<unsigned char>(std::lround(color.g() * 255.f)),
-                                            static_cast<unsigned char>(std::lround(color.b() * 255.f)));
-                    }
-                } else {
-                    wxColourData cd;
-                    cd.SetChooseFull(true);
-                    cd.SetChooseAlpha(false);
-                    wxColourDialog native_dialog(popup_parent, &cd);
-                    auto move_color_dialog = [&native_dialog, color_anchor]() {
-                        native_dialog.Move(constrained_dialog_position(color_anchor, native_dialog.GetBestSize()));
-                    };
-                    native_dialog.Bind(wxEVT_SHOW, [move_color_dialog](wxShowEvent& e) mutable {
-                        e.Skip();
-                        if (e.IsShown()) move_color_dialog();
-                    });
-                    move_color_dialog();
-                    if (native_dialog.ShowModal() == wxID_OK)
-                        selected = native_dialog.GetColourData().GetColour();
+                if (dlg.ShowModal() == wxID_OK && dlg.selection()) {
+                    const auto& color = std::get<ColorRGBA>(*dlg.selection());
+                    selected = wxColour(static_cast<unsigned char>(std::lround(color.r() * 255.f)),
+                                        static_cast<unsigned char>(std::lround(color.g() * 255.f)),
+                                        static_cast<unsigned char>(std::lround(color.b() * 255.f)));
                 }
             }
             if (selected && on_add_filament) on_add_filament(*selected);

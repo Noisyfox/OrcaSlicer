@@ -82,7 +82,6 @@ public:
                       bool preserve_multi_color = false, wxWindow* anchor = nullptr);
     ~ColorPickerDialog() override;
 
-    bool is_available() const { return m_available; }
     const std::optional<ColorSelection>& selection() const { return m_selection; }
 
 private:
@@ -104,7 +103,6 @@ private:
     std::vector<ColorSelection> m_favorites;
     std::string m_page_id;
     bool m_preserve_multi_color = false;
-    bool m_available = false;
     bool m_init_sent = false;
     bool m_page_ready = false;
     bool m_closing = false;

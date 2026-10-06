@@ -9,7 +9,6 @@
 #include <optional>
 #include "Widgets/Button.hpp"
 #include "EncodedFilament.hpp"
-#include <wx/colourdata.h>
 #include <wx/dialog.h>
 #include <wx/string.h>
 #include <wx/event.h>
@@ -82,7 +81,6 @@ private:
 
     // Data loading
     bool LoadFilamentData(const wxString& fila_id);
-    wxColourData GetSingleColorData();
 
     // Flash effect
     void StartFlashing();

@@ -1,6 +1,8 @@
 #include "ColorPickerDialog.hpp"
 #include "Widgets/WebViewHostDialog.hpp"
 #include <wx/dialog.h>
+#include <wx/button.h>
+#include <wx/stattext.h>
 #include <wx/toplevel.h>
 #include <wx/frame.h>
 #include <wx/nonownedwnd.h>
@@ -28,6 +30,7 @@
 
 #include <nlohmann/json.hpp>
 #include <wx/defs.h>
+#include <wx/chartype.h>
 #include <wx/event.h>
 #include <wx/gdicmn.h>
 #include <wx/sizer.h>
@@ -717,6 +720,13 @@ ColorPickerDialog::ColorPickerDialog(wxWindow* parent, const ColorSelection& ini
                         wxBORDER_NONE | wxFRAME_NO_TASKBAR | wxFRAME_SHAPED),
       m_initial(initial), m_options(options), m_preserve_multi_color(preserve_multi_color)
 {
+    Bind(wxEVT_CLOSE_WINDOW, [this](wxCloseEvent&) { finish(wxID_CANCEL); });
+    Bind(wxEVT_CHAR_HOOK, [this](wxKeyEvent& event) {
+        if (event.GetKeyCode() == WXK_ESCAPE)
+            finish(wxID_CANCEL);
+        else
+            event.Skip();
+    });
     SetBackgroundColour(wxGetApp().get_window_default_clr());
     // Snapshot the trigger instead of following the mouse or retaining a raw pointer.
     wxWindow* trigger = anchor ? anchor : parent;
@@ -727,13 +737,22 @@ ColorPickerDialog::ColorPickerDialog(wxWindow* parent, const ColorSelection& ini
         display_index = 0;
     m_work_area = wxDisplay(static_cast<unsigned int>(display_index)).GetClientArea();
     const auto normalized = normalize_color_selection(initial, options);
-    if (!normalized)
+    if (normalized)
+        m_initial = *normalized;
+    if (!normalized || !create_webview("web/dialog/ColorPickerDialog/index.html", _L("Color Picker"),
+                                      wxSize(550, 520), wxSize(550, 300))) {
+        auto* sizer = new wxBoxSizer(wxVERTICAL);
+        sizer->Add(new wxStaticText(this, wxID_ANY, wxS("wxWebView unavailable")), wxSizerFlags().Border(wxALL, FromDIP(20)));
+        sizer->Add(new wxButton(this, wxID_CANCEL, _L("Cancel")), wxSizerFlags().Right().Border(wxALL, FromDIP(8)));
+        SetSizerAndFit(sizer);
+        Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { finish(wxID_CANCEL); }, wxID_CANCEL);
+        Bind(wxEVT_SHOW, [this](wxShowEvent& event) {
+            if (event.IsShown()) apply_rounded_shape();
+            event.Skip();
+        });
+        Move(color_picker_panel_position(m_anchor_rect, m_work_area, GetSize(), FromDIP(4)));
         return;
-    m_initial = *normalized;
-    m_available = create_webview("web/dialog/ColorPickerDialog/index.html", _L("Color Picker"),
-                                 wxSize(550, 520), wxSize(550, 300));
-    if (!m_available)
-        return;
+    }
     browser()->EnableBrowserAcceleratorKeys(false);
     Bind(wxEVT_ACTIVATE, [this](wxActivateEvent& event) {
         if (event.GetActive() && IsShown() && !m_closing)
@@ -769,14 +788,6 @@ ColorPickerDialog::ColorPickerDialog(wxWindow* parent, const ColorSelection& ini
         event.Skip();
     });
     apply_rounded_shape();
-
-    Bind(wxEVT_CLOSE_WINDOW, [this](wxCloseEvent&) { finish(wxID_CANCEL); });
-    Bind(wxEVT_CHAR_HOOK, [this](wxKeyEvent& event) {
-        if (event.GetKeyCode() == WXK_ESCAPE)
-            finish(wxID_CANCEL);
-        else
-            event.Skip();
-    });
 }
 
 ColorPickerDialog::~ColorPickerDialog() { m_alive->store(false, std::memory_order_release); }
@@ -908,7 +919,7 @@ void ColorPickerDialog::on_script_message(const nlohmann::json& payload)
 
 void ColorPickerDialog::handle_web_command(const nlohmann::json& payload)
 {
-    if (!m_available || !payload.is_object())
+    if (!browser() || !payload.is_object())
         return;
     const auto command = payload.find("command");
     const auto page_id = payload.find("page_id");

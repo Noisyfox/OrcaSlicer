@@ -41,11 +41,9 @@
 #include <cmath>
 #include "slic3r/GUI/Widgets/PopupWindow.hpp"
 #include "slic3r/GUI/Widgets/StaticBox.hpp"
-#include <wx/colordlg.h>
 #include <wx/dcclient.h>
 #include <wx/dc.h>
 #include <wx/colour.h>
-#include <wx/colourdata.h>
 #include <wx/dcgraph.h>
 #include <wx/event.h>
 #include <wx/gdicmn.h>
@@ -1865,31 +1863,11 @@ void ColorPickerPopup::on_custom_clr_picker(wxMouseEvent& /*event*/)
         // Snapshot the custom control's anchor before releasing the transient popup grab.
         ColorPickerDialog dialog(GetParent(), initial, {}, false, m_custom_cp);
         Dismiss();
-        if (dialog.is_available()) {
-            if (dialog.ShowModal() == wxID_OK && dialog.selection()) {
-                const auto& result = std::get<ColorRGBA>(*dialog.selection());
-                picker_color = wxColour(static_cast<unsigned char>(std::lround(result.r() * 255.f)),
-                                        static_cast<unsigned char>(std::lround(result.g() * 255.f)),
-                                        static_cast<unsigned char>(std::lround(result.b() * 255.f)));
-            }
-        } else {
-            wxColourData data;
-            data.SetChooseFull(true);
-            data.SetChooseAlpha(false);
-            data.SetColour(m_def_col);
-            auto colors = wxGetApp().app_config->get_custom_color_from_config();
-            for (std::size_t i = 0; i < colors.size() && i < CUSTOM_COLOR_COUNT; ++i)
-                data.SetCustomColour(static_cast<int>(i), string_to_wxColor(colors[i]));
-            wxColourDialog native_dialog(GetParent(), &data);
-            if (native_dialog.ShowModal() == wxID_OK) {
-                const auto& selected = native_dialog.GetColourData();
-                colors.resize(CUSTOM_COLOR_COUNT);
-                for (int i = 0; i < CUSTOM_COLOR_COUNT; ++i)
-                    colors[i] = color_to_string(selected.GetCustomColour(i));
-                wxGetApp().app_config->save_custom_color_to_config(colors);
-                const auto& color = selected.GetColour();
-                picker_color = wxColour(color.Red(), color.Green(), color.Blue());
-            }
+        if (dialog.ShowModal() == wxID_OK && dialog.selection()) {
+            const auto& result = std::get<ColorRGBA>(*dialog.selection());
+            picker_color = wxColour(static_cast<unsigned char>(std::lround(result.r() * 255.f)),
+                                    static_cast<unsigned char>(std::lround(result.g() * 255.f)),
+                                    static_cast<unsigned char>(std::lround(result.b() * 255.f)));
         }
     } // Destroy the modal before restoring the first-level popup and its focus/grab.
     if (!picker_color) {
