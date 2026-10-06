@@ -50,6 +50,13 @@ and packed RGBA event path. Device permission/status checks remain at the first-
 entry. Legacy native custom colors are read and written only in the unavailable-
 WebView fallback.
 
+Texture import's color-mapping Add Material action opens a solid, opaque editor
+anchored to the mapping row. The existing filament limit is checked before opening.
+The first-level material popup closes as an action; its callback is copied before
+dismissal, so popup destruction does not invalidate the modal's completion path.
+Confirmation invokes the existing virtual-filament callback once; cancellation
+adds no material. Only backend unavailability opens the positioned native fallback.
+
 Native gettext strings are installed at document start. Static page labels and
 palette names use stable English keys; RAL codes, channel symbols, and numeric
 labels remain data. The palette color values do not depend on the UI language.

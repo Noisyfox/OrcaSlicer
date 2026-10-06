@@ -10,6 +10,11 @@
 #include "GUI_App.hpp"
 #include "MsgDialog.hpp"
 #include "ColorDecomposeDialog.hpp"
+#include "ColorPickerDialog.hpp"
+#include "libslic3r/Color.hpp"
+#include <optional>
+#include <variant>
+#include <wx/weakref.h>
 #include "ColorDecomposeSupport.hpp"
 #include "Widgets/StateColor.hpp"
 #include "Widgets/StaticLine.hpp"
@@ -651,24 +656,39 @@ public:
             auto on_add_filament = m_on_add_filament;
             wxWindow* popup_parent = GetParent();
             wxWindow* color_anchor = m_dialog_anchor ? m_dialog_anchor : popup_parent;
+            wxWeakRef<FilamentSelectPopup> popup(this);
             m_closing_from_action = true;
-            Dismiss();
-            wxColourData cd;
-            cd.SetChooseFull(true);
-            wxColourDialog dlg(popup_parent, &cd);
-            auto move_color_dialog = [&dlg, color_anchor]() {
-                dlg.Move(constrained_dialog_position(color_anchor, dlg.GetBestSize()));
-            };
-            dlg.Bind(wxEVT_SHOW, [move_color_dialog](wxShowEvent& e) mutable {
-                e.Skip();
-                if (e.IsShown())
+            std::optional<wxColour> selected;
+            {
+                // Capture the stable mapping row before the transient popup is dismissed.
+                ColorPickerDialog dlg(popup_parent, ColorRGBA(0.f, 0.f, 0.f, 1.f), {}, false, color_anchor);
+                if (popup) popup->Dismiss();
+                // Dismissal can delete the popup. Only copied locals are used below.
+                if (dlg.is_available()) {
+                    if (dlg.ShowModal() == wxID_OK && dlg.selection()) {
+                        const auto& color = std::get<ColorRGBA>(*dlg.selection());
+                        selected = wxColour(static_cast<unsigned char>(std::lround(color.r() * 255.f)),
+                                            static_cast<unsigned char>(std::lround(color.g() * 255.f)),
+                                            static_cast<unsigned char>(std::lround(color.b() * 255.f)));
+                    }
+                } else {
+                    wxColourData cd;
+                    cd.SetChooseFull(true);
+                    cd.SetChooseAlpha(false);
+                    wxColourDialog native_dialog(popup_parent, &cd);
+                    auto move_color_dialog = [&native_dialog, color_anchor]() {
+                        native_dialog.Move(constrained_dialog_position(color_anchor, native_dialog.GetBestSize()));
+                    };
+                    native_dialog.Bind(wxEVT_SHOW, [move_color_dialog](wxShowEvent& e) mutable {
+                        e.Skip();
+                        if (e.IsShown()) move_color_dialog();
+                    });
                     move_color_dialog();
-            });
-            move_color_dialog();
-            if (dlg.ShowModal() == wxID_OK) {
-                wxColour clr = dlg.GetColourData().GetColour();
-                if (on_add_filament) on_add_filament(clr);
+                    if (native_dialog.ShowModal() == wxID_OK)
+                        selected = native_dialog.GetColourData().GetColour();
+                }
             }
+            if (selected && on_add_filament) on_add_filament(*selected);
         });
 
         m_content->SetSizer(outer);
