@@ -36,6 +36,9 @@ private:
     void finish(int return_code);
     void apply_rounded_shape();
     void position_panel();
+    void resize_to_content(int height);
+    void focus_webview();
+    void repaint_webview();
     void on_dpi_changed(const wxRect& suggested_rect) override;
 
     ColorSelection m_initial;
@@ -46,7 +49,7 @@ private:
     bool m_preserve_multi_color = false;
     bool m_available = false;
     bool m_init_sent = false;
-    bool m_initialized = false;
+    bool m_page_ready = false;
     bool m_closing = false;
     bool m_favorites_writable = false;
     int m_corner_radius{8};

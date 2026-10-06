@@ -20,6 +20,7 @@
 
 #include "GUI_App.hpp"
 #include "GUI_Utils.hpp"
+#include "slic3r/Utils/MacDarkMode.hpp"
 #include "I18N.hpp"
 #include "libslic3r/AppConfig.hpp"
 
@@ -35,6 +36,10 @@
 #include <wx/sizer.h>
 #include <wx/string.h>
 #include <wx/window.h>
+
+#ifdef __linux__
+#include <gtk/gtk.h>
+#endif
 
 namespace Slic3r::GUI {
 
@@ -53,6 +58,7 @@ ColorPickerDialog::ColorPickerDialog(wxWindow* parent, const ColorSelection& ini
                         wxBORDER_NONE | wxFRAME_NO_TASKBAR | wxFRAME_SHAPED),
       m_initial(initial), m_options(options), m_preserve_multi_color(preserve_multi_color)
 {
+    SetBackgroundColour(wxGetApp().get_window_default_clr());
     // Snapshot the trigger instead of following the mouse or retaining a raw pointer.
     wxWindow* trigger = anchor ? anchor : parent;
     if (trigger)
@@ -69,6 +75,12 @@ ColorPickerDialog::ColorPickerDialog(wxWindow* parent, const ColorSelection& ini
                                  wxSize(550, 520), wxSize(550, 300));
     if (!m_available)
         return;
+    browser()->EnableBrowserAcceleratorKeys(false);
+    Bind(wxEVT_ACTIVATE, [this](wxActivateEvent& event) {
+        if (event.GetActive() && IsShown() && !m_closing)
+            focus_webview();
+        event.Skip();
+    });
     if (wxGetApp().app_config) {
         const auto stored = load_color_picker_favorites(*wxGetApp().app_config);
         m_favorites = stored.favorites;
@@ -79,18 +91,20 @@ ColorPickerDialog::ColorPickerDialog(wxWindow* parent, const ColorSelection& ini
     Move(m_work_area.GetPosition());
     // SetSizeHints may fit the window to the WebView's small initial best size.
     // Restore the intended dialog size only after applying the layout hints.
-    position_panel();
+    resize_to_content(m_content_height);
     Bind(wxEVT_SIZE, [this](wxSizeEvent& event) {
         event.Skip();
         apply_rounded_shape();
     });
     Bind(wxEVT_SHOW, [this](wxShowEvent& event) {
         if (event.IsShown()) {
-            position_panel();
+            resize_to_content(m_content_height);
             // GTK can require a realized window before applying its shape.
             wxGetApp().CallAfter([this, alive = m_alive] {
-                if (alive->load(std::memory_order_acquire) && !m_closing)
-                    apply_rounded_shape();
+                if (alive->load(std::memory_order_acquire) && !m_closing) {
+                    resize_to_content(m_content_height);
+                    focus_webview();
+                }
             });
         }
         event.Skip();
@@ -125,10 +139,56 @@ void ColorPickerDialog::position_panel()
     m_positioning = false;
 }
 
+void ColorPickerDialog::resize_to_content(int height)
+{
+    m_content_height = height;
+    position_panel();
+    Layout();
+#ifdef __WXOSX__
+    // Like SpeedDial, explicitly match WKWebView's viewport even at unchanged size.
+    if (wxWebView* view = browser())
+        view->SetSize(GetClientSize());
+#endif
+    apply_rounded_shape();
+    repaint_webview();
+}
+
+void ColorPickerDialog::focus_webview()
+{
+    wxWebView* view = browser();
+    if (!view)
+        return;
+#ifdef __linux__
+    if (void* backend = view->GetNativeBackend())
+        gtk_widget_grab_focus(static_cast<GtkWidget*>(backend));
+#else
+    view->SetFocus();
+#endif
+    if (m_page_ready)
+        run_script("window.ColorPickerDialog.focusInput();");
+}
+
+void ColorPickerDialog::repaint_webview()
+{
+    wxWebView* view = browser();
+    if (!view)
+        return;
+    view->Refresh();
+#ifdef __WXOSX__
+    if (void* backend = view->GetNativeBackend())
+        WKWebView_force_display(backend);
+    view->Update();
+#elif defined(__linux__)
+    if (void* backend = view->GetNativeBackend())
+        gtk_widget_queue_draw(static_cast<GtkWidget*>(backend));
+#else
+    view->Update();
+#endif
+}
+
 void ColorPickerDialog::on_dpi_changed(const wxRect&)
 {
-    position_panel();
-    apply_rounded_shape();
+    resize_to_content(m_content_height);
     Refresh();
 }
 
@@ -203,7 +263,7 @@ void ColorPickerDialog::handle_web_command(const nlohmann::json& payload)
         // document (e.g. WebView recreation) gets a fresh initialization handshake.
         if (id != m_page_id) {
             m_page_id = id;
-            m_initialized = false;
+            m_page_ready = false;
             m_init_sent = false;
         }
         if (!m_init_sent)
@@ -217,11 +277,14 @@ void ColorPickerDialog::handle_web_command(const nlohmann::json& payload)
         return;
     }
     if (*command == "initialized") {
-        if (m_init_sent)
-            m_initialized = true;
+        if (m_init_sent && !m_page_ready) {
+            m_page_ready = true;
+            focus_webview();
+            repaint_webview();
+        }
         return;
     }
-    if (!m_initialized)
+    if (!m_page_ready)
         return;
     if (*command == "resize") {
         const auto height = payload.find("height");
@@ -230,8 +293,7 @@ void ColorPickerDialog::handle_web_command(const nlohmann::json& payload)
         const double value = height->get<double>();
         if (!std::isfinite(value) || value < 300 || value > 900)
             return;
-        m_content_height = static_cast<int>(std::ceil(value));
-        position_panel();
+        resize_to_content(static_cast<int>(std::ceil(value)));
         return;
     }
     if (*command == "confirm") {

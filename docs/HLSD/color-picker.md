@@ -5,6 +5,10 @@ The color picker is a local HTML dialog hosted by `ColorPickerDialog`, a
 It appears as a rounded, borderless floating panel. macOS rounds the native view
 layer instead of calling `SetShape`, which synchronously resizes its window;
 other platforms use a validated shape region with a reentry guard.
+Like SpeedDial, the host disables browser zoom accelerators, restores native
+WebView focus on activation and readiness, and synchronizes layout and the macOS
+viewport before repainting the backend. Activation never dismisses this modal
+dialog; focus restoration preserves an active editor and its partial input.
 The initialized page reports
 its intrinsic content height; native code validates the current page identifier
 and bounded numeric height, converts CSS pixels to device-independent window

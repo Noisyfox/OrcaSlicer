@@ -136,6 +136,14 @@
     return true;
   }
 
+  function focusInput() {
+    if (!initialized) return;
+    // Restore initial keyboard focus without replacing an editor's in-progress input.
+    const active = document.activeElement;
+    if (!active || active === document.body || active === document.documentElement)
+      hexInput.focus({preventScroll: true});
+  }
+
   function handleMessage(payload) {
     if (!payload || typeof payload !== "object" || payload.page_id !== pageId) return false;
     if (payload.command === "init") {
@@ -269,7 +277,7 @@
   });
 
   window.ColorPickerDialog = {
-    init, handleMessage, exportSelection: () => model.exportSelection(state),
+    init, handleMessage, focusInput, exportSelection: () => model.exportSelection(state),
     setFavorites: (values) => { favorites = model.normalizeFavorites(values); drawFavorites(); }
   };
   drawSpectrum(); populatePalette(); drawFavorites(); render(true); emit("ready");

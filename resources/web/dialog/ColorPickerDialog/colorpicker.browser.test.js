@@ -229,3 +229,21 @@ test("Floating panel fits capabilities and wrapped translations without a resize
     assert.equal(await page.locator("#confirmBtn").isVisible(), true);
   }
 });
+
+test("Native focus hook waits for initialization and preserves active partial edits", options, async t => {
+  const {page, ready, send} = await open(t);
+  await page.evaluate(() => ColorPickerDialog.focusInput());
+  assert.notEqual(await page.evaluate(() => document.activeElement.id), "hexInput");
+  await send(init(ready, true, true));
+  await page.evaluate(() => ColorPickerDialog.focusInput());
+  assert.equal(await page.evaluate(() => document.activeElement.id), "hexInput");
+  await page.locator("#rValue").fill("");
+  const selection = await page.evaluate(() => ColorPickerDialog.exportSelection());
+  await page.evaluate(() => ColorPickerDialog.focusInput());
+  assert.equal(await page.evaluate(() => document.activeElement.id), "rValue");
+  assert.equal(await page.locator("#rValue").inputValue(), "");
+  assert.deepEqual(await page.evaluate(() => ColorPickerDialog.exportSelection()), selection);
+  assert.equal(await count(page, "confirm"), 0);
+  await page.locator("#rValue").press("Escape");
+  assert.equal(await count(page, "cancel"), 1);
+});
