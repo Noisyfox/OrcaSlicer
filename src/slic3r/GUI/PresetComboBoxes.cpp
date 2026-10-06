@@ -23,6 +23,8 @@
 #include "slic3r/GUI/CalibrationWizardPage.hpp"
 #include <vector>
 #include <string>
+#include <sstream>
+#include <optional>
 #include <set>
 #include <utility>
 #include <algorithm>
@@ -84,6 +86,24 @@ using Slic3r::GUI::format_wxstr;
 
 namespace Slic3r {
 namespace GUI {
+
+static FilamentColorPickerValue filament_color_picker_value(const DynamicPrintConfig& config, std::size_t index)
+{
+    FilamentColorPickerValue value;
+    if (const auto* primary = config.opt<ConfigOptionStrings>("filament_colour"); primary && index < primary->values.size())
+        value.primary = primary->values[index];
+    if (const auto* multi = config.opt<ConfigOptionStrings>("filament_multi_colour"); multi && index < multi->values.size()) {
+        std::istringstream stream(multi->values[index]);
+        for (std::string color; stream >> color;)
+            value.colors.push_back(std::move(color));
+    }
+    if (value.colors.empty() && !value.primary.empty())
+        value.colors.push_back(value.primary);
+    if (const auto* types = config.opt<ConfigOptionStrings>("filament_colour_type"); types && index < types->values.size())
+        value.gradient = value.colors.size() > 1 && types->values[index] == "0";
+    return value;
+}
+
 
 #define BORDER_W 10
 

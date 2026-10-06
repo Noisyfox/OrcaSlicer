@@ -52,13 +52,17 @@
 #include <array>
 #include <charconv>
 #include <system_error>
-#include "libslic3r/Config.hpp"
-#include "libslic3r/PrintConfig.hpp"
-#include <sstream>
 
 namespace Slic3r::GUI {
 
 namespace {
+
+using ColorGradient = std::array<ColorRGBA, 2>;
+
+struct ColorPickerFavoritesState {
+    std::vector<ColorSelection> favorites;
+    bool writable = true;
+};
 
 bool normalize_color(ColorRGBA& color, bool allow_alpha)
 {
@@ -97,8 +101,6 @@ std::string rgba_hex(const ColorRGBA& color)
     }
     return hex;
 }
-
-} // namespace
 
 std::optional<ColorSelection> normalize_color_selection(const ColorSelection& selection, ColorPickerOptions options)
 {
@@ -164,7 +166,6 @@ std::optional<std::vector<ColorSelection>> color_favorites_from_json(const nlohm
     return favorites;
 }
 
-namespace {
 std::optional<ColorSelection> legacy_color(const std::string& value)
 {
     if (!value.empty() && value.front() == '#')
@@ -187,8 +188,6 @@ std::optional<ColorSelection> legacy_color(const std::string& value)
     return ColorRGBA(static_cast<unsigned char>(bytes[0]), static_cast<unsigned char>(bytes[1]),
                      static_cast<unsigned char>(bytes[2]), static_cast<unsigned char>(bytes[3]));
 }
-} // namespace
-
 bool save_color_picker_favorites(AppConfig& config, const nlohmann::json& values)
 {
     if (config.has_section("color_picker") && config.get("color_picker", "version") != "1")
@@ -238,22 +237,7 @@ ColorPickerFavoritesState load_color_picker_favorites(AppConfig& config)
     return {*color_favorites_from_json(imported), true};
 }
 
-FilamentColorPickerValue filament_color_picker_value(const DynamicPrintConfig& config, std::size_t index)
-{
-    FilamentColorPickerValue value;
-    if (const auto* primary = config.opt<ConfigOptionStrings>("filament_colour"); primary && index < primary->values.size())
-        value.primary = primary->values[index];
-    if (const auto* multi = config.opt<ConfigOptionStrings>("filament_multi_colour"); multi && index < multi->values.size()) {
-        std::istringstream stream(multi->values[index]);
-        for (std::string color; stream >> color;)
-            value.colors.push_back(std::move(color));
-    }
-    if (value.colors.empty() && !value.primary.empty())
-        value.colors.push_back(value.primary);
-    if (const auto* types = config.opt<ConfigOptionStrings>("filament_colour_type"); types && index < types->values.size())
-        value.gradient = value.colors.size() > 1 && types->values[index] == "0";
-    return value;
-}
+} // namespace
 
 std::optional<ColorSelection> filament_color_picker_selection(const FilamentColorPickerValue& value)
 {
@@ -705,6 +689,9 @@ nlohmann::json color_picker_ui_strings()
 } // namespace
 
 
+namespace {
+
+// All geometry uses native screen coordinates, including negative monitor origins.
 wxPoint color_picker_panel_position(const wxRect& anchor, const wxRect& work_area, const wxSize& size, int gap)
 {
     const int below = anchor.y + anchor.height + gap;
@@ -713,6 +700,8 @@ wxPoint color_picker_panel_position(const wxRect& anchor, const wxRect& work_are
     return {std::clamp(anchor.x, work_area.x, work_area.x + std::max(0, work_area.width - size.x)),
             std::clamp(y, work_area.y, work_area.y + std::max(0, work_area.height - size.y))};
 }
+
+} // namespace
 
 ColorPickerDialog::ColorPickerDialog(wxWindow* parent, const ColorSelection& initial, ColorPickerOptions options,
                                    bool preserve_multi_color, wxWindow* anchor)

@@ -625,11 +625,9 @@ public:
     void			disable() override{ if (window) window->Disable(); }
 	wxWindow*		getWindow() override { return window; }
 
-protected:
+private:
     // An absent result is cancellation; transparent color is the undefined field.
     void apply_user_color(const std::optional<wxColour>& color);
-
-private:
     void draw_bmp_btn();
     void on_button_click(wxCommandEvent& event);
     wxColour m_colour = wxTransparentColour;

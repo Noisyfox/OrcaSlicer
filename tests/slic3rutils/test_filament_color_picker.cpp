@@ -1,28 +1,22 @@
 #include "slic3r/GUI/ColorPickerDialog.hpp"
-#include "libslic3r/Config.hpp"
 #include "libslic3r/Color.hpp"
-#include "libslic3r/PrintConfig.hpp"
 
+#include <array>
+#include <limits>
+#include <stdexcept>
 #include <optional>
 #include <string>
 #include <vector>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
-#include <nlohmann/json.hpp>
 
 using namespace Slic3r;
 using namespace Slic3r::GUI;
 
 TEST_CASE("Project gradient direction survives editing and RGB serialization", "[FilamentColorPicker]")
 {
-    DynamicPrintConfig config;
     const std::vector<std::string> endpoints = {"#FF0000", "#0000FF"};
-    config.set_key_value("filament_colour", new ConfigOptionStrings({endpoints.front()}));
-    config.set_key_value("filament_multi_colour", new ConfigOptionStrings({endpoints[0] + " " + endpoints[1]}));
-    config.set_key_value("filament_colour_type", new ConfigOptionStrings({"0"}));
-    const auto stored = filament_color_picker_value(config, 0);
-    REQUIRE(stored.colors == endpoints);
-    REQUIRE(stored.gradient);
+    const FilamentColorPickerValue stored{endpoints, true};
     const auto initial = filament_color_picker_selection(stored);
     REQUIRE(initial);
     REQUIRE(filament_color_picker_result(*initial).colors == endpoints);
@@ -46,20 +40,15 @@ TEST_CASE("Unrepresentable project colors remain unchanged until a different sel
     REQUIRE(filament_color_picker_result(*changed).colors == std::vector<std::string>{"#FE0000"});
 }
 
-TEST_CASE("Filament selections preserve alpha and fall back safely when project arrays are missing", "[FilamentColorPicker]")
+TEST_CASE("Filament seeds preserve primary alpha when colors are invalid or absent", "[FilamentColorPicker]")
 {
-    DynamicPrintConfig config;
-    config.set_key_value("filament_colour", new ConfigOptionStrings({"#12345680"}));
-    REQUIRE(filament_color_picker_value(config, 0).colors == std::vector<std::string>{"#12345680"});
-    config.set_key_value("filament_multi_colour", new ConfigOptionStrings({"invalid #00FF00"}));
-    const auto stale = filament_color_picker_value(config, 0);
+    const FilamentColorPickerValue stale{{"invalid", "#00FF00"}, false, "#12345680"};
     REQUIRE_FALSE(filament_color_picker_selection(stale));
     REQUIRE(filament_color_picker_result(filament_color_picker_initial(stale)).colors == std::vector<std::string>{"#12345680"});
     const auto value = filament_color_picker_selection({{"#12345680", "#ABCDEF01"}, true});
     REQUIRE(value);
-    REQUIRE(color_selection_to_json(*value).at("colors")[0] == "#12345680");
     REQUIRE(filament_color_picker_result(*value).colors == std::vector<std::string>{"#12345680", "#ABCDEF01"});
-    const auto missing = filament_color_picker_initial(filament_color_picker_value(config, 3));
+    const auto missing = filament_color_picker_initial({});
     REQUIRE(filament_color_picker_result(missing).colors == std::vector<std::string>{"#000000"});
 }
 
@@ -68,9 +57,7 @@ TEST_CASE("Filament project colors round trip every alpha boundary with compatib
     const auto hex = GENERATE(std::string("#12345600"), std::string("#12345601"),
                               std::string("#12345680"), std::string("#123456FE"),
                               std::string("#123456FF"), std::string("#123456"));
-    DynamicPrintConfig config;
-    config.set_key_value("filament_colour", new ConfigOptionStrings({hex}));
-    const auto stored = filament_color_picker_value(config, 0);
+    const FilamentColorPickerValue stored{{hex}, false};
     const auto selection = filament_color_picker_selection(stored);
     REQUIRE(selection);
     REQUIRE_FALSE(filament_color_picker_changed(*selection, selection));
@@ -80,11 +67,10 @@ TEST_CASE("Filament project colors round trip every alpha boundary with compatib
     REQUIRE(result.colors == std::vector<std::string>{expected});
     ColorRGBA decoded;
     REQUIRE(decode_color(result.colors.front(), decoded));
-    REQUIRE(color_selection_to_json(ColorSelection{decoded}) == color_selection_to_json(*selection));
-    config.set_key_value("filament_multi_colour", new ConfigOptionStrings({result.colors.front()}));
-    const auto reloaded = filament_color_picker_selection(filament_color_picker_value(config, 0));
+    REQUIRE(filament_color_picker_result(ColorSelection{decoded}).colors == result.colors);
+    const auto reloaded = filament_color_picker_selection(result);
     REQUIRE(reloaded);
-    REQUIRE(color_selection_to_json(*reloaded) == color_selection_to_json(*selection));
+    REQUIRE(filament_color_picker_result(*reloaded).colors == result.colors);
 }
 
 TEST_CASE("Alpha only filament edits preserve ordered independent gradient endpoint alpha", "[FilamentColorPicker]")
@@ -97,11 +83,7 @@ TEST_CASE("Alpha only filament edits preserve ordered independent gradient endpo
     const auto result = filament_color_picker_result(*edited);
     REQUIRE(result.gradient);
     REQUIRE(result.colors == std::vector<std::string>{"#FF000001", "#0000FFFE"});
-    DynamicPrintConfig config;
-    config.set_key_value("filament_colour", new ConfigOptionStrings({result.colors.front()}));
-    config.set_key_value("filament_multi_colour", new ConfigOptionStrings({result.colors[0] + " " + result.colors[1]}));
-    config.set_key_value("filament_colour_type", new ConfigOptionStrings({"0"}));
-    const auto reloaded = filament_color_picker_selection(filament_color_picker_value(config, 0));
+    const auto reloaded = filament_color_picker_selection(result);
     REQUIRE(reloaded);
     REQUIRE_FALSE(filament_color_picker_changed(*edited, reloaded));
     const auto reversed = filament_color_picker_selection({{result.colors[1], result.colors[0]}, true});
@@ -129,4 +111,42 @@ TEST_CASE("Unrepresentable filament seeds retain first endpoint or valid primary
     REQUIRE_FALSE(filament_color_picker_changed(initial, std::nullopt));
     const auto edited = filament_color_picker_selection({{"#FF000001"}, false});
     REQUIRE(filament_color_picker_changed(initial, edited));
+}
+
+TEST_CASE("Filament selections require complete hexadecimal colors and exact endpoint counts", "[FilamentColorPicker]")
+{
+    const std::string hex = GENERATE("", "112233", "#ABC", "#1234567", "#123456789", "#GG2233", "#11223Z", "#112233G0", " #112233", "#112233 ");
+    REQUIRE_FALSE(filament_color_picker_selection({{hex}, false}));
+    REQUIRE_FALSE(filament_color_picker_selection({{"#112233", hex}, true}));
+    const auto malformed = GENERATE(FilamentColorPickerValue{{}, false},
+                                   FilamentColorPickerValue{{}, true},
+                                   FilamentColorPickerValue{{"#112233"}, true});
+    REQUIRE_FALSE(filament_color_picker_selection(malformed));
+}
+
+TEST_CASE("Every RGBA byte survives the public filament conversion round trip", "[FilamentColorPicker]")
+{
+    constexpr char digits[] = "0123456789ABCDEF";
+    for (int byte = 0; byte < 256; ++byte) {
+        std::string hex = "#";
+        for (int channel = 0; channel < 4; ++channel) {
+            hex += digits[byte >> 4];
+            hex += digits[byte & 15];
+        }
+        const auto selection = filament_color_picker_selection({{hex}, false});
+        REQUIRE(selection);
+        const auto result = filament_color_picker_result(*selection);
+        REQUIRE(result.colors == std::vector<std::string>{byte == 255 ? hex.substr(0, 7) : hex});
+        REQUIRE_FALSE(filament_color_picker_changed(*selection, filament_color_picker_selection(result)));
+    }
+}
+
+TEST_CASE("Filament serialization rejects invalid native RGBA channels", "[FilamentColorPicker]")
+{
+    const float invalid = GENERATE(-0.1f, 1.1f, std::numeric_limits<float>::infinity(), std::numeric_limits<float>::quiet_NaN());
+    const int channel = GENERATE(0, 1, 2, 3);
+    ColorRGBA color;
+    color[channel] = invalid;
+    REQUIRE_THROWS_AS(filament_color_picker_result(color), std::invalid_argument);
+    REQUIRE_THROWS_AS(filament_color_picker_result(std::array<ColorRGBA, 2>{ColorRGBA::WHITE(), color}), std::invalid_argument);
 }

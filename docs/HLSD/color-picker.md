@@ -2,8 +2,9 @@
 
 The color picker is a local HTML dialog hosted by `ColorPickerDialog`, a
 `WebViewHostDialog` subclass. Its header and implementation own the ordered
-selection contract, filament conversion, favorites persistence and private
-gettext string table. Its colors use the existing `ColorRGBA` utility.
+selection contract and shared filament conversion. Bridge validation, favorites
+persistence, placement and gettext strings remain private to the implementation.
+Its colors use the existing `ColorRGBA` utility.
 It appears as a rounded, borderless floating panel. macOS rounds the native view
 layer instead of calling `SetShape`, which synchronously resizes its window;
 other platforms use a validated shape region with a reentry guard.
@@ -28,8 +29,9 @@ endpoints. The bridge represents these as `{"type":"solid|gradient",
 Native validation rejects malformed hex and incorrect cardinality.
 
 The project filament color action and the official filament picker's More Colors
-action enable two-endpoint gradients and independent endpoint alpha. They read project colors
-in their stored vector order and apply changes through `sync_colour_config`,
+action enable two-endpoint gradients and independent endpoint alpha. The preset
+combo box reads project colors in their stored vector order locally and applies
+changes through `sync_colour_config`,
 retaining the existing RGB/RGBA profile/project formats and dirty marking.
 Opaque colors use `#RRGGBB`; nonopaque colors use `#RRGGBBAA`, including fully
 transparent alpha `00`. Initial selections, alpha-only edits and cancellation
