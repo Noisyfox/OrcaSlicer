@@ -31,6 +31,15 @@ editor starts from the first color, and unchanged confirmation is a no-op.
 Cancellation is also a no-op. The system color picker is used only when the
 WebView backend is unavailable.
 
+Generic color option fields use an ordinary color button on every platform and
+open the same panel with gradients and alpha disabled. The panel is anchored to
+the field button. Empty or invalid field values remain undefined (the empty
+string), distinct from opaque black. Right-click resets to undefined. Cancel does
+not notify the field; confirmation and reset notify only when its RGB string
+changes. Programmatic assignments remain silent, and reading a field never
+writes legacy favorites. Only the unavailable-WebView native fallback uses the
+legacy custom-color configuration.
+
 Native gettext strings are installed at document start. Static page labels and
 palette names use stable English keys; RAL codes, channel symbols, and numeric
 labels remain data. The palette color values do not depend on the UI language.

@@ -6,6 +6,7 @@ add_executable(${_TEST_NAME}_tests
     test_creality_cfs_match.cpp
     test_dev_mapping.cpp
     test_filament_bitmap_utils.cpp
+    test_colour_picker_field.cpp
     test_color_picker_data.cpp
     test_color_picker_favorites.cpp
     test_color_picker_position.cpp
