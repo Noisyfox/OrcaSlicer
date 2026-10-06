@@ -19,7 +19,7 @@ async function open(t, strings = {}, language = "") {
   page.on("pageerror", error => errors.push(error.message));
   t.after(async () => { await page.close(); assert.deepEqual(errors, []); });
   await page.addInitScript(({table, language}) => {
-    window.ORCA_COLOR_PICKER_STRINGS = table;
+    window.ORCA_UI_STRINGS = table;
     window.ORCA_COLOR_PICKER_LANGUAGE = language;
     window.messages = [];
     window.wx = {postMessage: text => messages.push(JSON.parse(text))};

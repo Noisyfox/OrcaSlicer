@@ -889,7 +889,7 @@ void ColorPickerDialog::add_user_scripts()
     if (wxWebView* view = browser()) {
         auto language = wxGetApp().current_language_code().ToStdString();
         std::replace(language.begin(), language.end(), '_', '-');
-        const std::string script = "window.ORCA_COLOR_PICKER_STRINGS = " +
+        const std::string script = "window.ORCA_UI_STRINGS = " +
             color_picker_ui_strings().dump(-1, ' ', false, nlohmann::json::error_handler_t::ignore) +
             ";window.ORCA_COLOR_PICKER_LANGUAGE = " + nlohmann::json(language).dump() + ";";
         view->AddUserScript(wxString::FromUTF8(script));

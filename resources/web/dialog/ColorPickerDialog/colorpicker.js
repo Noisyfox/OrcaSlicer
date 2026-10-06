@@ -1,7 +1,7 @@
 "use strict";
 (() => {
   if (window.ORCA_COLOR_PICKER_LANGUAGE) document.documentElement.lang = window.ORCA_COLOR_PICKER_LANGUAGE;
-  const T = (key) => window.ORCA_COLOR_PICKER_STRINGS?.[key] || key;
+  const T = (key) => window.ORCA_UI_STRINGS?.[key] || key;
   document.title = T("Color Picker");
   for (const element of document.querySelectorAll("[data-i18n]")) element.textContent = T(element.dataset.i18n);
   for (const attribute of ["aria-label", "title"])
