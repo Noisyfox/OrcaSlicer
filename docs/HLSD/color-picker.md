@@ -21,7 +21,10 @@ a feedback loop; oversized content remains scrollable.
 The panel snapshots the triggering color or More Colors button's screen rectangle.
 It aligns below the button, flips above when needed, and clamps to that button's
 display work area. Content and DPI changes reuse the same anchor and display;
-later mouse movement does not affect placement. The official filament palette's
+later mouse movement does not affect placement. wxGTK clears the dialog's default
+parent-centering constraint and reapplies its native position after showing,
+bypassing wxGTK's requested-position cache. Absolute top-level placement remains
+subject to the window manager; Wayland compositors control it. The official filament palette's
 existing placement is independent of this custom panel.
 A solid selection contains one color; a gradient contains exactly two ordered
 endpoints. The bridge represents these as `{"type":"solid|gradient",

@@ -717,6 +717,10 @@ ColorPickerDialog::ColorPickerDialog(wxWindow* parent, const ColorSelection& ini
             event.Skip();
     });
     SetBackgroundColour(wxGetApp().get_window_default_clr());
+#ifdef __WXGTK__
+    // wxGTK dialogs default to CENTER_ON_PARENT, which conflicts with the anchor.
+    gtk_window_set_position(GTK_WINDOW(GetHandle()), GTK_WIN_POS_NONE);
+#endif
     // Snapshot the trigger instead of following the mouse or retaining a raw pointer.
     wxWindow* trigger = anchor ? anchor : parent;
     if (trigger)
@@ -736,10 +740,17 @@ ColorPickerDialog::ColorPickerDialog(wxWindow* parent, const ColorSelection& ini
         SetSizerAndFit(sizer);
         Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { finish(wxID_CANCEL); }, wxID_CANCEL);
         Bind(wxEVT_SHOW, [this](wxShowEvent& event) {
-            if (event.IsShown()) apply_rounded_shape();
+            if (event.IsShown()) {
+                move_to_anchor();
+                apply_rounded_shape();
+                wxGetApp().CallAfter([this, alive = m_alive] {
+                    if (alive->load(std::memory_order_acquire) && !m_closing)
+                        move_to_anchor();
+                });
+            }
             event.Skip();
         });
-        Move(color_picker_panel_position(m_anchor_rect, m_work_area, GetSize(), FromDIP(4)));
+        move_to_anchor();
         return;
     }
     browser()->EnableBrowserAcceleratorKeys(false);
@@ -792,10 +803,20 @@ void ColorPickerDialog::position_panel()
     SetMinSize(wxSize(std::min(FromDIP(550), size.x), std::min(FromDIP(300), size.y)));
     if (size != GetClientSize())
         SetClientSize(size);
+    move_to_anchor();
+    m_positioning = false;
+}
+
+void ColorPickerDialog::move_to_anchor()
+{
     const wxPoint position = color_picker_panel_position(m_anchor_rect, m_work_area, GetSize(), FromDIP(4));
     if (position != GetPosition())
         Move(position);
-    m_positioning = false;
+#ifdef __WXGTK__
+    // wxGTK caches requested coordinates: Move can skip a post-show request even
+    // when the window manager ignored the initial one. Reapply at native level.
+    gtk_window_move(GTK_WINDOW(GetHandle()), position.x, position.y);
+#endif
 }
 
 void ColorPickerDialog::resize_to_content(int height)

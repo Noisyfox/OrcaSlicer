@@ -56,6 +56,7 @@ private:
     void finish(int return_code);
     void apply_rounded_shape();
     void position_panel();
+    void move_to_anchor();
     void resize_to_content(int height);
     void focus_webview();
     void repaint_webview();
