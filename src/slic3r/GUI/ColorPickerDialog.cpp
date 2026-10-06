@@ -1,4 +1,8 @@
 #include "ColorPickerDialog.hpp"
+#include "ColorPickerData.hpp"
+#include "Widgets/WebViewHostDialog.hpp"
+#include <wx/dialog.h>
+#include <wx/toplevel.h>
 #include "ColorPickerFavorites.hpp"
 #include "ColorPickerStrings.hpp"
 #include <wx/webview.h>

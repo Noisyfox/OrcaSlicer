@@ -24,6 +24,17 @@ Native gettext strings are installed at document start. Static page labels and
 palette names use stable English keys; RAL codes, channel symbols, and numeric
 labels remain data. The palette color values do not depend on the UI language.
 
+The pure color/state regressions run with
+`node --test resources/web/dialog/ColorPickerDialog/colorpicker.test.js`.
+Optional real-browser regressions live beside them in
+`colorpicker.browser.test.js`. They use an existing Playwright installation
+(`ORCA_PLAYWRIGHT_MODULE` can name its module path) and an installed browser
+(`ORCA_BROWSER_EXECUTABLE` can name its executable), without adding a production
+dependency. They cover bridge initialization, capability combinations, invalid
+editor recovery, ordered endpoint alpha, favorites, gettext keys, and live theme
+changes. These browser checks complement native contract/persistence tests; they
+do not establish the full native modal confirmation and favorites journey.
+
 Gradient and alpha capabilities are independent and default off. Unsupported
 gradients are rejected; disabled alpha normalizes the selected result to opaque.
 Favorites retain both capabilities independently of the current caller. The page

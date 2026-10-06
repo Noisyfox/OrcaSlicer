@@ -1,4 +1,7 @@
 #include "FilamentPickerDialog.hpp"
+#include "ColorPickerData.hpp"
+#include "FilamentColorPicker.hpp"
+#include <optional>
 #include "ColorPickerDialog.hpp"
 #include <utility>
 #include "GUI.hpp"

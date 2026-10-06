@@ -1,4 +1,7 @@
 #include "ColorPickerData.hpp"
+#include "libslic3r/Color.hpp"
+#include <optional>
+#include <variant>
 
 #include <cmath>
 #include <cstddef>

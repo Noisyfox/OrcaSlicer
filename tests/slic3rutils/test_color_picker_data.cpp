@@ -8,6 +8,7 @@
 #include <nlohmann/json.hpp>
 
 #include "slic3r/GUI/ColorPickerData.hpp"
+#include "libslic3r/Color.hpp"
 
 using namespace Slic3r;
 using namespace Slic3r::GUI;

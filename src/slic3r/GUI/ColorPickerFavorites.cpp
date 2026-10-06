@@ -1,4 +1,5 @@
 #include "ColorPickerFavorites.hpp"
+#include "ColorPickerData.hpp"
 
 #include "libslic3r/AppConfig.hpp"
 

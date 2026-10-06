@@ -1,4 +1,7 @@
 #include "FilamentColorPicker.hpp"
+#include "ColorPickerData.hpp"
+#include <cstddef>
+#include <optional>
 
 #include "libslic3r/Config.hpp"
 #include "libslic3r/PrintConfig.hpp"

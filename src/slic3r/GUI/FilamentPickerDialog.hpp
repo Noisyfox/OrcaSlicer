@@ -6,6 +6,7 @@
 #include "GUI_Utils.hpp"
 #include "FilamentBitmapUtils.hpp"
 #include "FilamentColorPicker.hpp"
+#include "ColorPickerData.hpp"
 #include <optional>
 #include "Widgets/Button.hpp"
 #include "EncodedFilament.hpp"
