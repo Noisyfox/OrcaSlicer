@@ -613,7 +613,7 @@ void FilamentPickerDialog::BindEvents()
             const auto initial = filament_color_picker_initial(current);
             std::optional<ColorSelection> selected;
             {
-                ColorPickerDialog dialog(this, initial, {true, false}, !filament_color_picker_selection(current));
+                ColorPickerDialog dialog(this, initial, {true, false}, !filament_color_picker_selection(current), m_more_btn);
                 if (dialog.is_available()) {
                     if (dialog.ShowModal() == wxID_OK)
                         selected = dialog.selection();

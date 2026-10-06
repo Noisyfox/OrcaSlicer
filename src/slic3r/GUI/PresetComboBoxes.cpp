@@ -1620,7 +1620,7 @@ void PlaterPresetComboBox::show_default_color_picker()
 {
     const auto value = filament_color_picker_value(wxGetApp().preset_bundle->project_config, m_filament_idx);
     const auto initial = filament_color_picker_initial(value);
-    ColorPickerDialog dialog(this, initial, {true, false}, !filament_color_picker_selection(value));
+    ColorPickerDialog dialog(this, initial, {true, false}, !filament_color_picker_selection(value), clr_picker);
     if (dialog.is_available()) {
         if (dialog.ShowModal() == wxID_OK && filament_color_picker_changed(initial, dialog.selection())) {
             const auto selected = filament_color_picker_result(*dialog.selection());

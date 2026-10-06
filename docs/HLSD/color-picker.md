@@ -8,6 +8,11 @@ and bounded numeric height, converts CSS pixels to device-independent window
 size, and fits within the display's work area. Identical sizes are ignored. The
 page observes content rather than viewport height, so resizing does not create
 a feedback loop; oversized content remains scrollable.
+The panel snapshots the triggering color or More Colors button's screen rectangle.
+It aligns below the button, flips above when needed, and clamps to that button's
+display work area. Content and DPI changes reuse the same anchor and display;
+later mouse movement does not affect placement. The official filament palette's
+existing placement is independent of this custom panel.
 A solid selection contains one color; a gradient contains exactly two ordered
 endpoints. The bridge represents these as `{"type":"solid|gradient",
 "colors":["#RRGGBBAA", ...]}`. RGB input is also accepted and becomes opaque.

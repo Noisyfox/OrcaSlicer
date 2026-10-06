@@ -14,11 +14,14 @@ class wxWindow;
 
 namespace Slic3r::GUI {
 
+// All geometry uses native screen coordinates, including negative monitor origins.
+wxPoint color_picker_panel_position(const wxRect& anchor, const wxRect& work_area, const wxSize& size, int gap);
+
 class ColorPickerDialog : public WebViewHostDialog
 {
 public:
     ColorPickerDialog(wxWindow* parent, const ColorSelection& initial, ColorPickerOptions options = {},
-                      bool preserve_multi_color = false);
+                      bool preserve_multi_color = false, wxWindow* anchor = nullptr);
     ~ColorPickerDialog() override;
 
     bool is_available() const { return m_available; }
@@ -31,6 +34,8 @@ private:
     void send_initial_state();
     void finish(int return_code);
     void update_window_shape();
+    void position_panel();
+    void on_dpi_changed(const wxRect& suggested_rect) override;
 
     ColorSelection m_initial;
     ColorPickerOptions m_options;
@@ -44,6 +49,10 @@ private:
     bool m_closing = false;
     bool m_favorites_writable = false;
     wxSize m_shape_size;
+    wxRect m_anchor_rect;
+    wxRect m_work_area;
+    int m_content_height = 520;
+    bool m_positioning = false;
     std::shared_ptr<std::atomic<bool>> m_alive = std::make_shared<std::atomic<bool>>(true);
 };
 

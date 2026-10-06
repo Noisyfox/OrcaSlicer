@@ -33,14 +33,33 @@
 #include <wx/gdicmn.h>
 #include <wx/sizer.h>
 #include <wx/string.h>
+#include <wx/window.h>
 
 namespace Slic3r::GUI {
 
-ColorPickerDialog::ColorPickerDialog(wxWindow* parent, const ColorSelection& initial, ColorPickerOptions options, bool preserve_multi_color)
+wxPoint color_picker_panel_position(const wxRect& anchor, const wxRect& work_area, const wxSize& size, int gap)
+{
+    const int below = anchor.y + anchor.height + gap;
+    const int above = anchor.y - gap - size.y;
+    const int y = below + size.y <= work_area.y + work_area.height ? below : above;
+    return {std::clamp(anchor.x, work_area.x, work_area.x + std::max(0, work_area.width - size.x)),
+            std::clamp(y, work_area.y, work_area.y + std::max(0, work_area.height - size.y))};
+}
+
+ColorPickerDialog::ColorPickerDialog(wxWindow* parent, const ColorSelection& initial, ColorPickerOptions options,
+                                   bool preserve_multi_color, wxWindow* anchor)
     : WebViewHostDialog(parent, wxID_ANY, _L("Color Picker"), wxDefaultPosition, wxDefaultSize,
                         wxBORDER_NONE | wxFRAME_NO_TASKBAR | wxFRAME_SHAPED),
       m_initial(initial), m_options(options), m_preserve_multi_color(preserve_multi_color)
 {
+    // Snapshot the trigger instead of following the mouse or retaining a raw pointer.
+    wxWindow* trigger = anchor ? anchor : parent;
+    if (trigger)
+        m_anchor_rect = trigger->GetScreenRect();
+    int display_index = wxDisplay::GetFromPoint(m_anchor_rect.GetPosition() + wxPoint(m_anchor_rect.width / 2, m_anchor_rect.height / 2));
+    if (display_index == wxNOT_FOUND)
+        display_index = 0;
+    m_work_area = wxDisplay(static_cast<unsigned int>(display_index)).GetClientArea();
     const auto normalized = normalize_color_selection(initial, options);
     if (!normalized)
         return;
@@ -56,14 +75,14 @@ ColorPickerDialog::ColorPickerDialog(wxWindow* parent, const ColorSelection& ini
     }
     // The shared host attaches its sizer before constructing the full layout.
     GetSizer()->SetSizeHints(this);
-    SetMinSize(FromDIP(wxSize(550, 300)));
+    Move(m_work_area.GetPosition());
     // SetSizeHints may fit the window to the WebView's small initial best size.
     // Restore the intended dialog size only after applying the layout hints.
-    SetClientSize(FromDIP(wxSize(550, 520)));
-    CentreOnParent();
+    position_panel();
     Bind(wxEVT_SIZE, [this](wxSizeEvent& event) { update_window_shape(); event.Skip(); });
     Bind(wxEVT_SHOW, [this](wxShowEvent& event) {
         if (event.IsShown()) {
+            position_panel();
             // GTK can require a realized window before applying its shape.
             wxGetApp().CallAfter([this, alive = m_alive] {
                 if (alive->load(std::memory_order_acquire) && !m_closing)
@@ -84,6 +103,31 @@ ColorPickerDialog::ColorPickerDialog(wxWindow* parent, const ColorSelection& ini
 }
 
 ColorPickerDialog::~ColorPickerDialog() { m_alive->store(false, std::memory_order_release); }
+
+void ColorPickerDialog::position_panel()
+{
+    if (m_positioning)
+        return;
+    m_positioning = true;
+    wxSize size = FromDIP(wxSize(550, m_content_height));
+    size.x = std::min(size.x, m_work_area.width);
+    size.y = std::min(size.y, std::max(1, m_work_area.height - FromDIP(16)));
+    SetMinSize(wxSize(std::min(FromDIP(550), size.x), std::min(FromDIP(300), size.y)));
+    if (size != GetClientSize())
+        SetClientSize(size);
+    const wxPoint position = color_picker_panel_position(m_anchor_rect, m_work_area, GetSize(), FromDIP(4));
+    if (position != GetPosition())
+        Move(position);
+    m_positioning = false;
+}
+
+void ColorPickerDialog::on_dpi_changed(const wxRect&)
+{
+    position_panel();
+    m_shape_size = wxSize();
+    update_window_shape();
+    Refresh();
+}
 
 void ColorPickerDialog::update_window_shape()
 {
@@ -164,14 +208,8 @@ void ColorPickerDialog::handle_web_command(const nlohmann::json& payload)
         const double value = height->get<double>();
         if (!std::isfinite(value) || value < 300 || value > 900)
             return;
-        wxSize size = FromDIP(wxSize(550, static_cast<int>(std::ceil(value))));
-        const wxDisplay display(this);
-        if (display.IsOk())
-            size.y = std::min(size.y, display.GetClientArea().height - FromDIP(16));
-        if (size != GetClientSize()) {
-            SetClientSize(size);
-            CentreOnParent();
-        }
+        m_content_height = static_cast<int>(std::ceil(value));
+        position_panel();
         return;
     }
     if (*command == "confirm") {
