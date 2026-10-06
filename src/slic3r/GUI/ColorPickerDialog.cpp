@@ -1,5 +1,7 @@
 #include "ColorPickerDialog.hpp"
 #include "ColorPickerFavorites.hpp"
+#include "ColorPickerStrings.hpp"
+#include <wx/webview.h>
 
 #include "GUI_App.hpp"
 #include "I18N.hpp"
@@ -19,10 +21,10 @@
 
 namespace Slic3r::GUI {
 
-ColorPickerDialog::ColorPickerDialog(wxWindow* parent, const ColorSelection& initial, ColorPickerOptions options)
+ColorPickerDialog::ColorPickerDialog(wxWindow* parent, const ColorSelection& initial, ColorPickerOptions options, bool preserve_multi_color)
     : WebViewHostDialog(parent, wxID_ANY, _L("Color Picker"), wxDefaultPosition, wxDefaultSize,
                         wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER),
-      m_initial(initial), m_options(options)
+      m_initial(initial), m_options(options), m_preserve_multi_color(preserve_multi_color)
 {
     const auto normalized = normalize_color_selection(initial, options);
     if (!normalized)
@@ -40,6 +42,10 @@ ColorPickerDialog::ColorPickerDialog(wxWindow* parent, const ColorSelection& ini
     // The shared host attaches its sizer before constructing the full layout.
     GetSizer()->SetSizeHints(this);
     SetMinSize(FromDIP(wxSize(570, 620)));
+    // SetSizeHints may fit the window to the WebView's small initial best size.
+    // Restore the intended dialog size only after applying the layout hints.
+    SetSize(FromDIP(wxSize(600, 660)));
+    CentreOnParent();
 
     Bind(wxEVT_CLOSE_WINDOW, [this](wxCloseEvent&) { finish(wxID_CANCEL); });
     Bind(wxEVT_CHAR_HOOK, [this](wxKeyEvent& event) {
@@ -51,6 +57,15 @@ ColorPickerDialog::ColorPickerDialog(wxWindow* parent, const ColorSelection& ini
 }
 
 ColorPickerDialog::~ColorPickerDialog() { m_alive->store(false, std::memory_order_release); }
+
+void ColorPickerDialog::add_user_scripts()
+{
+    if (wxWebView* view = browser()) {
+        const std::string script = "window.ORCA_COLOR_PICKER_STRINGS = " +
+            color_picker_ui_strings().dump(-1, ' ', false, nlohmann::json::error_handler_t::ignore) + ";";
+        view->AddUserScript(wxString::FromUTF8(script));
+    }
+}
 
 void ColorPickerDialog::on_script_message(const nlohmann::json& payload)
 {
@@ -131,7 +146,7 @@ void ColorPickerDialog::send_initial_state()
     const nlohmann::json payload = {{"command", "init"}, {"page_id", m_page_id},
                                    {"options", {{"allow_gradient", m_options.allow_gradient}, {"allow_alpha", m_options.allow_alpha}}},
                                    {"selection", color_selection_to_json(m_initial)}, {"favorites", std::move(favorites)},
-                                   {"favorites_writable", m_favorites_writable}};
+                                   {"favorites_writable", m_favorites_writable}, {"preserve_multi_color", m_preserve_multi_color}};
     m_init_sent = true;
     // Already deferred and guarded: avoid the shared call_web_handler's unguarded
     // second CallAfter, which could run after this modal dialog is destroyed.

@@ -127,6 +127,10 @@ set(SLIC3R_GUI_SOURCES
     GUI/Shortcuts.hpp
     GUI/SpeedDialDialog.cpp
     GUI/SpeedDialDialog.hpp
+    GUI/ColorPickerStrings.cpp
+    GUI/ColorPickerStrings.hpp
+    GUI/FilamentColorPicker.cpp
+    GUI/FilamentColorPicker.hpp
     GUI/ColorPickerData.cpp
     GUI/ColorPickerData.hpp
     GUI/ColorPickerDialog.cpp

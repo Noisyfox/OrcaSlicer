@@ -386,3 +386,5 @@ input, select, button { font-family: inherit; }
 #confirmBtn:hover, #saveColorBtn:hover { filter: brightness(1.1); }
 #hexInput:invalid, .value-input:invalid { border-color: var(--control-invalid); }
 input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px solid var(--main-color); outline-offset: 1px; }
+
+#selectionNotice { margin: 0 0 8px; color: var(--fg-color-label); }

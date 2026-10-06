@@ -1,5 +1,15 @@
 "use strict";
 (() => {
+  const T = (key) => window.ORCA_COLOR_PICKER_STRINGS?.[key] || key;
+  document.title = T("Color Picker");
+  for (const element of document.querySelectorAll("[data-i18n]")) element.textContent = T(element.dataset.i18n);
+  for (const attribute of ["aria-label", "title"])
+    for (const element of document.querySelectorAll(`[data-i18n-${attribute}]`))
+      element.setAttribute(attribute, T(element.getAttribute(`data-i18n-${attribute}`)));
+  function paletteName(name) {
+    const ral = name.match(/^(\d{4}) (.+)$/);
+    return ral ? `${ral[1]} ${T(ral[2])}` : /^%\d+$/.test(name) ? name : T(name);
+  }
   const model = window.ColorPickerModel;
   const palettes = window.ColorPickerPalettes;
   const byId = (id) => document.getElementById(id);
@@ -57,9 +67,9 @@
       if (!model.normalizeSelection(selection, state.options)) continue;
       const row = document.createElement("button"); row.type = "button"; row.className = "color-item";
       const swatch = document.createElement("span"); swatch.className = "color-swatch";
-      const name = document.createElement("span"); name.className = "color-name"; name.textContent = entry.name;
+      const name = document.createElement("span"); name.className = "color-name"; name.textContent = paletteName(entry.name);
       setSwatch(swatch, model.normalizeSelection(selection, {allow_gradient: true, allow_alpha: true}));
-      row.append(swatch, name); row.title = entry.name;
+      row.append(swatch, name); row.title = paletteName(entry.name);
       row.addEventListener("click", () => {
         // Solid palette colors edit the active endpoint while gradient mode is on.
         const changed = entry.grad ? model.applySelection(state, selection) : model.setHex(state, entry.hex);
@@ -87,6 +97,9 @@
     if (!payload || typeof payload !== "object" || (payload.options !== undefined && (!payload.options || typeof payload.options !== "object"))) return false;
     const next = model.createState(payload.options, payload.selection);
     if (!next) return false;
+    const notice = byId("selectionNotice");
+    notice.hidden = payload.preserve_multi_color !== true;
+    notice.textContent = T("The current multi-color selection is kept until you choose a different color.");
     state = next; favorites = model.normalizeFavorites(payload.favorites || []);
     favoritesWritable = payload.favorites_writable !== false;
     byId("saveColorBtn").disabled = !favoritesWritable;
@@ -107,7 +120,8 @@
       const options = payload.options;
       if (!options || typeof options.allow_gradient !== "boolean" || typeof options.allow_alpha !== "boolean" ||
           !model.normalizeSelection(payload.selection, options) || !validFavorites(payload.favorites) ||
-          (payload.favorites_writable !== undefined && typeof payload.favorites_writable !== "boolean")) return false;
+          (payload.favorites_writable !== undefined && typeof payload.favorites_writable !== "boolean") ||
+          (payload.preserve_multi_color !== undefined && typeof payload.preserve_multi_color !== "boolean")) return false;
       if (initialized) return true;
       if (!init(payload)) return false;
       emit("initialized");
@@ -178,7 +192,7 @@
     const text = hexInput.value;
     const caret = hexInput.selectionStart;
     const valid = model.setHex(state, text.startsWith("#") ? text : "#" + text);
-    hexInput.setCustomValidity(valid ? "" : "Enter a complete hexadecimal color");
+    hexInput.setCustomValidity(valid ? "" : T("Enter a complete hexadecimal color"));
     if (valid) {
       render();
       // Do not append alpha after the sixth digit while the user is typing RGBA.

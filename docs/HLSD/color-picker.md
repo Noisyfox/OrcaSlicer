@@ -7,6 +7,23 @@ endpoints. The bridge represents these as `{"type":"solid|gradient",
 "colors":["#RRGGBBAA", ...]}`. RGB input is also accepted and becomes opaque.
 Native validation rejects malformed hex and incorrect cardinality.
 
+The project filament color action and the official filament picker's More Colors
+action enable two-endpoint gradients and disable alpha. They read project colors
+in their stored vector order and apply changes through `sync_colour_config`,
+retaining the existing RGB profile/project format and dirty marking. Ordered
+custom results bypass the official palette's `FilamentColor` set. Choosing an
+official swatch retains its existing palette behavior.
+
+Striped colors and gradients with more than two endpoints cannot be represented
+by this editor. A notice explains that the current selection is retained; the
+editor starts from the first color, and unchanged confirmation is a no-op.
+Cancellation is also a no-op. The system color picker is used only when the
+WebView backend is unavailable.
+
+Native gettext strings are installed at document start. Static page labels and
+palette names use stable English keys; RAL codes, channel symbols, and numeric
+labels remain data. The palette color values do not depend on the UI language.
+
 Gradient and alpha capabilities are independent and default off. Unsupported
 gradients are rejected; disabled alpha normalizes the selected result to opaque.
 Favorites retain both capabilities independently of the current caller. The page

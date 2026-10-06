@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="en" data-orca-page="color-picker">
-<head><title>Color Picker</title>
+<head><title data-i18n="Color Picker">Color Picker</title>
 
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -9,15 +9,16 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+<p id="selectionNotice" hidden></p>
 <fieldset id="pickerEditors" disabled>
 <div class="main-wrapper">
 
   <div class="left-panel">
     <div class="palette-select"><select id="paletteCombo" class="comboBox" tabindex="-1">
-      <option value="basic">Basic Colors</option>
-      <option value="orca">Orca Palette</option>
-      <option value="ral">RAL Classic</option>
-      <option value="gradient" hidden>Gradients</option>
+      <option value="basic" data-i18n="Basic Colors">Basic Colors</option>
+      <option value="orca" data-i18n="Orca Palette">Orca Palette</option>
+      <option value="ral" data-i18n="RAL Classic">RAL Classic</option>
+      <option value="gradient" hidden data-i18n="Gradients">Gradients</option>
     </select></div>
     <div class="palette" id="palette" tabindex="-1"></div>
   </div>
@@ -25,9 +26,9 @@
   <div class="right-panel">
     <div class="tabs-container">
       <input type="radio" id="tab1" name="tab" checked>
-      <label for="tab1">Color</label>
+      <label for="tab1" data-i18n="Color">Color</label>
       <input type="radio" id="tab2" name="tab">
-      <label for="tab2" class="hidden">Gradient</label>
+      <label for="tab2" class="hidden" data-i18n="Gradient">Gradient</label>
     </div>
 
     <div class="spectrum-container">
@@ -51,7 +52,7 @@
         </label>
       </div>
       <div id="hexLabel">#</div>
-      <input type="text" id="hexInput" required value="808080" maxlength="8" autocomplete="off" spellcheck="false" aria-label="Hex color">
+      <input type="text" id="hexInput" required value="808080" maxlength="8" autocomplete="off" spellcheck="false" aria-label="Hex color" data-i18n-aria-label="Hex color">
     </div>
 
     <div id="rgbSliders">
@@ -90,15 +91,15 @@
       </div>
     </div>
 
-    <div id="alphaControls" class="slider-group hidden"><label class="slider-label" for="aValue">A</label><input type="range" id="aSlider" min="0" max="100" step="0.1" aria-label="Opacity"><input type="number" id="aValue" min="0" max="100" step="0.1" class="value-input" aria-label="Opacity percent"><span class="percent-label">%</span></div><div class="bottom-container">
+    <div id="alphaControls" class="slider-group hidden"><label class="slider-label" for="aValue">A</label><input type="range" id="aSlider" min="0" max="100" step="0.1" aria-label="Opacity" data-i18n-aria-label="Opacity"><input type="number" id="aValue" min="0" max="100" step="0.1" class="value-input" aria-label="Opacity percent" data-i18n-aria-label="Opacity percent"><span class="percent-label">%</span></div><div class="bottom-container">
       <div class="saved-grid" id="userColors"></div>
       <div class="preview-container">
-        <button id="saveColorBtn" title="Save color">&lt;</button>
+        <button id="saveColorBtn" title="Save color" data-i18n-title="Save color">&lt;</button>
         <div class="color-preview" id="colorPreview"></div>
       </div>
     </div>
   </div>
-</div><div class="dialog-actions"><button id="cancelBtn">Cancel</button><button id="confirmBtn">OK</button></div>
+</div><div class="dialog-actions"><button id="cancelBtn" data-i18n="Cancel">Cancel</button><button id="confirmBtn" data-i18n="OK">OK</button></div>
 </fieldset>
 <script src="palettes.js"></script><script src="colorpicker-model.js"></script><script src="colorpicker.js"></script></body></html>
 

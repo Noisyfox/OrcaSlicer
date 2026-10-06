@@ -69,6 +69,8 @@
 #include "MsgDialog.hpp"
 #include "ParamsDialog.hpp"
 #include "FilamentPickerDialog.hpp"
+#include "ColorPickerDialog.hpp"
+#include "FilamentColorPicker.hpp"
 #include "wxExtensions.hpp"
 
 #include "DeviceCore/DevManager.h"
@@ -913,31 +915,37 @@ PlaterPresetComboBox::PlaterPresetComboBox(wxWindow *parent, Preset::Type preset
                 FilamentColor fila_color = get_cur_color_info();
 
                 // Show filament picker dialog
-                FilamentPickerDialog dialog(this, fila_id, fila_color, fila_type);
+                FilamentPickerDialog dialog(this, fila_id, fila_color, fila_type,
+                    filament_color_picker_value(m_preset_bundle->project_config, m_filament_idx));
 
                 if (!dialog.IsDataLoaded()) {
                     // If FilamentPicker fails, fallback to default color picker
                     show_default_color_picker();
-                } else if (dialog.ShowModal() == wxID_OK) {
-                    // Get selected filament color data
-                    FilamentColor fila_color = dialog.GetSelectedFilamentColor();
-
-                    // Check if we have valid color data
-                    if (!fila_color.m_colors.empty()) {
-                        // Convert to storage format
-                        std::vector<std::string> colors;
-                        for (const wxColour& color : fila_color.m_colors) {
-                            colors.push_back(color.GetAsString(wxC2S_HTML_SYNTAX).ToStdString());
-                        }
-
-                        bool is_gradient = (fila_color.m_color_type == FilamentColor::ColorType::GRADIENT_CLR);
-                        this->sync_colour_config(colors, is_gradient);
+                } else if (dialog.ShowModal() == wxID_OK && dialog.HasSelectionChanged()) {
+                    if (const auto& custom = dialog.GetCustomColorSelection()) {
+                        const auto value = filament_color_picker_result(*custom);
+                        sync_colour_config(value.colors, value.gradient);
                     } else {
-                        // Fallback to basic color if no FilamentColor data
-                        wxColour selected_color = dialog.GetSelectedColour();
-                        if (selected_color.IsOk()) {
-                            std::vector<std::string> color = {selected_color.GetAsString(wxC2S_HTML_SYNTAX).ToStdString()};
-                            this->sync_colour_config(color, false);
+                        // Get selected filament color data
+                        FilamentColor fila_color = dialog.GetSelectedFilamentColor();
+
+                        // Check if we have valid color data
+                        if (!fila_color.m_colors.empty()) {
+                            // Convert to storage format
+                            std::vector<std::string> colors;
+                            for (const wxColour& color : fila_color.m_colors) {
+                                colors.push_back(color.GetAsString(wxC2S_HTML_SYNTAX).ToStdString());
+                            }
+
+                            bool is_gradient = (fila_color.m_color_type == FilamentColor::ColorType::GRADIENT_CLR);
+                            this->sync_colour_config(colors, is_gradient);
+                        } else {
+                            // Fallback to basic color if no FilamentColor data
+                            wxColour selected_color = dialog.GetSelectedColour();
+                            if (selected_color.IsOk()) {
+                                std::vector<std::string> color = {selected_color.GetAsString(wxC2S_HTML_SYNTAX).ToStdString()};
+                                this->sync_colour_config(color, false);
+                            }
                         }
                     }
                 }
@@ -1610,19 +1618,24 @@ FilamentColor PlaterPresetComboBox::get_cur_color_info()
 
 void PlaterPresetComboBox::show_default_color_picker()
 {
-    DynamicPrintConfig* cfg = &wxGetApp().preset_bundle->project_config;
-    auto colors = static_cast<ConfigOptionStrings*>(cfg->option("filament_colour")->clone());
-    wxColour current_clr(colors->values[m_filament_idx]);
-    if (!current_clr.IsOk())
-        current_clr = wxColour(0, 0, 0); // Don't set alfa to transparence
+    const auto value = filament_color_picker_value(wxGetApp().preset_bundle->project_config, m_filament_idx);
+    const auto initial = filament_color_picker_initial(value);
+    ColorPickerDialog dialog(this, initial, {true, false}, !filament_color_picker_selection(value));
+    if (dialog.is_available()) {
+        if (dialog.ShowModal() == wxID_OK && filament_color_picker_changed(initial, dialog.selection())) {
+            const auto selected = filament_color_picker_result(*dialog.selection());
+            sync_colour_config(selected.colors, selected.gradient);
+        }
+        return;
+    }
 
-    m_clrData.SetColour(current_clr);
-
+    // Backend unavailability is the only reason to open the native fallback.
+    const auto primary = filament_color_picker_result(initial).colors.front();
+    m_clrData.SetColour(wxColour(wxString::FromUTF8(primary)));
     wxColourData data = show_sys_picker_dialog(this, m_clrData);
     if (m_clrData.GetColour() != data.GetColour()) {
-        std::vector<std::string> color = {data.GetColour().GetAsString(wxC2S_HTML_SYNTAX).ToStdString()};
         m_clrData.SetColour(data.GetColour());
-        sync_colour_config(color, false);
+        sync_colour_config({data.GetColour().GetAsString(wxC2S_HTML_SYNTAX).ToStdString()}, false);
     }
 }
 

@@ -16,13 +16,15 @@ namespace Slic3r::GUI {
 class ColorPickerDialog : public WebViewHostDialog
 {
 public:
-    ColorPickerDialog(wxWindow* parent, const ColorSelection& initial, ColorPickerOptions options = {});
+    ColorPickerDialog(wxWindow* parent, const ColorSelection& initial, ColorPickerOptions options = {},
+                      bool preserve_multi_color = false);
     ~ColorPickerDialog() override;
 
     bool is_available() const { return m_available; }
     const std::optional<ColorSelection>& selection() const { return m_selection; }
 
 private:
+    void add_user_scripts() override;
     void on_script_message(const nlohmann::json& payload) override;
     void handle_web_command(const nlohmann::json& payload);
     void send_initial_state();
@@ -33,6 +35,7 @@ private:
     std::optional<ColorSelection> m_selection;
     std::vector<ColorSelection> m_favorites;
     std::string m_page_id;
+    bool m_preserve_multi_color = false;
     bool m_available = false;
     bool m_init_sent = false;
     bool m_initialized = false;
