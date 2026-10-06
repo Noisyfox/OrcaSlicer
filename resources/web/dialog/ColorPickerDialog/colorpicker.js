@@ -1,0 +1,202 @@
+"use strict";
+(() => {
+  const model = window.ColorPickerModel;
+  const palettes = window.ColorPickerPalettes;
+  const byId = (id) => document.getElementById(id);
+  const hexInput = byId("hexInput"), canvas = byId("spectrum"), context = canvas.getContext("2d");
+  const paletteCombo = byId("paletteCombo"), palette = byId("palette"), preview = byId("colorPreview");
+  const modeSwitch = byId("modeSwitch"), endpointSwitch = byId("gradientSwitch");
+  const rgbPairs = ["r", "g", "b"].map((name) => [byId(name + "Slider"), byId(name + "Value")]);
+  const hslPairs = ["h", "s", "l"].map((name) => [byId(name + "Slider"), byId(name + "Value")]);
+  const alphaPair = [byId("aSlider"), byId("aValue")];
+  let state = model.createState(), favorites = [], dragging = false;
+
+  function emit(command, data = {}) {
+    window.dispatchEvent(new CustomEvent("color-picker-message", {detail: {command, ...data}}));
+  }
+
+  function setSwatch(element, selection) {
+    element.style.setProperty("--swatch-color", model.selectionBackground(selection));
+  }
+
+  function render(resetEditors = false) {
+    const color = model.activeColor(state), hsl = model.rgbToHsl(...color.slice(0, 3));
+    if (resetEditors || hexInput.checkValidity()) {
+      hexInput.value = model.toHex(color).slice(1, state.options.allow_alpha ? 9 : 7);
+      hexInput.setCustomValidity("");
+    }
+    for (const [pairs, values] of [[rgbPairs, color], [hslPairs, hsl]]) {
+      pairs.forEach(([slider, input], index) => {
+        slider.value = values[index];
+        if (resetEditors || input.checkValidity()) input.value = Math.round(values[index] * 10) / 10;
+        slider.style.setProperty("--thumb-color", model.toHex(color));
+      });
+    }
+    // Percentage is a display only until explicitly edited. Never round it back
+    // into the alpha byte on endpoint switches, RGB edits, or confirmation.
+    alphaPair.forEach((input) => { if (resetEditors || input.checkValidity()) input.value = Math.round(color[3] / 255 * 1000) / 10; });
+    const rgbHex = model.toHex([...color.slice(0, 3), 255]);
+    alphaPair[0].style.setProperty("--track-gradient", `linear-gradient(to right, ${rgbHex.slice(0,7)}00, ${rgbHex})`);
+    alphaPair[0].style.setProperty("--thumb-color", rgbHex);
+    byId("sSlider").style.setProperty("--track-gradient", `linear-gradient(to right, hsl(${hsl[0]},0%,${hsl[2]}%), hsl(${hsl[0]},100%,${hsl[2]}%))`);
+    byId("tab1").checked = state.mode === "solid";
+    byId("tab2").checked = state.mode === "gradient";
+    endpointSwitch.checked = state.active === 1;
+    byId("gradient-switch").classList.toggle("hidden", state.mode !== "gradient");
+    setSwatch(preview, model.exportSelection(state));
+    updateIndicator(color);
+  }
+
+  function populatePalette() {
+    palette.replaceChildren();
+    for (const entry of palettes[paletteCombo.value] || []) {
+      const selection = {type: entry.grad ? "gradient" : "solid", colors: entry.grad ? entry.grad.split("-") : [entry.hex]};
+      if (!model.normalizeSelection(selection, state.options)) continue;
+      const row = document.createElement("button"); row.type = "button"; row.className = "color-item";
+      const swatch = document.createElement("span"); swatch.className = "color-swatch";
+      const name = document.createElement("span"); name.className = "color-name"; name.textContent = entry.name;
+      setSwatch(swatch, model.normalizeSelection(selection, {allow_gradient: true, allow_alpha: true}));
+      row.append(swatch, name); row.title = entry.name;
+      row.addEventListener("click", () => {
+        // Solid palette colors edit the active endpoint while gradient mode is on.
+        const changed = entry.grad ? model.applySelection(state, selection) : model.setHex(state, entry.hex);
+        if (changed) render(true);
+      });
+      palette.appendChild(row);
+    }
+  }
+
+  function drawFavorites() {
+    const grid = byId("userColors"); grid.replaceChildren();
+    const visible = favorites.filter((favorite) => state.options.allow_gradient || favorite.type === "solid");
+    for (let index = 0; index < 24; ++index) {
+      const swatch = document.createElement("button"); swatch.type = "button"; swatch.className = "saved-swatch";
+      const favorite = visible[index];
+      if (favorite) {
+        setSwatch(swatch, favorite); swatch.title = favorite.colors.join(" → ");
+        swatch.addEventListener("click", () => { if (model.applySelection(state, favorite)) render(true); });
+      } else { swatch.classList.add("empty"); swatch.disabled = true; }
+      grid.appendChild(swatch);
+    }
+  }
+
+  function init(payload) {
+    if (!payload || typeof payload !== "object" || (payload.options !== undefined && (!payload.options || typeof payload.options !== "object"))) return false;
+    const next = model.createState(payload.options, payload.selection);
+    if (!next) return false;
+    state = next; favorites = model.normalizeFavorites(payload.favorites || []);
+    byId("tab2").nextElementSibling.classList.toggle("hidden", !state.options.allow_gradient);
+    for (const option of paletteCombo.options) option.hidden = option.value === "gradient" && !state.options.allow_gradient;
+    if (!state.options.allow_gradient && paletteCombo.value === "gradient") paletteCombo.value = "basic";
+    byId("alphaControls").classList.toggle("hidden", !state.options.allow_alpha);
+    hexInput.maxLength = state.options.allow_alpha ? 9 : 7;
+    populatePalette(); drawFavorites(); render(true);
+    return true;
+  }
+
+  function drawSpectrum() {
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = Math.max(1, Math.round(rect.width)); canvas.height = Math.max(1, Math.round(rect.height));
+    const hue = context.createLinearGradient(0, 0, canvas.width, 0);
+    for (let i = 0; i <= 6; ++i) hue.addColorStop(i / 6, `hsl(${i * 60},100%,50%)`);
+    context.fillStyle = hue; context.fillRect(0, 0, canvas.width, canvas.height);
+    const shade = context.createLinearGradient(0, 0, 0, canvas.height);
+    shade.addColorStop(0, "#FFFFFF"); shade.addColorStop(0.5, "#FFFFFF00"); shade.addColorStop(0.5, "#00000000"); shade.addColorStop(1, "#000000");
+    context.fillStyle = shade; context.fillRect(0, 0, canvas.width, canvas.height);
+  }
+
+  function updateIndicator(color) {
+    const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+    let distance = Infinity, bestX = 0, bestY = 0;
+    for (let y = 0; y < canvas.height; y += 2) for (let x = 0; x < canvas.width; x += 2) {
+      const offset = (y * canvas.width + x) * 4;
+      const delta = color.slice(0, 3).reduce((sum, channel, i) => sum + (pixels[offset + i] - channel) ** 2, 0);
+      if (delta < distance) { distance = delta; bestX = x; bestY = y; }
+    }
+    const indicator = byId("colorIndicator");
+    indicator.style.left = bestX + "px"; indicator.style.top = bestY + "px";
+  }
+
+  function sampleSpectrum(event) {
+    const rect = canvas.getBoundingClientRect();
+    const x = Math.max(0, Math.min(canvas.width - 1, Math.floor((event.clientX - rect.left) * canvas.width / rect.width)));
+    const y = Math.max(0, Math.min(canvas.height - 1, Math.floor((event.clientY - rect.top) * canvas.height / rect.height)));
+    model.setRgb(state, Array.from(context.getImageData(x, y, 1, 1).data).slice(0, 3)); render();
+  }
+
+  function bindPair(pair, update) {
+    const [slider, input] = pair;
+    input.required = true;
+    for (const control of pair) {
+      control.addEventListener("input", () => {
+        if (control.value === "" || !control.checkValidity()) return;
+        const value = Number(control.value);
+        if (!Number.isFinite(value)) return;
+        slider.value = value; update();
+      });
+      control.addEventListener("wheel", (event) => {
+        event.preventDefault();
+        slider.value = Math.max(Number(slider.min), Math.min(Number(slider.max), Number(slider.value) + (event.deltaY > 0 ? -5 : 5)));
+        update();
+      }, {passive: false});
+    }
+  }
+
+  rgbPairs.forEach((pair) => bindPair(pair, () => { model.setRgb(state, rgbPairs.map(([slider]) => Number(slider.value))); render(); }));
+  hslPairs.forEach((pair) => bindPair(pair, () => { model.setRgb(state, model.hslToRgb(...hslPairs.map(([slider]) => Number(slider.value)))); render(); }));
+  bindPair(alphaPair, () => { model.setAlphaPercent(state, Number(alphaPair[0].value)); render(); });
+  hexInput.addEventListener("input", () => {
+    const text = hexInput.value;
+    const caret = hexInput.selectionStart;
+    const valid = model.setHex(state, text.startsWith("#") ? text : "#" + text);
+    hexInput.setCustomValidity(valid ? "" : "Enter a complete hexadecimal color");
+    if (valid) {
+      render();
+      // Do not append alpha after the sixth digit while the user is typing RGBA.
+      hexInput.value = text; hexInput.setSelectionRange(caret, caret);
+    }
+  });
+  hexInput.addEventListener("blur", () => { if (hexInput.checkValidity()) render(); });
+  modeSwitch.addEventListener("change", () => {
+    byId("rgbSliders").classList.toggle("hidden", modeSwitch.checked);
+    byId("hslSliders").classList.toggle("hidden", !modeSwitch.checked);
+  });
+  for (const [id, mode] of [["tab1", "solid"], ["tab2", "gradient"]]) byId(id).addEventListener("change", () => { model.setMode(state, mode); render(true); });
+  endpointSwitch.addEventListener("change", () => { state.active = endpointSwitch.checked ? 1 : 0; render(true); });
+  paletteCombo.addEventListener("change", populatePalette);
+  canvas.addEventListener("pointerdown", (event) => { dragging = true; canvas.setPointerCapture(event.pointerId); sampleSpectrum(event); });
+  canvas.addEventListener("pointermove", (event) => { if (dragging) sampleSpectrum(event); });
+  canvas.addEventListener("pointerup", () => { dragging = false; });
+  canvas.addEventListener("pointercancel", () => { dragging = false; });
+  window.addEventListener("resize", () => { drawSpectrum(); render(); });
+  function validateEditors() {
+    const pairs = modeSwitch.checked ? hslPairs : rgbPairs;
+    const inputs = [hexInput, ...pairs.map(([, input]) => input)];
+    if (state.options.allow_alpha) inputs.push(alphaPair[1]);
+    return inputs.every((input) => input.reportValidity());
+  }
+  function confirm() {
+    if (validateEditors()) emit("confirm", {selection: model.exportSelection(state)});
+  }
+  byId("saveColorBtn").addEventListener("click", () => {
+    if (!validateEditors()) return;
+    const selection = model.exportSelection(state);
+    const key = JSON.stringify(selection);
+    favorites = [selection, ...favorites.filter((favorite) => JSON.stringify(favorite) !== key)].slice(0, 24);
+    drawFavorites(); emit("update_favorites", {favorites});
+  });
+  byId("confirmBtn").addEventListener("click", confirm);
+  byId("cancelBtn").addEventListener("click", () => emit("cancel"));
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") { event.preventDefault(); emit("cancel"); }
+    else if (event.key === "Enter" && event.target instanceof HTMLInputElement && ["text", "number"].includes(event.target.type)) {
+      event.preventDefault(); confirm();
+    }
+  });
+
+  window.ColorPickerDialog = {
+    init, exportSelection: () => model.exportSelection(state),
+    setFavorites: (values) => { favorites = model.normalizeFavorites(values); drawFavorites(); }
+  };
+  drawSpectrum(); init({}); emit("ready");
+})();

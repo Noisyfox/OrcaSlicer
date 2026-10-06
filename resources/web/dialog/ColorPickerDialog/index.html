@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><title>Color Picker</title>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="main-wrapper">
+
+  <div class="left-panel">
+    <select id="paletteCombo" class="comboBox" tabindex="-1">
+      <option value="basic">Basic Colors</option>
+      <option value="orca">Orca Palette</option>
+      <option value="ral">RAL Classic</option>
+      <option value="gradient">Gradients</option>
+    </select>
+    <div class="palette" id="palette" tabindex="-1"></div>
+  </div>
+
+  <div class="right-panel">
+    <div class="tabs-container">
+      <input type="radio" id="tab1" name="tab" checked>
+      <label for="tab1">Color</label>
+      <input type="radio" id="tab2" name="tab">
+      <label for="tab2">Gradient</label>
+    </div>
+
+    <div class="spectrum-container">
+      <canvas id="spectrum"></canvas>
+      <div id="colorIndicator"></div>
+    </div>
+
+    <div class="middle-container">
+      <div id="slider-type-switch">
+        <input class="switch-check" type="checkbox" id="modeSwitch">
+        <label class="switch-slider" for="modeSwitch">
+          <div class="switch-label">RGB</div>
+          <div class="switch-label">HSL</div>
+        </label>
+      </div>
+      <div id="gradient-switch" class="hidden">
+        <input class="switch-check" type="checkbox" id="gradientSwitch">
+        <label class="switch-slider" for="gradientSwitch">
+          <div class="switch-label">1</div>
+          <div class="switch-label">2</div>
+        </label>
+      </div>
+      <div id="hexLabel">#</div>
+      <input type="text" id="hexInput" required value="808080" maxlength="8" autocomplete="off" spellcheck="false" aria-label="Hex color">
+    </div>
+
+    <div id="rgbSliders">
+      <div class="slider-group">
+        <div class="slider-label">R</div>
+        <input type="range"  id="rSlider" min="0" max="255" step="0.1" tabindex="-1">
+        <input type="number" id="rValue"  min="0" max="255" step="1" class="value-input">
+      </div>
+      <div class="slider-group">
+        <div class="slider-label">G</div>
+        <input type="range"  id="gSlider" min="0" max="255" step="0.1" tabindex="-1">
+        <input type="number" id="gValue"  min="0" max="255" step="1" class="value-input">
+      </div>
+      <div class="slider-group">
+        <div class="slider-label">B</div>
+        <input type="range"  id="bSlider" min="0" max="255" step="0.1" tabindex="-1">
+        <input type="number" id="bValue"  min="0" max="255" step="1" class="value-input">
+      </div>
+    </div>
+
+    <div id="hslSliders" class="hidden">
+      <div class="slider-group">
+        <div class="slider-label">H</div>
+        <input type="range"  id="hSlider" min="0" max="360" step="0.1" tabindex="-1">
+        <input type="number" id="hValue"  min="0" max="360" step="0.1" class="value-input">
+      </div>
+      <div class="slider-group">
+        <div class="slider-label">S</div>
+        <input type="range"  id="sSlider" min="0" max="100" step="0.1" tabindex="-1">
+        <input type="number" id="sValue"  min="0" max="100" step="0.1" class="value-input">
+      </div>
+      <div class="slider-group">
+        <div class="slider-label">L</div>
+        <input type="range"  id="lSlider" min="0" max="100" step="0.1" tabindex="-1">
+        <input type="number" id="lValue"  min="0" max="100" step="0.1" class="value-input">
+      </div>
+    </div>
+
+    <div id="alphaControls" class="slider-group hidden"><label class="slider-label" for="aValue">A</label><input type="range" id="aSlider" min="0" max="100" step="0.1" aria-label="Opacity"><input type="number" id="aValue" min="0" max="100" step="0.1" class="value-input" aria-label="Opacity percent"><span class="percent-label">%</span></div><div class="bottom-container">
+      <div class="saved-grid" id="userColors"></div>
+      <div class="preview-container">
+        <button id="saveColorBtn" title="Save color">&lt;</button>
+        <div class="color-preview" id="colorPreview"></div>
+      </div>
+    </div>
+  </div>
+</div><div class="dialog-actions"><button id="cancelBtn">Cancel</button><button id="confirmBtn">OK</button></div>
+<script src="palettes.js"></script><script src="colorpicker-model.js"></script><script src="colorpicker.js"></script></body></html>
+
+
+
