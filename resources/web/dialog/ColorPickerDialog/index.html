@@ -1,21 +1,23 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-orca-page="color-picker">
 <head><title>Color Picker</title>
 
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="../../include/global.css">
+<link rel="stylesheet" href="../css/theme.css">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <div class="main-wrapper">
 
   <div class="left-panel">
-    <select id="paletteCombo" class="comboBox" tabindex="-1">
+    <div class="palette-select"><select id="paletteCombo" class="comboBox" tabindex="-1">
       <option value="basic">Basic Colors</option>
       <option value="orca">Orca Palette</option>
       <option value="ral">RAL Classic</option>
       <option value="gradient">Gradients</option>
-    </select>
+    </select></div>
     <div class="palette" id="palette" tabindex="-1"></div>
   </div>
 
