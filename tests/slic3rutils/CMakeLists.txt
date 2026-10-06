@@ -7,6 +7,7 @@ add_executable(${_TEST_NAME}_tests
     test_dev_mapping.cpp
     test_filament_bitmap_utils.cpp
     test_color_picker_data.cpp
+    test_color_picker_favorites.cpp
     test_device_progress.cpp
     test_device_manager_integration.cpp
     test_web_media_controller.cpp

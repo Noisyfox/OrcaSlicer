@@ -10,7 +10,7 @@
   const hslPairs = ["h", "s", "l"].map((name) => [byId(name + "Slider"), byId(name + "Value")]);
   const alphaPair = [byId("aSlider"), byId("aValue")];
   const pageId = Date.now().toString(36) + Math.random().toString(36).slice(2);
-  let state = model.createState(), favorites = [], dragging = false, initialized = false;
+  let state = model.createState(), favorites = [], dragging = false, initialized = false, favoritesWritable = true;
 
   function emit(command, data = {}) {
     window.dispatchEvent(new CustomEvent("color-picker-message", {detail: {command, ...data}}));
@@ -88,6 +88,8 @@
     const next = model.createState(payload.options, payload.selection);
     if (!next) return false;
     state = next; favorites = model.normalizeFavorites(payload.favorites || []);
+    favoritesWritable = payload.favorites_writable !== false;
+    byId("saveColorBtn").disabled = !favoritesWritable;
     byId("tab2").nextElementSibling.classList.toggle("hidden", !state.options.allow_gradient);
     for (const option of paletteCombo.options) option.hidden = option.value === "gradient" && !state.options.allow_gradient;
     if (!state.options.allow_gradient && paletteCombo.value === "gradient") paletteCombo.value = "basic";
@@ -104,7 +106,8 @@
     if (payload.command === "init") {
       const options = payload.options;
       if (!options || typeof options.allow_gradient !== "boolean" || typeof options.allow_alpha !== "boolean" ||
-          !model.normalizeSelection(payload.selection, options) || !validFavorites(payload.favorites)) return false;
+          !model.normalizeSelection(payload.selection, options) || !validFavorites(payload.favorites) ||
+          (payload.favorites_writable !== undefined && typeof payload.favorites_writable !== "boolean")) return false;
       if (initialized) return true;
       if (!init(payload)) return false;
       emit("initialized");
@@ -205,7 +208,7 @@
     if (initialized && validateEditors()) emit("confirm", {selection: model.exportSelection(state)});
   }
   byId("saveColorBtn").addEventListener("click", () => {
-    if (!initialized || !validateEditors()) return;
+    if (!initialized || !favoritesWritable || !validateEditors()) return;
     const selection = model.exportSelection(state);
     const key = JSON.stringify(selection);
     favorites = [selection, ...favorites.filter((favorite) => JSON.stringify(favorite) !== key)].slice(0, 24);

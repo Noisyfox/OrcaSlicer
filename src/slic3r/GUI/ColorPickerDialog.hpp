@@ -37,6 +37,7 @@ private:
     bool m_init_sent = false;
     bool m_initialized = false;
     bool m_closing = false;
+    bool m_favorites_writable = false;
     std::shared_ptr<std::atomic<bool>> m_alive = std::make_shared<std::atomic<bool>>(true);
 };
 

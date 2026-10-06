@@ -1,7 +1,9 @@
 #include "ColorPickerDialog.hpp"
+#include "ColorPickerFavorites.hpp"
 
 #include "GUI_App.hpp"
 #include "I18N.hpp"
+#include "libslic3r/AppConfig.hpp"
 
 #include <atomic>
 #include <memory>
@@ -30,6 +32,11 @@ ColorPickerDialog::ColorPickerDialog(wxWindow* parent, const ColorSelection& ini
                                  wxSize(600, 660), wxSize(570, 620));
     if (!m_available)
         return;
+    if (wxGetApp().app_config) {
+        const auto stored = load_color_picker_favorites(*wxGetApp().app_config);
+        m_favorites = stored.favorites;
+        m_favorites_writable = stored.writable;
+    }
     // The shared host attaches its sizer before constructing the full layout.
     GetSizer()->SetSizeHints(this);
     SetMinSize(FromDIP(wxSize(570, 620)));
@@ -102,11 +109,17 @@ void ColorPickerDialog::handle_web_command(const nlohmann::json& payload)
         finish(wxID_OK);
     } else if (*command == "update_favorites") {
         const auto values = payload.find("favorites");
-        if (values == payload.end())
+        if (values == payload.end() || !m_favorites_writable || !wxGetApp().app_config)
             return;
         const auto favorites = color_favorites_from_json(*values);
-        if (favorites)
+        if (favorites && save_color_picker_favorites(*wxGetApp().app_config, *values)) {
             m_favorites = *favorites;
+            nlohmann::json canonical = nlohmann::json::array();
+            for (const ColorSelection& selection : m_favorites)
+                canonical.push_back(color_selection_to_json(selection));
+            const nlohmann::json response = {{"command", "favorites"}, {"page_id", m_page_id}, {"favorites", std::move(canonical)}};
+            run_script(wxString::FromUTF8("window.ColorPickerDialog.handleMessage(" + response.dump() + ")"));
+        }
     }
 }
 
@@ -117,7 +130,8 @@ void ColorPickerDialog::send_initial_state()
         favorites.push_back(color_selection_to_json(selection));
     const nlohmann::json payload = {{"command", "init"}, {"page_id", m_page_id},
                                    {"options", {{"allow_gradient", m_options.allow_gradient}, {"allow_alpha", m_options.allow_alpha}}},
-                                   {"selection", color_selection_to_json(m_initial)}, {"favorites", std::move(favorites)}};
+                                   {"selection", color_selection_to_json(m_initial)}, {"favorites", std::move(favorites)},
+                                   {"favorites_writable", m_favorites_writable}};
     m_init_sent = true;
     // Already deferred and guarded: avoid the shared call_web_handler's unguarded
     // second CallAfter, which could run after this modal dialog is destroyed.

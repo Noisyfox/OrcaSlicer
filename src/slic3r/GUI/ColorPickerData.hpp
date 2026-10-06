@@ -32,8 +32,8 @@ std::optional<ColorSelection> color_selection_from_json(const nlohmann::json& va
 // std::invalid_argument for invalid native channels; never drops endpoint alpha.
 nlohmann::json color_selection_to_json(const ColorSelection& selection);
 
-// Favorites always retain full RGBA/gradient capabilities. Reject an invalid
-// collection as a whole, including collections exceeding the 24-slot limit.
+// Favorites retain full RGBA/gradient capabilities and deduplicate canonical
+// values in order. Reject invalid collections or inputs exceeding 24 slots.
 std::optional<std::vector<ColorSelection>> color_favorites_from_json(const nlohmann::json& values);
 
 } // namespace Slic3r::GUI

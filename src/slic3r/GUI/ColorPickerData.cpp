@@ -3,6 +3,7 @@
 #include <cmath>
 #include <cstddef>
 #include <stdexcept>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -104,11 +105,13 @@ std::optional<std::vector<ColorSelection>> color_favorites_from_json(const nlohm
         return std::nullopt;
     std::vector<ColorSelection> favorites;
     favorites.reserve(values.size());
+    std::set<std::string> seen;
     for (const auto& value : values) {
         const auto selection = color_selection_from_json(value, {true, true});
         if (!selection)
             return std::nullopt;
-        favorites.push_back(*selection);
+        if (seen.insert(color_selection_to_json(*selection).dump()).second)
+            favorites.push_back(*selection);
     }
     return favorites;
 }

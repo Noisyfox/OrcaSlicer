@@ -131,6 +131,8 @@ set(SLIC3R_GUI_SOURCES
     GUI/ColorPickerData.hpp
     GUI/ColorPickerDialog.cpp
     GUI/ColorPickerDialog.hpp
+    GUI/ColorPickerFavorites.cpp
+    GUI/ColorPickerFavorites.hpp
     GUI/ActionRegistry.cpp
     GUI/ActionRegistry.hpp
     GUI/NativeCommands.cpp
