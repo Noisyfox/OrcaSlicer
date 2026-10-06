@@ -40,6 +40,14 @@ changes. Programmatic assignments remain silent, and reading a field never
 writes legacy favorites. Only the unavailable-WebView native fallback uses the
 legacy custom-color configuration.
 
+AMS material settings retain their fixed/AMS swatches and first-level popup. Only
+its custom-color action opens the solid, opaque editor, anchored to that custom
+control. The transient popup releases its grab while the modal is open and returns
+to the same selection on cancellation. Confirmation uses the existing default-color
+and packed RGBA event path. Device permission/status checks remain at the first-level
+entry. Legacy native custom colors are read and written only in the unavailable-
+WebView fallback.
+
 Native gettext strings are installed at document start. Static page labels and
 palette names use stable English keys; RAL codes, channel symbols, and numeric
 labels remain data. The palette color values do not depend on the UI language.
