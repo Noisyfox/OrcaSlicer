@@ -24,6 +24,8 @@ in their stored vector order and apply changes through `sync_colour_config`,
 retaining the existing RGB profile/project format and dirty marking. Ordered
 custom results bypass the official palette's `FilamentColor` set. Choosing an
 official swatch retains its existing palette behavior.
+The Linux sidebar's Change extruder color menu uses this same custom editor and
+the filament swatch anchor, including ordered gradients and configuration syncing.
 
 Striped colors and gradients with more than two endpoints cannot be represented
 by this editor. A notice explains that the current selection is retained; the

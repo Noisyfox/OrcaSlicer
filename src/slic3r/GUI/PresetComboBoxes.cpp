@@ -41,7 +41,6 @@
 #include <wx/textctrl.h>
 #include <wx/button.h>
 #include <wx/statbox.h>
-#include <wx/colordlg.h>
 #include <wx/wupdlock.h>
 #include <wx/menu.h>
 #include <wx/odcombo.h>
@@ -1101,30 +1100,8 @@ bool PlaterPresetComboBox::switch_to_tab()
 
 void PlaterPresetComboBox::change_extruder_color()
 {
-    // get current color
-    DynamicPrintConfig* cfg = &wxGetApp().preset_bundle->project_config;
-    auto colors = static_cast<ConfigOptionStrings*>(cfg->option("filament_colour")->clone());
-    wxColour clr(colors->values[m_filament_idx]);
-    if (!clr.IsOk())
-        clr = wxColour(0, 0, 0); // Don't set alfa to transparence
-
-    auto data = new wxColourData();
-    data->SetChooseFull(1);
-    data->SetColour(clr);
-
-    wxColourDialog dialog(this, data);
-    dialog.CenterOnParent();
-    if (dialog.ShowModal() == wxID_OK)
-    {
-        colors->values[m_filament_idx] = dialog.GetColourData().GetColour().GetAsString(wxC2S_HTML_SYNTAX).ToStdString();
-
-        DynamicPrintConfig cfg_new = *cfg;
-        cfg_new.set_key_value("filament_colour", colors);
-
-        wxGetApp().get_tab(Preset::TYPE_PRINTER)->load_config(cfg_new);
-        this->update();
-        wxGetApp().plater()->on_config_change(cfg_new);
-    }
+    // The Linux sidebar menu edits the same ordered project color as its swatch.
+    show_default_color_picker();
 }
 
 void PlaterPresetComboBox::show_add_menu()
