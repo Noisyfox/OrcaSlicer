@@ -108,3 +108,23 @@ TEST_CASE("Every hexadecimal byte survives a bridge round trip", "[ColorPickerDa
         REQUIRE(color_selection_to_json(*selection) == value);
     }
 }
+
+TEST_CASE("Favorite bridge collections reject malformed entries atomically and retain full capabilities", "[ColorPickerData]")
+{
+    const json solid = {{"type", "solid"}, {"colors", {"#ABCDEF20"}}};
+    const json gradient = {{"type", "gradient"}, {"colors", {"#FF000000", "#0000FF80"}}};
+    const auto favorites = color_favorites_from_json(json::array({solid, gradient}));
+    REQUIRE(favorites.has_value());
+    REQUIRE(favorites->size() == 2);
+    REQUIRE(color_selection_to_json((*favorites)[0]) == solid);
+    REQUIRE(color_selection_to_json((*favorites)[1]) == gradient);
+    const auto empty = color_favorites_from_json(json::array());
+    REQUIRE(empty.has_value());
+    REQUIRE(empty->empty());
+    REQUIRE_FALSE(color_favorites_from_json(json::object()).has_value());
+    REQUIRE_FALSE(color_favorites_from_json(json::array({solid, nullptr})).has_value());
+    json too_many = json::array();
+    for (int i = 0; i < 25; ++i)
+        too_many.push_back(solid);
+    REQUIRE_FALSE(color_favorites_from_json(too_many).has_value());
+}

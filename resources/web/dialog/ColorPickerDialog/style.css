@@ -1,5 +1,8 @@
 :root { --thumb-size: 20px; }
 
+#pickerEditors { border: 0; margin: 0; padding: 0; min-inline-size: 0; }
+#pickerEditors:disabled #spectrum { pointer-events: none; }
+
 * { box-sizing: border-box; }
 
 body {

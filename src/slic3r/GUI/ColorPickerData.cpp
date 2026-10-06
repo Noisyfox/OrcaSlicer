@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 #include <nlohmann/json.hpp>
 
@@ -95,6 +96,21 @@ nlohmann::json color_selection_to_json(const ColorSelection& selection)
         return {{"type", "solid"}, {"colors", {rgba_hex(*solid)}}};
     const auto& gradient = std::get<ColorGradient>(*normalized);
     return {{"type", "gradient"}, {"colors", {rgba_hex(gradient[0]), rgba_hex(gradient[1])}}};
+}
+
+std::optional<std::vector<ColorSelection>> color_favorites_from_json(const nlohmann::json& values)
+{
+    if (!values.is_array() || values.size() > 24)
+        return std::nullopt;
+    std::vector<ColorSelection> favorites;
+    favorites.reserve(values.size());
+    for (const auto& value : values) {
+        const auto selection = color_selection_from_json(value, {true, true});
+        if (!selection)
+            return std::nullopt;
+        favorites.push_back(*selection);
+    }
+    return favorites;
 }
 
 } // namespace Slic3r::GUI

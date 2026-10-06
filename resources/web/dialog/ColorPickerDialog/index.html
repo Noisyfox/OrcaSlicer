@@ -9,6 +9,7 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+<fieldset id="pickerEditors" disabled>
 <div class="main-wrapper">
 
   <div class="left-panel">
@@ -16,7 +17,7 @@
       <option value="basic">Basic Colors</option>
       <option value="orca">Orca Palette</option>
       <option value="ral">RAL Classic</option>
-      <option value="gradient">Gradients</option>
+      <option value="gradient" hidden>Gradients</option>
     </select></div>
     <div class="palette" id="palette" tabindex="-1"></div>
   </div>
@@ -26,7 +27,7 @@
       <input type="radio" id="tab1" name="tab" checked>
       <label for="tab1">Color</label>
       <input type="radio" id="tab2" name="tab">
-      <label for="tab2">Gradient</label>
+      <label for="tab2" class="hidden">Gradient</label>
     </div>
 
     <div class="spectrum-container">
@@ -98,6 +99,7 @@
     </div>
   </div>
 </div><div class="dialog-actions"><button id="cancelBtn">Cancel</button><button id="confirmBtn">OK</button></div>
+</fieldset>
 <script src="palettes.js"></script><script src="colorpicker-model.js"></script><script src="colorpicker.js"></script></body></html>
 
 

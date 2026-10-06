@@ -9,10 +9,13 @@
   const rgbPairs = ["r", "g", "b"].map((name) => [byId(name + "Slider"), byId(name + "Value")]);
   const hslPairs = ["h", "s", "l"].map((name) => [byId(name + "Slider"), byId(name + "Value")]);
   const alphaPair = [byId("aSlider"), byId("aValue")];
-  let state = model.createState(), favorites = [], dragging = false;
+  const pageId = Date.now().toString(36) + Math.random().toString(36).slice(2);
+  let state = model.createState(), favorites = [], dragging = false, initialized = false;
 
   function emit(command, data = {}) {
     window.dispatchEvent(new CustomEvent("color-picker-message", {detail: {command, ...data}}));
+    if (window.wx && typeof window.wx.postMessage === "function")
+      window.wx.postMessage(JSON.stringify({command, page_id: pageId, ...data}));
   }
 
   function setSwatch(element, selection) {
@@ -91,7 +94,30 @@
     byId("alphaControls").classList.toggle("hidden", !state.options.allow_alpha);
     hexInput.maxLength = state.options.allow_alpha ? 9 : 7;
     populatePalette(); drawFavorites(); render(true);
+    initialized = true;
+    byId("pickerEditors").disabled = false;
     return true;
+  }
+
+  function handleMessage(payload) {
+    if (!payload || typeof payload !== "object" || payload.page_id !== pageId) return false;
+    if (payload.command === "init") {
+      const options = payload.options;
+      if (!options || typeof options.allow_gradient !== "boolean" || typeof options.allow_alpha !== "boolean" ||
+          !model.normalizeSelection(payload.selection, options) || !validFavorites(payload.favorites)) return false;
+      if (initialized) return true;
+      if (!init(payload)) return false;
+      emit("initialized");
+      return true;
+    }
+    if (payload.command === "favorites" && initialized && validFavorites(payload.favorites)) {
+      favorites = model.normalizeFavorites(payload.favorites); drawFavorites(); return true;
+    }
+    return false;
+  }
+
+  function validFavorites(values) {
+    return Array.isArray(values) && values.length <= 24 && values.every((value) => model.normalizeSelection(value, {allow_gradient: true, allow_alpha: true}));
   }
 
   function drawSpectrum() {
@@ -176,10 +202,10 @@
     return inputs.every((input) => input.reportValidity());
   }
   function confirm() {
-    if (validateEditors()) emit("confirm", {selection: model.exportSelection(state)});
+    if (initialized && validateEditors()) emit("confirm", {selection: model.exportSelection(state)});
   }
   byId("saveColorBtn").addEventListener("click", () => {
-    if (!validateEditors()) return;
+    if (!initialized || !validateEditors()) return;
     const selection = model.exportSelection(state);
     const key = JSON.stringify(selection);
     favorites = [selection, ...favorites.filter((favorite) => JSON.stringify(favorite) !== key)].slice(0, 24);
@@ -195,8 +221,8 @@
   });
 
   window.ColorPickerDialog = {
-    init, exportSelection: () => model.exportSelection(state),
+    init, handleMessage, exportSelection: () => model.exportSelection(state),
     setFavorites: (values) => { favorites = model.normalizeFavorites(values); drawFavorites(); }
   };
-  drawSpectrum(); init({}); emit("ready");
+  drawSpectrum(); populatePalette(); drawFavorites(); render(true); emit("ready");
 })();
