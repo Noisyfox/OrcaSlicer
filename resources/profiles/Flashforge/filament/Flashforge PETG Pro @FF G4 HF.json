@@ -5,10 +5,10 @@
 	"from": "system",
 	"setting_id": "R0nZuLXEo5qA6Mt8",
 	"filament_id": "OFXiArjA",
+	"instantiation": "true",
 	"filament_vendor": [
 		"Flashforge"
 	],
-	"instantiation": "true",
 	"activate_air_filtration": [
 		"1"
 	],
@@ -89,6 +89,12 @@
 	],
 	"support_material_interface_fan_speed": [
 		"90"
+	],
+	"supertack_plate_temp": [
+		"60"
+	],
+	"supertack_plate_temp_initial_layer": [
+		"60"
 	],
 	"temperature_vitrification": [
 		"70"

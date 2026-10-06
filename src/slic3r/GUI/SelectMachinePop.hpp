@@ -1,6 +1,15 @@
 #ifndef slic3r_GUI_SelectMachinePop_hpp_
 #define slic3r_GUI_SelectMachinePop_hpp_
 
+#include <wx/event.h>
+#include <wx/dc.h>
+#include <cstddef>
+#include "slic3r/GUI/Widgets/HyperLink.hpp"
+#include <vector>
+#include <memory>
+#include <string>
+#include <map>
+#include "slic3r/GUI/Widgets/TextInput.hpp"
 #include <wx/wx.h>
 #include <wx/intl.h>
 #include <wx/collpane.h>
@@ -183,7 +192,9 @@ private:
     HyperLink*                        m_hyperlink{nullptr}; // ORCA
     wxBoxSizer *                      m_sizer_my_devices{nullptr};
     wxBoxSizer *                      m_sizer_other_devices{nullptr};
+#if defined(__WINDOWS__)
     wxBoxSizer *                      m_sizer_search_bar{nullptr};
+#endif
     wxSearchCtrl*                     m_search_bar{nullptr};
     wxScrolledWindow *                m_scrolledWindow{nullptr};
     wxTimer *                         m_refresh_timer{nullptr};

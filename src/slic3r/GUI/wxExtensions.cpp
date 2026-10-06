@@ -1,11 +1,34 @@
 #include "wxExtensions.hpp"
 
+#include <functional>
+#include <algorithm>
+#include "slic3r/GUI/BitmapCache.hpp"
+#include "libslic3r/Exception.hpp"
+#include <cstddef>
+#include "libslic3r/Utils.hpp"
+#include "slic3r/GUI/Widgets/PopupWindow.hpp"
 #include <stdexcept>
 #include <cmath>
 
+#include <wx/event.h>
+#include <wx/checklst.h>
+#include <string>
+#include <wx/gdicmn.h>
+#include <wx/dataview.h>
+#include <vector>
+#include <wx/dcclient.h>
+#include <wx/dcmemory.h>
+#include <wx/colour.h>
+#include <wx/colourdata.h>
+#include <wx/anybutton.h>
+#include <wx/object.h>
+#include <wx/popupwin.h>
+#include <wx/panel.h>
 #include <wx/sizer.h>
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/log/trivial.hpp>
+#include <wx/utils.h>
+#include <wx/string.h>
 
 #include "GUI.hpp"
 #include "GUI_App.hpp"
@@ -13,13 +36,14 @@
 #include "I18N.hpp"
 #include "GUI_Utils.hpp"
 #include "Plater.hpp"
-#include "../Utils/MacDarkMode.hpp"
 #include "BitmapComboBox.hpp"
 #include "Widgets/StaticBox.hpp"
 #include "Widgets/Label.hpp"
 #include "../Utils/WxFontUtils.hpp"
 #include "FilamentBitmapUtils.hpp"
 #include "../Utils/ColorSpaceConvert.hpp"
+#include "libslic3r_version.h"
+#include <map>
 #ifndef __linux__
 // msw_menuitem_bitmaps is used for MSW and OSX
 static std::map<int, std::string> msw_menuitem_bitmaps;
@@ -617,7 +641,7 @@ wxColourData show_sys_picker_dialog(wxWindow *parent, const wxColourData &clr_da
     }
 
     wxColourDialog dialog(parent, &data);
-    dialog.SetTitle(_L("Please choose the filament colour"));
+    dialog.SetTitle(_L("Please choose the filament color"));
 
     if (dialog.ShowModal() == wxID_OK) {
         data = dialog.GetColourData();
@@ -1222,7 +1246,7 @@ ImageTransientPopup::ImageTransientPopup( wxWindow *parent, bool scrolled, wxBit
         m_panel->SetSize(300, 300);
 
         // And also actually enable them.
-        m_panel->SetScrollRate(10, 10);
+        m_panel->SetScrollRate(10, FromDIP(20));
     }
     else
     {

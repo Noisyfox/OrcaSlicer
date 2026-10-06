@@ -1,20 +1,47 @@
+#include "Flow.hpp"
+#include "Config.hpp"
+#include "ExPolygon.hpp"
+#include "ExtrusionEntity.hpp"
+#include "Exception.hpp"
 #include "Layer.hpp"
 #include "BridgeDetector.hpp"
 #include "ClipperUtils.hpp"
 #include "Geometry.hpp"
+#include "Line.hpp"
 #include "PerimeterGenerator.hpp"
 #include "Point.hpp"
+#include "Polygon.hpp"
+#include "Polyline.hpp"
 #include "Print.hpp"
+#include "PrintConfig.hpp"
 #include "Surface.hpp"
 #include "BoundingBox.hpp"
 #include "SVG.hpp"
 #include "Algorithm/RegionExpansion.hpp"
+#include "libslic3r.h"
+#include "Utils.hpp"
 
+#include <cmath>
+#include <array>
+#include <cstddef>
+#include <initializer_list>
+#include <algorithm>
+#include <cstdint>
+#include <optional>
+#include <iterator>
+#include <stdexcept>
+#include <math.h>
+#include <cassert>
 #include <string>
 #include <map>
 
 #include <boost/log/trivial.hpp>
 #include <boost/algorithm/clamp.hpp>
+#include <utility>
+#include <vector>
+#include "ExtrusionEntityCollection.hpp"
+#include "MultiMaterialSegmentation.hpp"
+#include "SurfaceCollection.hpp"
 
 namespace Slic3r {
 
@@ -120,9 +147,6 @@ void LayerRegion::make_perimeters(const SurfaceCollection &slices, const LayerRe
         fill_no_overlap
     );
     
-    if (this->layer()->lower_layer != nullptr)
-        // Cummulative sum of polygons over all the regions.
-        g.lower_slices = &this->layer()->lower_layer->lslices;
     if (this->layer()->upper_layer != NULL)
         g.upper_slices = &this->layer()->upper_layer->lslices;
 
@@ -134,6 +158,13 @@ void LayerRegion::make_perimeters(const SurfaceCollection &slices, const LayerRe
     g.ext_perimeter_flow    = this->flow(frExternalPerimeter);
     g.overhang_flow         = this->bridging_flow(frPerimeter, object_config.thick_bridges);
     g.solid_infill_flow     = this->flow(frSolidInfill);
+
+    // Cumulative sum of polygons over all the regions, less what the lower layer could not print.
+    ExPolygons lower_slices;
+    if (this->layer()->lower_layer != nullptr) {
+        lower_slices   = g.printable_slices(this->layer()->lower_layer->lslices);
+        g.lower_slices = &lower_slices;
+    }
 
     if (this->layer()->object()->config().wall_generator.value == PerimeterGeneratorType::Arachne && !spiral_mode)
         g.process_arachne();
@@ -623,9 +654,9 @@ void LayerRegion::process_external_surfaces(const Layer *lower_layer, const Poly
 }
 #else
 
-//#define EXTERNAL_SURFACES_OFFSET_PARAMETERS ClipperLib::jtMiter, 3.
-//#define EXTERNAL_SURFACES_OFFSET_PARAMETERS ClipperLib::jtMiter, 1.5
-#define EXTERNAL_SURFACES_OFFSET_PARAMETERS ClipperLib::jtSquare, 0.
+//#define EXTERNAL_SURFACES_OFFSET_PARAMETERS jtMiter, 3.
+//#define EXTERNAL_SURFACES_OFFSET_PARAMETERS jtMiter, 1.5
+#define EXTERNAL_SURFACES_OFFSET_PARAMETERS jtSquare, 0.
 
 void LayerRegion::process_external_surfaces(const Layer *lower_layer, const Polygons *lower_layer_covered)
 {
@@ -1070,7 +1101,7 @@ void LayerRegion::simplify_entity_collection(ExtrusionEntityCollection* entity_c
 
 void LayerRegion::simplify_path(ExtrusionPath* path)
 {
-    const auto print_config = this->layer()->object()->print()->config();
+    const auto &print_config = this->layer()->object()->print()->config();
     const bool spiral_mode = print_config.spiral_mode;
     const bool enable_arc_fitting = print_config.enable_arc_fitting;
     const auto scaled_resolution = scaled<double>(print_config.resolution.value);
@@ -1088,7 +1119,7 @@ void LayerRegion::simplify_path(ExtrusionPath* path)
 
 void LayerRegion::simplify_multi_path(ExtrusionMultiPath* multipath)
 {
-    const auto print_config = this->layer()->object()->print()->config();
+    const auto &print_config = this->layer()->object()->print()->config();
     const bool spiral_mode = print_config.spiral_mode;
     const bool enable_arc_fitting = print_config.enable_arc_fitting;
     const auto scaled_resolution = scaled<double>(print_config.resolution.value);
@@ -1108,7 +1139,7 @@ void LayerRegion::simplify_multi_path(ExtrusionMultiPath* multipath)
 
 void LayerRegion::simplify_loop(ExtrusionLoop* loop)
 {
-    const auto print_config = this->layer()->object()->print()->config();
+    const auto &print_config = this->layer()->object()->print()->config();
     const bool spiral_mode = print_config.spiral_mode;
     const bool enable_arc_fitting = print_config.enable_arc_fitting;
     const auto scaled_resolution = scaled<double>(print_config.resolution.value);

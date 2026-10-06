@@ -5,17 +5,27 @@
 
 #include "../libslic3r.h"
 
+#include <cstdint>
+#include <cstddef>
+#include <algorithm>
 #include <functional>
 #include <map>
+#include <tuple>
+#include <set>
+#include <unordered_map>
+#include <string>
 #include <utility>
 
 #include <boost/container/small_vector.hpp>
-#include "../FilamentGroup.hpp"
+#include <vector>
 #include "../FilamentMixer.hpp"
 #include "../MultiNozzleUtils.hpp"
-#include "../ExtrusionEntity.hpp"
 #include "../ObjectID.hpp"
 #include "../PrintConfig.hpp"
+
+namespace Slic3r { class ExtrusionEntity; }
+namespace Slic3r { class ExtrusionEntityCollection; }
+namespace Slic3r { enum ExtrusionRole : uint8_t; }
 
 namespace Slic3r {
 
@@ -416,6 +426,11 @@ private:
 
     int                        most_used_extruder;
 };
+
+// Parse the user defined cyclic toolchange sequence ("3,2 , 1 , 4") into 0-based filament indices.
+// Out-of-range entries, duplicates and non-numeric tokens are dropped, so a partially valid string
+// still orders the filaments it does name. Exposed for unit testing.
+std::vector<unsigned int> parse_cyclic_order(const std::string& str, unsigned int number_of_extruders);
 
 } // namespace SLic3r
 
