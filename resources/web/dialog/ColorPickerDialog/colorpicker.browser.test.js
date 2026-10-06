@@ -127,10 +127,30 @@ test("Live app theme overrides the opposite system scheme without changing color
       document.documentElement.dataset.orcaTheme = value;
       const colors = value === "light" ? {bg: "#ffffff", fg: "#262e30", muted: "#363636", border: "#dbdbdb", accent: "#009688"} : {bg: "#2d2d31", fg: "#efeff0", muted: "#b2b3b5", border: "#36363b", accent: "#00675b"};
       for (const [key, color] of Object.entries(colors)) document.documentElement.style.setProperty("--orca-" + key, color);
+      document.documentElement.style.setProperty("--orca-accent-fg", "#ffffff");
     }, theme);
     assert.equal(await page.locator("body").evaluate(element => getComputedStyle(element).backgroundColor), background);
     assert.equal(await page.locator("html").evaluate(element => getComputedStyle(element).colorScheme), theme);
     assert.deepEqual(await page.evaluate(() => ({selection: ColorPickerDialog.exportSelection(), spectrum: document.getElementById("spectrum").toDataURL()})), initial);
+    for (const id of ["modeSwitch", "gradientSwitch"]) for (const checked of [false, true]) {
+      if (await page.locator("#" + id).isChecked() !== checked) await page.locator(`label[for=${id}]`).click();
+      await page.evaluate(async () => {
+        await Promise.all(document.getAnimations().map(animation => animation.finished.catch(() => {})));
+      });
+      const result = await page.locator(`label[for=${id}]`).evaluate((element, selected) => {
+        const tokenColor = token => {
+          const probe = document.createElement("span"); probe.style.cssText = `position:absolute;visibility:hidden;color:var(${token})`;
+          document.body.appendChild(probe); const color = getComputedStyle(probe).color; probe.remove(); return color;
+        };
+        const labels = element.querySelectorAll(".switch-label");
+        return {selected: getComputedStyle(labels[selected ? 1 : 0]).color,
+          unselected: getComputedStyle(labels[selected ? 0 : 1]).color,
+          accentForeground: tokenColor("--button-fg-light"), mutedForeground: tokenColor("--fg-color-label")};
+      }, checked);
+      assert.equal(result.selected, result.accentForeground, `${theme} ${id} selected text uses the accent foreground`);
+      assert.equal(result.unselected, result.mutedForeground, `${theme} ${id} unselected text stays muted`);
+      assert.deepEqual(await page.evaluate(() => ColorPickerDialog.exportSelection()), initial.selection, "switching editors/endpoints keeps color and byte alpha");
+    }
   }
 });
 

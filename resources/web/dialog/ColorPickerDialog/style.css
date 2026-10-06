@@ -214,7 +214,7 @@ body {
 }
 .switch-check:checked + .switch-slider div:last-child,
 .switch-check         + .switch-slider div:first-child{
-  color: var(--fg-color-text);
+  color: var(--button-fg-light);
   transition: all 0.2s;
 }
 
