@@ -63,6 +63,9 @@ adds no material. Only backend unavailability opens the positioned native fallba
 Native gettext strings are installed at document start. Static page labels and
 palette names use stable English keys; RAL codes, channel symbols, and numeric
 labels remain data. The palette color values do not depend on the UI language.
+The application locale also sets the document language. Numeric editor validation
+uses the application's gettext messages, rather than browser language defaults;
+missing translations fall back to the stable English keys.
 
 The pure color/state regressions run with
 `node --test resources/web/dialog/ColorPickerDialog/colorpicker.test.js`.

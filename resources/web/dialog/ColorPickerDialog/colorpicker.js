@@ -1,5 +1,6 @@
 "use strict";
 (() => {
+  if (window.ORCA_COLOR_PICKER_LANGUAGE) document.documentElement.lang = window.ORCA_COLOR_PICKER_LANGUAGE;
   const T = (key) => window.ORCA_COLOR_PICKER_STRINGS?.[key] || key;
   document.title = T("Color Picker");
   for (const element of document.querySelectorAll("[data-i18n]")) element.textContent = T(element.dataset.i18n);
@@ -58,13 +59,17 @@
     for (const [pairs, values] of [[rgbPairs, color], [hslPairs, hsl]]) {
       pairs.forEach(([slider, input], index) => {
         slider.value = values[index];
+        if (resetEditors) input.setCustomValidity("");
         if (resetEditors || input.checkValidity()) input.value = Math.round(values[index] * 10) / 10;
         slider.style.setProperty("--thumb-color", model.toHex(color));
       });
     }
     // Percentage is a display only until explicitly edited. Never round it back
     // into the alpha byte on endpoint switches, RGB edits, or confirmation.
-    alphaPair.forEach((input) => { if (resetEditors || input.checkValidity()) input.value = Math.round(color[3] / 255 * 1000) / 10; });
+    alphaPair.forEach((input) => {
+      if (resetEditors) input.setCustomValidity("");
+      if (resetEditors || input.checkValidity()) input.value = Math.round(color[3] / 255 * 1000) / 10;
+    });
     const rgbHex = model.toHex([...color.slice(0, 3), 255]);
     alphaPair[0].style.setProperty("--track-gradient", `linear-gradient(to right, ${rgbHex.slice(0,7)}00, ${rgbHex})`);
     alphaPair[0].style.setProperty("--thumb-color", rgbHex);
@@ -190,6 +195,7 @@
     input.required = true;
     for (const control of pair) {
       control.addEventListener("input", () => {
+        control.setCustomValidity("");
         if (control.value === "" || !control.checkValidity()) return;
         const value = Number(control.value);
         if (!Number.isFinite(value)) return;
@@ -234,6 +240,13 @@
     const pairs = modeSwitch.checked ? hslPairs : rgbPairs;
     const inputs = [hexInput, ...pairs.map(([, input]) => input)];
     if (state.options.allow_alpha) inputs.push(alphaPair[1]);
+    for (const input of inputs) {
+      if (input === hexInput) continue;
+      input.setCustomValidity("");
+      const validity = input.validity;
+      if (!validity.valid)
+        input.setCustomValidity(T(validity.rangeUnderflow || validity.rangeOverflow ? "Value is out of range." : "Invalid input"));
+    }
     return inputs.every((input) => input.reportValidity());
   }
   function confirm() {

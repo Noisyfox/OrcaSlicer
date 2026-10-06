@@ -14,15 +14,16 @@ const url = pathToFileURL(resolve(__dirname, "index.html")).href;
 let browser;
 before(async () => { if (chromium) browser = await chromium.launch({headless: true, ...(process.env.ORCA_BROWSER_EXECUTABLE ? {executablePath: process.env.ORCA_BROWSER_EXECUTABLE} : {})}); });
 after(async () => { if (browser) await browser.close(); });
-async function open(t, strings = {}) {
+async function open(t, strings = {}, language = "") {
   const page = await browser.newPage({viewport: {width: 600, height: 660}}), errors = [];
   page.on("pageerror", error => errors.push(error.message));
   t.after(async () => { await page.close(); assert.deepEqual(errors, []); });
-  await page.addInitScript(table => {
+  await page.addInitScript(({table, language}) => {
     window.ORCA_COLOR_PICKER_STRINGS = table;
+    window.ORCA_COLOR_PICKER_LANGUAGE = language;
     window.messages = [];
     window.wx = {postMessage: text => messages.push(JSON.parse(text))};
-  }, strings);
+  }, {table: strings, language});
   await page.goto(url);
   const ready = await page.evaluate(() => messages[0]);
   assert.equal(ready.command, "ready");
@@ -97,11 +98,11 @@ test("Read-only favorites remain selectable and late documents cannot initialize
   assert.equal(await send(init(ready)), false); assert.equal(await page.locator("#confirmBtn").isDisabled(), true);
 });
 
-test("Document strings translate all palette names while retaining RAL codes and numeric labels", options, async t => {
+test("Document strings translate palette names and editor errors while retaining RAL codes and numeric labels", options, async t => {
   const source = readFileSync(resolve(__dirname, "../../../../src/slic3r/GUI/ColorPickerStrings.cpp"), "utf8");
   const keys = [...source.matchAll(/_u8L\("([^"\n]+)"\)/g)].map(match => match[1]);
   const strings = Object.fromEntries(keys.map(key => [key, "Translated: " + key]));
-  const {page, ready, send} = await open(t, strings); await send({...init(ready, true), preserve_multi_color: true});
+  const {page, ready, send} = await open(t, strings); await send({...init(ready, true, true), preserve_multi_color: true});
   assert.equal(await page.title(), strings["Color Picker"]);
   for (const element of await page.locator("[data-i18n]").all()) assert.equal(await element.textContent(), strings[await element.getAttribute("data-i18n")]);
   for (const attribute of ["aria-label", "title"]) for (const element of await page.locator(`[data-i18n-${attribute}]`).all())
@@ -116,6 +117,38 @@ test("Document strings translate all palette names while retaining RAL codes and
   }
   await page.locator("#hexInput").fill("bad");
   assert.equal(await page.locator("#hexInput").evaluate(element => element.validationMessage), strings["Enter a complete hexadecimal color"]);
+  await page.locator("#hexInput").fill("12345680");
+  for (const [id, invalid, valid, key] of [["rValue", "999", "18", "Value is out of range."],
+                                         ["rValue", "", "18", "Invalid input"],
+                                         ["aValue", "101", "50", "Value is out of range."]]) {
+    const confirms = await count(page, "confirm");
+    await page.locator("#" + id).fill(invalid);
+    await page.locator("#confirmBtn").click();
+    assert.equal(await count(page, "confirm"), confirms);
+    assert.equal(await page.locator("#" + id).evaluate(element => element.validationMessage), strings[key]);
+    await page.locator("#" + id).fill(valid);
+    assert.equal(await page.locator("#" + id).evaluate(element => element.validationMessage), "");
+    await page.locator("#confirmBtn").click();
+    assert.equal(await count(page, "confirm"), confirms + 1);
+  }
+  await page.locator("label[for=modeSwitch]").click();
+  await page.locator("#hValue").fill("361");
+  await page.locator("#saveColorBtn").click();
+  assert.equal(await page.locator("#hValue").evaluate(element => element.validationMessage), strings["Value is out of range."]);
+  await page.locator(".color-item").first().click();
+  assert.equal(await page.locator("#hValue").evaluate(element => element.validationMessage), "", "a new palette selection clears the previous editor error");
+});
+
+test("Document language and escaped labels preserve untranslated English fallback", options, async t => {
+  const cancel = '取消 "Cancel" \\ /\n下一行';
+  const {page, ready, send} = await open(t, {Cancel: cancel}, "zh-CN");
+  await send(init(ready));
+  assert.equal(await page.locator("html").getAttribute("lang"), "zh-CN");
+  assert.equal(await page.locator("#cancelBtn").textContent(), cancel);
+  assert.equal(await page.title(), "Color Picker");
+  assert.equal(await page.locator(".color-name").first().textContent(), "Red");
+  assert.deepEqual(await page.locator("#slider-type-switch .switch-label").allTextContents(), ["RGB", "HSL"]);
+  assert.deepEqual(await page.evaluate(() => ColorPickerDialog.exportSelection()), {type: "solid", colors: ["#012345FF"]});
 });
 
 test("Live app theme overrides the opposite system scheme without changing colors", options, async t => {
