@@ -1,5 +1,6 @@
 #include "FilamentPickerDialog.hpp"
 #include "ColorPickerData.hpp"
+#include "libslic3r/Color.hpp"
 #include "FilamentColorPicker.hpp"
 #include <optional>
 #include "ColorPickerDialog.hpp"
@@ -613,16 +614,18 @@ void FilamentPickerDialog::BindEvents()
             const auto initial = filament_color_picker_initial(current);
             std::optional<ColorSelection> selected;
             {
-                ColorPickerDialog dialog(this, initial, {true, false}, !filament_color_picker_selection(current), m_more_btn);
+                ColorPickerDialog dialog(this, initial, {true, true}, !filament_color_picker_selection(current), m_more_btn);
                 if (dialog.is_available()) {
                     if (dialog.ShowModal() == wxID_OK)
                         selected = dialog.selection();
                 } else {
                     wxColourData original = GetSingleColorData();
+                    original.SetChooseAlpha(true);
                     original.SetColour(wxColour(wxString::FromUTF8(filament_color_picker_result(initial).colors.front())));
                     const wxColourData result = show_sys_picker_dialog(this, original);
                     if (result.GetColour() != original.GetColour()) {
-                        selected = filament_color_picker_selection({{result.GetColour().GetAsString(wxC2S_HTML_SYNTAX).ToStdString()}, false});
+                        const auto& color = result.GetColour();
+                        selected = ColorRGBA(color.Red(), color.Green(), color.Blue(), color.Alpha());
                     }
                 }
             }

@@ -31,7 +31,7 @@ FilamentColorPickerValue filament_color_picker_value(const DynamicPrintConfig& c
 
 std::optional<ColorSelection> filament_color_picker_selection(const FilamentColorPickerValue& value)
 {
-    return color_selection_from_json({{"type", value.gradient ? "gradient" : "solid"}, {"colors", value.colors}}, {true, false});
+    return color_selection_from_json({{"type", value.gradient ? "gradient" : "solid"}, {"colors", value.colors}}, {true, true});
 }
 
 ColorSelection filament_color_picker_initial(const FilamentColorPickerValue& value)
@@ -39,22 +39,25 @@ ColorSelection filament_color_picker_initial(const FilamentColorPickerValue& val
     if (const auto exact = filament_color_picker_selection(value))
         return *exact;
     if (!value.colors.empty()) {
-        if (const auto primary = color_selection_from_json({{"type", "solid"}, {"colors", {value.colors.front()}}}))
+        if (const auto primary = color_selection_from_json({{"type", "solid"}, {"colors", {value.colors.front()}}}, {false, true}))
             return *primary;
     }
-    if (const auto primary = color_selection_from_json({{"type", "solid"}, {"colors", {value.primary}}}))
+    if (const auto primary = color_selection_from_json({{"type", "solid"}, {"colors", {value.primary}}}, {false, true}))
         return *primary;
     return ColorRGBA(0.f, 0.f, 0.f, 1.f);
 }
 
 FilamentColorPickerValue filament_color_picker_result(const ColorSelection& selection)
 {
-    // Native filament/project formats remain RGB, even if a favorite has alpha.
+    // Keep legacy RGB spelling for opaque colors; retain RGBA for transparency.
     const auto canonical = color_selection_to_json(selection);
     FilamentColorPickerValue value;
     value.gradient = canonical.at("type") == "gradient";
-    for (const auto& color : canonical.at("colors"))
-        value.colors.push_back(color.get<std::string>().substr(0, 7));
+    for (const auto& color : canonical.at("colors")) {
+        auto hex = color.get<std::string>();
+        if (hex.compare(7, 2, "FF") == 0) hex.resize(7);
+        value.colors.push_back(std::move(hex));
+    }
     return value;
 }
 

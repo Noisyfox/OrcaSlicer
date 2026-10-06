@@ -19,13 +19,16 @@ endpoints. The bridge represents these as `{"type":"solid|gradient",
 Native validation rejects malformed hex and incorrect cardinality.
 
 The project filament color action and the official filament picker's More Colors
-action enable two-endpoint gradients and disable alpha. They read project colors
+action enable two-endpoint gradients and independent endpoint alpha. They read project colors
 in their stored vector order and apply changes through `sync_colour_config`,
-retaining the existing RGB profile/project format and dirty marking. Ordered
+retaining the existing RGB/RGBA profile/project formats and dirty marking.
+Opaque colors use `#RRGGBB`; nonopaque colors use `#RRGGBBAA`, including fully
+transparent alpha `00`. Initial selections, alpha-only edits and cancellation
+retain stored alpha. Both native fallbacks explicitly allow alpha. Ordered
 custom results bypass the official palette's `FilamentColor` set. Choosing an
 official swatch retains its existing palette behavior.
 The Linux sidebar's Change extruder color menu uses this same custom editor and
-the filament swatch anchor, including ordered gradients and configuration syncing.
+the filament swatch anchor, including alpha, ordered gradients and configuration syncing.
 
 Striped colors and gradients with more than two endpoints cannot be represented
 by this editor. A notice explains that the current selection is retained; the
