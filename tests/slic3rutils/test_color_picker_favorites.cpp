@@ -10,8 +10,7 @@
 #include "libslic3r/AppConfig.hpp"
 #include "libslic3r/Thread.hpp"
 #include "plugin_test_utils.hpp"
-#include "slic3r/GUI/ColorPickerFavorites.hpp"
-#include "slic3r/GUI/ColorPickerData.hpp"
+#include "slic3r/GUI/ColorPickerDialog.hpp"
 #include "slic3r/Utils/ColorSpaceConvert.hpp"
 #include <wx/colour.h>
 

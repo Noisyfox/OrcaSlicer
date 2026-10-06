@@ -1,7 +1,9 @@
 # Color picker
 
 The color picker is a local HTML dialog hosted by `ColorPickerDialog`, a
-`WebViewHostDialog` subclass. Its colors use the existing `ColorRGBA` utility.
+`WebViewHostDialog` subclass. Its header and implementation own the ordered
+selection contract, filament conversion, favorites persistence and private
+gettext string table. Its colors use the existing `ColorRGBA` utility.
 It appears as a rounded, borderless floating panel. macOS rounds the native view
 layer instead of calling `SetShape`, which synchronously resizes its window;
 other platforms use a validated shape region with a reentry guard.

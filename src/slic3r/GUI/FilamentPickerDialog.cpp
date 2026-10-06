@@ -1,9 +1,7 @@
 #include "FilamentPickerDialog.hpp"
-#include "ColorPickerData.hpp"
-#include "libslic3r/Color.hpp"
-#include "FilamentColorPicker.hpp"
-#include <optional>
 #include "ColorPickerDialog.hpp"
+#include "libslic3r/Color.hpp"
+#include <optional>
 #include <utility>
 #include "GUI.hpp"
 #include "I18N.hpp"

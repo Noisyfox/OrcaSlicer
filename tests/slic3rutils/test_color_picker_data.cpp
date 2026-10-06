@@ -7,7 +7,7 @@
 #include <catch2/generators/catch_generators.hpp>
 #include <nlohmann/json.hpp>
 
-#include "slic3r/GUI/ColorPickerData.hpp"
+#include "slic3r/GUI/ColorPickerDialog.hpp"
 #include "libslic3r/Color.hpp"
 
 using namespace Slic3r;

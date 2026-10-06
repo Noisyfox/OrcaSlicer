@@ -99,7 +99,7 @@ test("Read-only favorites remain selectable and late documents cannot initialize
 });
 
 test("Document strings translate palette names and editor errors while retaining RAL codes and numeric labels", options, async t => {
-  const source = readFileSync(resolve(__dirname, "../../../../src/slic3r/GUI/ColorPickerStrings.cpp"), "utf8");
+  const source = readFileSync(resolve(__dirname, "../../../../src/slic3r/GUI/ColorPickerDialog.cpp"), "utf8");
   const keys = [...source.matchAll(/_u8L\("([^"\n]+)"\)/g)].map(match => match[1]);
   const strings = Object.fromEntries(keys.map(key => [key, "Translated: " + key]));
   const {page, ready, send} = await open(t, strings); await send({...init(ready, true, true), preserve_multi_color: true});

@@ -69,7 +69,6 @@
 #include "ParamsDialog.hpp"
 #include "FilamentPickerDialog.hpp"
 #include "ColorPickerDialog.hpp"
-#include "FilamentColorPicker.hpp"
 #include "wxExtensions.hpp"
 
 #include "DeviceCore/DevManager.h"
