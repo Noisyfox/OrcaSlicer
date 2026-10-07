@@ -82,6 +82,12 @@ public:
 class ColorPickerPopup : public PopupWindow
 {
 public:
+    struct ColorItem
+    {
+        std::vector<wxColour> colors;
+        int                   ctype = 2;
+    };
+
     ScalableBitmap m_ts_bitmap_custom;
     wxStaticBitmap* m_ts_stbitmap_custom;
     StaticBox* m_custom_cp;
@@ -90,7 +96,7 @@ public:
     wxFlexGridSizer* m_ams_fg_sizer;
     wxColour m_def_col;
     std::vector<wxColour> m_def_colors;
-    std::vector<wxColour> m_ams_colors;
+    std::vector<ColorItem> m_ams_color_items;
     std::vector<ColorPicker*> m_color_pickers;
     std::vector<ColorPicker*> m_ams_color_pickers;
 
@@ -98,7 +104,7 @@ public:
     ColorPickerPopup(wxWindow* parent);
     ~ColorPickerPopup() {};
     void on_custom_clr_picker(wxMouseEvent& event);
-    void set_ams_colours(std::vector<wxColour> ams);
+    void set_ams_colours(const std::vector<ColorItem>& ams);
     void set_def_colour(wxColour col);
     void paintEvent(wxPaintEvent& evt);
     virtual void OnDismiss() wxOVERRIDE;

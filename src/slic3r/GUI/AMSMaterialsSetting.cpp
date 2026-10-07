@@ -81,6 +81,36 @@ static std::string float_to_string_with_precision(float value, int precision = 3
     return stream.str();
 }
 
+static std::vector<ColorPickerPopup::ColorItem> collect_ams_color_items(DevFilaSystem* fila_system)
+{
+    std::vector<ColorPickerPopup::ColorItem> items;
+    if (!fila_system) return items;
+
+    for (const auto& ams_pair : fila_system->GetAmsList()) {
+        DevAms* ams = ams_pair.second;
+        if (!ams) continue;
+
+        for (const auto& tray_pair : ams->GetTrays()) {
+            DevAmsTray* tray = tray_pair.second;
+            if (!tray || !tray->is_tray_info_ready()) continue;
+
+            ColorPickerPopup::ColorItem item;
+            for (const std::string& col : tray->cols) {
+                item.colors.emplace_back(DevAmsTray::decode_color(col));
+            }
+            if (item.colors.empty() && !tray->color.empty()) {
+                item.colors.emplace_back(DevAmsTray::decode_color(tray->color));
+            }
+            if (item.colors.empty()) continue;
+
+            item.ctype = item.colors.size() > 1 ? tray->ctype : 2;
+            items.emplace_back(std::move(item));
+        }
+    }
+
+    return items;
+}
+
 AMSMaterialsSetting::AMSMaterialsSetting(wxWindow *parent, wxWindowID id)
     : DPIDialog(parent, id, _L("AMS Materials Setting"), wxDefaultPosition, wxDefaultSize, wxCAPTION | wxCLOSE_BOX)
     , m_color_picker_popup(ColorPickerPopup(this))
@@ -912,13 +942,10 @@ void AMSMaterialsSetting::on_clr_picker(wxMouseEvent &event)
         }
     }
 
-    std::vector<wxColour> ams_colors;
-    obj->GetFilaSystem()->CollectAmsColors(ams_colors);
-
     wxPoint img_pos = m_clr_picker->ClientToScreen(wxPoint(0, 0));
     wxPoint popup_pos(img_pos.x - m_color_picker_popup.GetSize().x - FromDIP(95), img_pos.y - FromDIP(65));
     m_color_picker_popup.Position(popup_pos, wxSize(0, 0));
-    m_color_picker_popup.set_ams_colours(ams_colors);
+    m_color_picker_popup.set_ams_colours(collect_ams_color_items(obj->GetFilaSystem().get()));
     m_color_picker_popup.set_def_colour(m_clr_picker->m_colour);
     m_color_picker_popup.Popup();
 }
@@ -1898,7 +1925,7 @@ void ColorPickerPopup::on_custom_clr_picker(wxMouseEvent& event)
     }
 }
 
-void ColorPickerPopup::set_ams_colours(std::vector<wxColour> ams)
+void ColorPickerPopup::set_ams_colours(const std::vector<ColorItem>& ams)
 {
     if (m_ams_color_pickers.size() > 0) {
         for (ColorPicker* col_pick:m_ams_color_pickers) {
@@ -1914,10 +1941,15 @@ void ColorPickerPopup::set_ams_colours(std::vector<wxColour> ams)
     }
 
 
-    m_ams_colors = ams;
-    for (wxColour col : m_ams_colors) {
+    m_ams_color_items = ams;
+    for (const ColorItem& item : m_ams_color_items) {
+        if (item.colors.empty()) continue;
+
         auto cp = new ColorPicker(m_def_color_box, wxID_ANY, wxDefaultPosition, wxDefaultSize);
-        cp->set_color(col);
+        cp->set_color(item.colors.front());
+        cp->set_colors(item.colors);
+        cp->ctype = item.colors.size() > 1 ? item.ctype : 2;
+        cp->set_show_full(true);
         cp->set_selected(false);
         cp->SetBackgroundColour(StateColor::darkModeColorFor(wxColour(238,238,238)));
         m_color_pickers.push_back(cp);
