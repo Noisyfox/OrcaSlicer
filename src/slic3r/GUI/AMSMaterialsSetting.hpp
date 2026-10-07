@@ -86,6 +86,7 @@ public:
     {
         std::vector<wxColour> colors;
         int                   ctype = 2;
+        wxString              name;
     };
 
     ScalableBitmap m_ts_bitmap_custom;
@@ -94,6 +95,7 @@ public:
     wxColourData* m_clrData;
     StaticBox* m_def_color_box;
     wxFlexGridSizer* m_ams_fg_sizer;
+    wxFlexGridSizer* m_other_fg_sizer;
     wxColour m_def_col;
     std::vector<wxColour> m_def_colors;
     std::vector<ColorItem> m_ams_color_items;
@@ -105,6 +107,7 @@ public:
     ~ColorPickerPopup() {};
     void on_custom_clr_picker(wxMouseEvent& event);
     void set_ams_colours(const std::vector<ColorItem>& ams);
+    void set_preset_colours(const std::vector<ColorItem>& preset_colors);
     void set_def_colour(wxColour col, std::vector<wxColour> cols = {}, int ctype = 2);
     const std::vector<wxColour>& get_selected_colours() const { return m_def_cols; }
     int get_selected_ctype() const { return m_def_ctype; }
@@ -113,6 +116,8 @@ public:
     virtual bool ProcessLeftDown(wxMouseEvent& event) wxOVERRIDE;
 
 private:
+    std::vector<ColorPicker*> m_default_color_pickers;
+    std::vector<ColorPicker*> m_preset_color_pickers;
     std::vector<wxColour> m_def_cols;
     int m_def_ctype = 2;
 };
