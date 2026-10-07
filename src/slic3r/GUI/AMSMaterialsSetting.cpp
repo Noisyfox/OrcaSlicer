@@ -81,6 +81,18 @@ static std::string float_to_string_with_precision(float value, int precision = 3
     return stream.str();
 }
 
+static wxColour mix_colour(const wxColour& left, const wxColour& right, double ratio)
+{
+    ratio = std::max(0.0, std::min(1.0, ratio));
+    auto mix_channel = [ratio](unsigned char l, unsigned char r) {
+        return static_cast<unsigned char>(std::round(l + (r - l) * ratio));
+    };
+    return wxColour(mix_channel(left.Red(), right.Red()),
+                    mix_channel(left.Green(), right.Green()),
+                    mix_channel(left.Blue(), right.Blue()),
+                    mix_channel(left.Alpha(), right.Alpha()));
+}
+
 static std::vector<ColorPickerPopup::ColorItem> collect_ams_color_items(DevFilaSystem* fila_system)
 {
     std::vector<ColorPickerPopup::ColorItem> items;
@@ -1673,7 +1685,46 @@ void ColorPicker::doRender(wxDC& dc)
     auto radius = m_show_full ? size.x / 2 - FromDIP(1) : size.x / 2;
     if (m_selected) radius -= FromDIP(1);
 
-    if (alpha == 0) {
+    if (m_show_full && m_cols.size() > 1) {
+        if (ctype == 0) {
+            const double center_x = size.x / 2.0;
+            const double center_y = size.y / 2.0;
+            const double draw_radius = radius;
+            dc.SetPen(*wxTRANSPARENT_PEN);
+            for (int x = 0; x < size.x; ++x) {
+                const double dx = x + 0.5 - center_x;
+                if (std::abs(dx) > draw_radius) continue;
+
+                const double half_height = std::sqrt(std::max(0.0, draw_radius * draw_radius - dx * dx));
+                const int top = std::max(0, static_cast<int>(std::ceil(center_y - half_height)));
+                const int bottom = std::min(size.y - 1, static_cast<int>(std::floor(center_y + half_height)));
+                const double pos = size.x > 1 ? static_cast<double>(x) / (size.x - 1) : 0.0;
+                const double scaled = pos * (m_cols.size() - 1);
+                const size_t idx = std::min(static_cast<size_t>(scaled), m_cols.size() - 2);
+                const double ratio = scaled - idx;
+
+                if (top <= bottom) {
+                    dc.SetBrush(wxBrush(mix_colour(m_cols[idx], m_cols[idx + 1], ratio)));
+                    dc.DrawRectangle(x, top, 1, bottom - top + 1);
+                }
+            }
+        }
+        else {
+            float ev_angle = 360.0 / m_cols.size();
+            const float overlap = 2.0f;
+            wxPoint center(size.x / 2, size.y / 2);
+            dc.SetPen(*wxTRANSPARENT_PEN);
+            dc.SetBrush(wxBrush(m_cols.front()));
+            dc.DrawCircle(center.x, center.y, radius);
+            for (int i = 0; i < m_cols.size(); i++) {
+                dc.SetBrush(m_cols[i]);
+                float startAngle = 270.0f + i * ev_angle;
+                float endAngle = startAngle + ev_angle;
+                dc.DrawEllipticArc(center.x - radius, center.y - radius, 2 * radius, 2 * radius, startAngle - overlap, endAngle + overlap);
+            }
+        }
+    }
+    else if (alpha == 0) {
         wxSize bmp_size = m_bitmap_transparent_def.GetBmpSize();
         int center_x = (size.x - bmp_size.x) / 2;
         int center_y = (size.y - bmp_size.y) / 2;
@@ -1715,52 +1766,6 @@ void ColorPicker::doRender(wxDC& dc)
         dc.SetPen(wxPen(wxColour("#6B6B6B")));
         dc.SetBrush(*wxTRANSPARENT_BRUSH);
         dc.DrawCircle(size.x / 2, size.y / 2, radius);
-
-        if (m_cols.size() > 1) {
-            if (ctype == 0) {
-                int left = FromDIP(0);
-                float total_width = size.x;
-                int gwidth = std::round(total_width / (m_cols.size() - 1));
-
-                for (int i = 0; i < m_cols.size() - 1; i++) {
-
-                    if ((left + gwidth) > (size.x)) {
-                        gwidth = size.x - left;
-                    }
-
-                    auto rect = wxRect(left, 0, gwidth, size.y);
-                    dc.GradientFillLinear(rect, m_cols[i], m_cols[i + 1], wxEAST);
-                    left += gwidth;
-                }
-                if (wxGetApp().dark_mode()) {
-                    dc.DrawBitmap(m_bitmap_border_dark, wxPoint(0, 0));
-                }
-                else {
-                    dc.DrawBitmap(m_bitmap_border, wxPoint(0, 0));
-                }
-            }
-            else {
-                float ev_angle = 360.0 / m_cols.size();
-                float startAngle = 270.0;
-                float endAngle = 270.0;
-                dc.SetPen(*wxTRANSPARENT_PEN);
-                for (int i = 0; i < m_cols.size(); i++) {
-                    dc.SetBrush(m_cols[i]);
-                    endAngle += ev_angle;
-                    endAngle = endAngle > 360.0 ? endAngle - 360.0 : endAngle;
-                    wxPoint center(size.x / 2, size.y / 2);
-                    dc.DrawEllipticArc(center.x - radius, center.y - radius, 2 * radius, 2 * radius, startAngle, endAngle);
-                    startAngle += ev_angle;
-                    startAngle = startAngle > 360.0 ? startAngle - 360.0 : startAngle;
-                }
-                if (wxGetApp().dark_mode()) {
-                    dc.DrawBitmap(m_bitmap_border_dark, wxPoint(0, 0));
-                }
-                else {
-                    dc.DrawBitmap(m_bitmap_border, wxPoint(0, 0));
-                }
-            }
-        }
     }
 
     if (m_is_empty) {
