@@ -81,6 +81,13 @@ static std::string float_to_string_with_precision(float value, int precision = 3
     return stream.str();
 }
 
+static std::string colour_to_ams_string(const wxColour& color)
+{
+    char col_buf[10];
+    sprintf(col_buf, "%02X%02X%02X%02X", (int)color.Red(), (int)color.Green(), (int)color.Blue(), (int)color.Alpha());
+    return col_buf;
+}
+
 static wxColour mix_colour(const wxColour& left, const wxColour& right, double ratio)
 {
     ratio = std::max(0.0, std::min(1.0, ratio));
@@ -796,8 +803,19 @@ void AMSMaterialsSetting::on_select_ok(wxCommandEvent &event)
     nozzle_temp_min.ToLong(&nozzle_temp_min_int);
     nozzle_temp_max.ToLong(&nozzle_temp_max_int);
     wxColour color = m_clr_picker->m_colour;
-    char col_buf[10];
-    sprintf(col_buf, "%02X%02X%02X%02X", (int)color.Red(), (int)color.Green(), (int)color.Blue(), (int)color.Alpha());
+    std::string tray_color = colour_to_ams_string(color);
+    std::vector<std::string> tray_colors;
+    int tray_ctype = 2;
+    // Only firmware advertising fun2[23] receives the manual multi-color fields.
+    if (obj->is_support_filament_manual_multi_color) {
+        for (const wxColour& selected_color : m_clr_picker->m_cols) {
+            tray_colors.emplace_back(colour_to_ams_string(selected_color));
+        }
+        if (tray_colors.empty()) {
+            tray_colors.emplace_back(tray_color);
+        }
+        tray_ctype = tray_colors.size() > 1 ? m_clr_picker->ctype : 2;
+    }
 
     if (ams_filament_id.empty() || nozzle_temp_min.empty() || nozzle_temp_max.empty() || m_filament_type.empty()) {
         BOOST_LOG_TRIVIAL(trace) << "Invalid Setting id";
@@ -816,13 +834,33 @@ void AMSMaterialsSetting::on_select_ok(wxCommandEvent &event)
                             << ", tray_info_idx (filament_id) = " << ams_filament_id
                             << ", setting_id = " << ams_setting_id
                             << ", tray_type = " << m_filament_type
-                            << ", tray_color = " << col_buf
+                            << ", tray_color = " << tray_color
                             << ", nozzle_temp_min = " << nozzle_temp_min_int
                             << ", nozzle_temp_max = " << nozzle_temp_max_int;
 
     // set filament
     if (m_is_third) {
-        obj->command_ams_filament_settings(ams_id, slot_id, ams_filament_id, ams_setting_id, std::string(col_buf), m_filament_type, nozzle_temp_min_int, nozzle_temp_max_int);
+        obj->command_ams_filament_settings(ams_id, slot_id, ams_filament_id, ams_setting_id, tray_color, m_filament_type, nozzle_temp_min_int, nozzle_temp_max_int,
+                                           tray_colors, tray_ctype);
+
+        // Refresh the edited tray immediately while its MQTT acknowledgement is pending.
+        DevAmsTray* tray = nullptr;
+        if (is_virtual_tray()) {
+            for (auto& virtual_tray : obj->vt_slot) {
+                if (virtual_tray.id == std::to_string(ams_id)) {
+                    tray = &virtual_tray;
+                    break;
+                }
+            }
+        } else {
+            tray = obj->GetFilaSystem()->GetAmsTray(std::to_string(ams_id), std::to_string(slot_id));
+        }
+        if (tray) {
+            tray->color = tray_color;
+            tray->cols = tray_colors;
+            tray->ctype = tray_ctype;
+            tray->set_hold_count();
+        }
     }
 
     //reset param
