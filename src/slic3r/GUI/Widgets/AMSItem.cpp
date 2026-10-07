@@ -1409,22 +1409,17 @@ void AMSLib::render_lite_lib(wxDC& dc)
 
     dc.SetPen(wxPen(*wxTRANSPARENT_PEN));
     if (m_info.material_cols.size() > 1) {
-        int left = FromDIP(10);
-        int gwidth = std::round(libsize.x / (m_info.material_cols.size() - 1));
-        //gradient
+        wxRect color_rect(FromDIP(10), FromDIP(10), libsize.x - FromDIP(18), libsize.y - FromDIP(18));
         if (m_info.ctype == 0) {
-            for (int i = 0; i < m_info.material_cols.size() - 1; i++) {
-                auto rect = wxRect(left, FromDIP(10), libsize.x - FromDIP(18), libsize.y - FromDIP(18));
-                fill_gradient_rect_east(dc, rect, m_info.material_cols[i], m_info.material_cols[i + 1]);
-                left += gwidth;
-            }
+            fill_gradient_rect_east(dc, color_rect, m_info.material_cols.front(), m_info.material_cols.back());
         }
         else {
             int cols_size = m_info.material_cols.size();
             for (int i = 0; i < cols_size; i++) {
                 dc.SetBrush(wxBrush(m_info.material_cols[i]));
-                float x = FromDIP(10) + ((float)libsize.x - FromDIP(18)) * i / cols_size;
-                dc.DrawRoundedRectangle(x, FromDIP(10), ((float)libsize.x - FromDIP(17)) / cols_size, libsize.y - FromDIP(20), 0);
+                int x = color_rect.x + color_rect.width * i / cols_size;
+                int next_x = color_rect.x + color_rect.width * (i + 1) / cols_size;
+                dc.DrawRectangle(x, color_rect.y, next_x - x, color_rect.height);
             }
             dc.SetBrush(wxBrush(tmp_lib_colour));
         }
