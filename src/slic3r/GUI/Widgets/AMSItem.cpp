@@ -38,6 +38,8 @@
 #include <cstddef>
 #include <wx/simplebook.h>
 #include <wx/dcgraph.h>
+#include <wx/graphics.h>
+#include <memory>
 
 #include <boost/log/trivial.hpp>
 #include <wx/timer.h>
@@ -2859,30 +2861,38 @@ void AMSPreview::doRender(wxDC &dc)
         //dc.DrawRoundedRectangle((size.x - rec_size.x) / 2, (size.y - rec_size.y) / 2, rec_size.x, rec_size.y, FromDIP(2));
         if (iter.material_cols.size() > 1)
         {
-            int fleft = (size.x - AMS_ITEM_CUBE_SIZE.x) / 2;
-
-            float total_width = AMS_ITEM_CUBE_SIZE.x;
-            int gwidth = (total_width / (iter.material_cols.size()));
-            if (iter.ctype == 0) {
-                for (int i = 0; i < iter.material_cols.size() - 1; i++) {
-
-                    if ((fleft + gwidth) > (AMS_ITEM_CUBE_SIZE.x)) {
-                        gwidth = (fleft + AMS_ITEM_CUBE_SIZE.x) - fleft;
-                    }
-
-                    auto rect = wxRect(fleft, (size.y - AMS_ITEM_CUBE_SIZE.y) / 2, gwidth, AMS_ITEM_CUBE_SIZE.y);
-                    fill_gradient_rect_east(dc, rect, iter.material_cols[i], iter.material_cols[i + 1]);
-                    fleft += gwidth;
-                }
+            const wxSize swatch_size = m_ams_item_type == AMSModel::N3S_AMS ? AMS_ITEM_CUBE_SIZE : AMS_ITEM_CUBE_SIZE2;
+            const wxRect rect((size.x - swatch_size.x) / 2, (size.y - swatch_size.y) / 2, swatch_size.x, swatch_size.y);
+            const int radius = m_ams_item_type == AMSModel::N3S_AMS ? 0 : FromDIP(3);
+            std::unique_ptr<wxGraphicsContext> owned_gc;
+            wxGraphicsContext* gc = dc.GetGraphicsContext();
+            if (!gc) {
+                owned_gc.reset(wxGraphicsContext::CreateFromUnknownDC(dc));
+                gc = owned_gc.get();
             }
-            else {
-                int cols_size = iter.material_cols.size();
-                for (int i = 0; i < cols_size; i++) {
-                    dc.SetPen(wxPen(*wxTRANSPARENT_PEN));
-                    dc.SetBrush(wxBrush(iter.material_cols[i]));
-                    float x = (size.x - AMS_ITEM_CUBE_SIZE.x) / 2 + total_width * i / cols_size;
-                    dc.DrawRectangle(x, (size.y - AMS_ITEM_CUBE_SIZE.y) / 2, total_width / cols_size, AMS_ITEM_CUBE_SIZE.y);
+            if (gc) {
+                wxGraphicsGradientStops stops(iter.material_cols.front(), iter.material_cols.back());
+                const size_t count = iter.material_cols.size();
+                if (iter.ctype == 0) {
+                    for (size_t i = 1; i + 1 < count; ++i)
+                        stops.Add(iter.material_cols[i], static_cast<float>(i) / (count - 1));
+                } else {
+                    // Two stops at each boundary keep multicolour bands distinct.
+                    for (size_t i = 1; i < count; ++i) {
+                        const float position = static_cast<float>(i) / count;
+                        stops.Add(iter.material_cols[i - 1], position);
+                        stops.Add(iter.material_cols[i], position);
+                    }
                 }
+                gc->PushState();
+                gc->SetPen(*wxTRANSPARENT_PEN);
+                gc->SetBrush(gc->CreateLinearGradientBrush(rect.x, rect.y, rect.x + rect.width, rect.y, stops));
+                gc->DrawRoundedRectangle(rect.x, rect.y, rect.width, rect.height, radius);
+                gc->PopState();
+            } else {
+                dc.SetPen(*wxTRANSPARENT_PEN);
+                dc.SetBrush(iter.material_colour);
+                dc.DrawRoundedRectangle(rect, radius);
             }
         }
         else {
