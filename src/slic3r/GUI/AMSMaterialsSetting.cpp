@@ -1796,6 +1796,8 @@ ColorPickerPopup::ColorPickerPopup(wxWindow* parent)
     for (wxColour col : m_def_colors) {
         auto cp = new ColorPicker(m_def_color_box, wxID_ANY, wxDefaultPosition, wxDefaultSize);
         cp->set_color(col);
+        cp->set_colors({col});
+        cp->ctype = 2;
         cp->set_selected(false);
         cp->SetBackgroundColour(StateColor::darkModeColorFor(wxColour(238,238,238)));
         m_color_pickers.push_back(cp);
@@ -1992,7 +1994,8 @@ void ColorPickerPopup::set_def_colour(wxColour col, std::vector<wxColour> cols, 
     }
 
     for (ColorPicker* cp : m_color_pickers) {
-        if (cp->m_colour == m_def_col) {
+        if (!cp->IsShown()) continue;
+        if (cp->ctype == m_def_ctype && cp->m_cols == m_def_cols) {
             cp->set_selected(true);
             break;
         }
