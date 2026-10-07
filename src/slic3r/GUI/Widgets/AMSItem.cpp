@@ -1516,7 +1516,27 @@ void AMSLib::render_generic_lib(wxDC &dc)
     int top = height - curr_height;
 
     if (m_ams_model == EXT_AMS){
-        dc.DrawRoundedRectangle(FromDIP(1), FromDIP(1), size.x - FromDIP(2), size.y - FromDIP(1), m_radius - 1);
+        wxRect color_rect(FromDIP(1), FromDIP(1), size.x - FromDIP(2), size.y - FromDIP(1));
+        if ((m_info.ctype == 0 || m_info.ctype == 1) && m_info.material_cols.size() > 1 && alpha != 0) {
+            if (m_info.ctype == 0) {
+                fill_gradient_rect_east(dc, color_rect, m_info.material_cols.front(), m_info.material_cols.back());
+            }
+            else {
+                int cols_size = static_cast<int>(m_info.material_cols.size());
+                for (int i = 0; i < cols_size; i++) {
+                    dc.SetPen(wxPen(*wxTRANSPARENT_PEN));
+                    dc.SetBrush(wxBrush(m_info.material_cols[i]));
+                    int x      = color_rect.x + color_rect.width * i / cols_size;
+                    int next_x = color_rect.x + color_rect.width * (i + 1) / cols_size;
+                    dc.DrawRectangle(x, color_rect.y, next_x - x, color_rect.height);
+                }
+            }
+            dc.SetPen(wxPen(*wxTRANSPARENT_PEN));
+            dc.SetBrush(wxBrush(tmp_lib_colour));
+        }
+        else {
+            dc.DrawRoundedRectangle(color_rect.x, color_rect.y, color_rect.width, color_rect.height, m_radius - 1);
+        }
         if (alpha == 0) {
             dc.DrawBitmap(m_bitmap_transparent_def.bmp(), FromDIP(2), FromDIP(2));
         }
