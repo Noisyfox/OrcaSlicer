@@ -926,8 +926,15 @@ void AMSMaterialsSetting::set_ctype(int ctype)
 
 void AMSMaterialsSetting::on_picker_color(wxCommandEvent& event)
 {
-    unsigned int color_num  = event.GetInt();
-    set_color(wxColour(color_num>>24&0xFF, color_num>>16&0xFF, color_num>>8&0xFF, color_num&0xFF));
+    std::vector<wxColour> colors = m_color_picker_popup.get_selected_colours();
+    if (colors.empty()) {
+        unsigned int color_num = event.GetInt();
+        colors.emplace_back(color_num >> 24 & 0xFF, color_num >> 16 & 0xFF, color_num >> 8 & 0xFF, color_num & 0xFF);
+    }
+
+    set_ctype(m_color_picker_popup.get_selected_ctype());
+    set_color(colors.front());
+    set_colors(colors);
 }
 
 void AMSMaterialsSetting::on_clr_picker(wxMouseEvent &event)
@@ -946,7 +953,7 @@ void AMSMaterialsSetting::on_clr_picker(wxMouseEvent &event)
     wxPoint popup_pos(img_pos.x - m_color_picker_popup.GetSize().x - FromDIP(95), img_pos.y - FromDIP(65));
     m_color_picker_popup.Position(popup_pos, wxSize(0, 0));
     m_color_picker_popup.set_ams_colours(collect_ams_color_items(obj->GetFilaSystem().get()));
-    m_color_picker_popup.set_def_colour(m_clr_picker->m_colour);
+    m_color_picker_popup.set_def_colour(m_clr_picker->m_colour, m_clr_picker->m_cols, m_clr_picker->ctype);
     m_color_picker_popup.Popup();
 }
 
@@ -1956,7 +1963,7 @@ void ColorPickerPopup::set_ams_colours(const std::vector<ColorItem>& ams)
         m_ams_color_pickers.push_back(cp);
         m_ams_fg_sizer->Add(cp, 0, wxALL, FromDIP(3));
         cp->Bind(wxEVT_LEFT_DOWN, [this, cp](auto& e) {
-            set_def_colour(cp->m_colour);
+            set_def_colour(cp->m_colour, cp->m_cols, cp->ctype);
 
             wxCommandEvent evt(EVT_SELECTED_COLOR);
             unsigned long g_col = ((cp->m_colour.Red() & 0xff) << 24) + ((cp->m_colour.Green() & 0xff) << 16) + ((cp->m_colour.Blue() & 0xff) << 8) + (cp->m_colour.Alpha() & 0xff);
@@ -1969,9 +1976,14 @@ void ColorPickerPopup::set_ams_colours(const std::vector<ColorItem>& ams)
     Fit();
 }
 
-void ColorPickerPopup::set_def_colour(wxColour col)
+void ColorPickerPopup::set_def_colour(wxColour col, std::vector<wxColour> cols, int ctype)
 {
     m_def_col = col;
+    if (cols.empty()) {
+        cols.push_back(col);
+    }
+    m_def_cols = cols;
+    m_def_ctype = m_def_cols.size() > 1 ? ctype : 2;
 
     for (ColorPicker* cp : m_color_pickers) {
         if (cp->m_selected) {

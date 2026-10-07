@@ -105,12 +105,16 @@ public:
     ~ColorPickerPopup() {};
     void on_custom_clr_picker(wxMouseEvent& event);
     void set_ams_colours(const std::vector<ColorItem>& ams);
-    void set_def_colour(wxColour col);
+    void set_def_colour(wxColour col, std::vector<wxColour> cols = {}, int ctype = 2);
+    const std::vector<wxColour>& get_selected_colours() const { return m_def_cols; }
+    int get_selected_ctype() const { return m_def_ctype; }
     void paintEvent(wxPaintEvent& evt);
     virtual void OnDismiss() wxOVERRIDE;
     virtual bool ProcessLeftDown(wxMouseEvent& event) wxOVERRIDE;
 
-public:
+private:
+    std::vector<wxColour> m_def_cols;
+    int m_def_ctype = 2;
 };
 
 
