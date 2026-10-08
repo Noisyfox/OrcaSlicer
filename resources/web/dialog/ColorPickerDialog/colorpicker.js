@@ -56,12 +56,16 @@
       hexInput.value = model.toHex(color).slice(1, state.options.allow_alpha ? 9 : 7);
       hexInput.setCustomValidity("");
     }
-    for (const [pairs, values] of [[rgbPairs, color], [hslPairs, hsl]]) {
+    // Each thumb shows only its own channel: R black→red, G black→green, B black→blue,
+    // H pure hue, S the color at that saturation, L grey at that lightness.
+    const rgbThumbs = [`rgb(${color[0]},0,0)`, `rgb(0,${color[1]},0)`, `rgb(0,0,${color[2]})`];
+    const hslThumbs = [`hsl(${hsl[0]},100%,50%)`, `hsl(${hsl[0]},${hsl[1]}%,${hsl[2]}%)`, `hsl(0,0%,${hsl[2]}%)`];
+    for (const [pairs, values, thumbs] of [[rgbPairs, color, rgbThumbs], [hslPairs, hsl, hslThumbs]]) {
       pairs.forEach(([slider, input], index) => {
         slider.value = values[index];
         if (resetEditors) input.setCustomValidity("");
         if (resetEditors || input.checkValidity()) input.value = Math.round(values[index] * 10) / 10;
-        slider.style.setProperty("--thumb-color", model.toHex(color));
+        slider.style.setProperty("--thumb-color", thumbs[index]);
       });
     }
     // Percentage is a display only until explicitly edited. Never round it back
