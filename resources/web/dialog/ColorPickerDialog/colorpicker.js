@@ -116,7 +116,7 @@
   function drawFavorites() {
     const grid = byId("userColors"); grid.replaceChildren();
     const visible = favorites.filter((favorite) => state.options.allow_gradient || favorite.type === "solid");
-    for (let index = 0; index < 24; ++index) {
+    for (let index = 0; index < 36; ++index) {
       const swatch = document.createElement("button"); swatch.type = "button"; swatch.className = "saved-swatch";
       const favorite = visible[index];
       if (favorite) {

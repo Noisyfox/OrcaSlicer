@@ -1,6 +1,7 @@
 :root { 
   --thumb-size: 20px;
-  --input-width:90px;
+  --input-width:68px;
+  --hex-input-width:90px;
 }
 
 #pickerEditors { border: 0; margin: 0; padding: 0; min-inline-size: 0; }
@@ -35,7 +36,7 @@ body {
   flex-direction: row;
   gap: 10px;
   padding: 0;
-  height: 480px;
+  height: 440px;
 }
 
 .left-panel {
@@ -109,7 +110,6 @@ body {
   font-size: 1.1em;
   overflow-wrap: anywhere;
   text-align: center;
-  background: var(--bg-color);
   color: var(--fg-color-label);
   border-bottom: 3px solid transparent;
   opacity: 0.6;
@@ -134,6 +134,7 @@ body {
 #spectrum {
   width: 100%;
   height: 100%;
+  touch-action: none; 
 }
 
 #colorIndicator {
@@ -212,6 +213,7 @@ body {
 }
 
 #hexInput {
+  width: var(--hex-input-width) !important;
   margin-left: 8px;
 }
 
@@ -280,7 +282,7 @@ input[type="range"]::-webkit-slider-thumb {
 
 .bottom-container{
   display: flex;
-  gap: 6px;
+  gap: 8px;
   padding-top: 8px;
   border-top: 1px solid var(--border-color);
 }
@@ -288,41 +290,51 @@ input[type="range"]::-webkit-slider-thumb {
 .saved-grid {
   display: grid;
   flex: 1; min-width: 0;
-  grid-template-columns: repeat(8, minmax(0, 1fr));
-  gap: 3px;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-template-rows: 1fr 1fr 1fr;
+  gap: 2px;
 }
 
 .saved-swatch {
   position: relative;
   width: 100%;
-  height: 30px;
-  border-radius: 6px;
+  border-radius: 4px;
   border: 1px solid var(--border-color);
   cursor: pointer;
 }
 
 .saved-swatch.empty {
   background: var(--bg-color);
+  background-image: none;
   cursor: default;
 }
 
 .preview-container {
+  display: block;
   flex: 0 0 var(--input-width);
+  width: var(--input-width);
+  height: var(--input-width);
+  position: relative;
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+  overflow: hidden;
 }
 
 #saveColorBtn {
-  padding: 1px 8px;
+  position: absolute;
   width: 100%;
-  font-size: 1em;
-  border-radius: 10px;
-  margin-bottom: 4px;
+  height: 100%;
+  display: none;
+  background-color: transparent;
+}
+
+.preview-container:hover  #saveColorBtn{
+  display: block;
 }
 
 .color-preview {
-  width: var(--input-width);
-  height: 75px;
-  border-radius: 6px;
-  border: 1px solid var(--border-color);
+  width: 100%;
+  height: 100%;
 }
 
 .hidden {
@@ -337,7 +349,6 @@ input[type="range"]::-webkit-slider-thumb {
 }
 .color-item { width: 100%; background: transparent; text-align: left; font-family: inherit; }
 .color-item:focus-visible, .saved-swatch:focus-visible { outline: 2px solid var(--main-color-hover); }
-.saved-swatch.empty { background-image: none; }
 .dialog-actions {
   margin-top: auto;
   display: flex;
@@ -345,7 +356,6 @@ input[type="range"]::-webkit-slider-thumb {
   padding: 12px 0 0;
   background: var(--bg-color);
 }
-#spectrum { touch-action: none; }
 #aSlider::-webkit-slider-runnable-track {
   background-image: var(--track-gradient), conic-gradient(var(--checker-light) 25%, var(--checker-dark) 0 50%, var(--checker-light) 0 75%, var(--checker-dark) 0);
   background-size: auto, 8px 8px;
