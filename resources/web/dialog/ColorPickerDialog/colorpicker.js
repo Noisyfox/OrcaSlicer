@@ -23,6 +23,14 @@
   const pageId = Date.now().toString(36) + Math.random().toString(36).slice(2);
   let state = model.createState(), favorites = [], dragging = false, initialized = false, favoritesWritable = true;
   let lastContentHeight = 0, resizePending = false;
+  // Last HSL the user set, with the RGB it produced. Greys, black and white lose hue and
+  // saturation in RGB, so reuse these values while the color is unchanged.
+  let hslMemory = null;
+  function displayHsl(color) {
+    const rgb = color.slice(0, 3);
+    if (hslMemory && hslMemory.rgb.every((value, index) => value === rgb[index])) return hslMemory.hsl;
+    return model.rgbToHsl(...rgb);
+  }
 
   function emit(command, data = {}) {
     window.dispatchEvent(new CustomEvent("color-picker-message", {detail: {command, ...data}}));
@@ -51,7 +59,7 @@
   }
 
   function render(resetEditors = false) {
-    const color = model.activeColor(state), hsl = model.rgbToHsl(...color.slice(0, 3));
+    const color = model.activeColor(state), hsl = displayHsl(color);
     if (resetEditors || hexInput.checkValidity()) {
       hexInput.value = model.toHex(color).slice(1, state.options.allow_alpha ? 9 : 7);
       hexInput.setCustomValidity("");
@@ -222,7 +230,12 @@
   }
 
   rgbPairs.forEach((pair) => bindPair(pair, () => { model.setRgb(state, rgbPairs.map(([slider]) => Number(slider.value))); render(); }));
-  hslPairs.forEach((pair) => bindPair(pair, () => { model.setRgb(state, model.hslToRgb(...hslPairs.map(([slider]) => Number(slider.value)))); render(); }));
+  hslPairs.forEach((pair) => bindPair(pair, () => {
+    const hsl = hslPairs.map(([slider]) => Number(slider.value));
+    model.setRgb(state, model.hslToRgb(...hsl));
+    hslMemory = {rgb: model.activeColor(state).slice(0, 3), hsl};
+    render();
+  }));
   bindPair(alphaPair, () => { model.setAlphaPercent(state, Number(alphaPair[0].value)); render(); });
   hexInput.addEventListener("input", () => {
     const text = hexInput.value;
