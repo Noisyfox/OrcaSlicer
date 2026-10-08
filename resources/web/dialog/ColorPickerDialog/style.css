@@ -1,9 +1,20 @@
-:root { --thumb-size: 20px; }
+:root { 
+  --thumb-size: 20px;
+  --input-width:90px;
+}
 
 #pickerEditors { border: 0; margin: 0; padding: 0; min-inline-size: 0; }
 #pickerEditors:disabled #spectrum { pointer-events: none; }
 
-* { box-sizing: border-box; }
+* {
+	padding: 0;
+	border: 0;
+	margin: 0;		
+	user-select: none;
+	-webkit-user-select: none;
+  box-sizing: border-box; 
+}
+
 html { overflow-y: auto; }
 
 body {
@@ -11,11 +22,11 @@ body {
   font-family: var(--orca-font, system-ui, sans-serif);
   background: var(--bg-color);
   color: var(--fg-color-text);
-  padding: 12px;
+  padding: 10px;
   border: 1px solid var(--border-color);
   border-radius: 8px;
   overflow: auto;
-  scrollbar-gutter: stable;
+  font-size: 14px;
 }
 
 .main-wrapper {
@@ -23,50 +34,27 @@ body {
   display: flex;
   flex-direction: row;
   gap: 10px;
-  background: var(--bg-color);
   padding: 0;
+  height: 480px;
 }
 
 .left-panel {
   display: flex;
   flex-direction: column;
   width: 160px;
-  height: 450px;
+  height: 100%;
 }
 
 #paletteCombo {
-  margin-bottom: 5px;
-}
-
-.comboBox {
-  padding: 5px;
-  font-size: 0.9em;
-  background: var(--bg-color);
-  color: var(--fg-color-text);
-  border: 1px solid var(--border-color);
-  padding-left: 26px;
-  -webkit-appearance: none; /* Hide arrow */
-}
-
-.comboBox:focus {
-  outline: none;
-  background-color: var(--focus-bg-box);
-  border-color: var(--main-color);
-}
-
-.comboBox:hover {
-  border-color: var(--main-color);
+  width: 100%;
 }
 
 .palette {
   flex: 1;
   overflow-y: auto;
   padding-right: 1px;
+  margin-top: 5px;
 }
-
-.palette::-webkit-scrollbar { width: 7px; }
-.palette::-webkit-scrollbar-track { background: var(--bg-color-alt); border-radius: 4px; }
-.palette::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 4px; }
 
 .color-item {
   display: flex;
@@ -107,8 +95,9 @@ body {
 .tabs-container {
   overflow: hidden;
   display: flex;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
   border-bottom: 1px solid var(--border-color);
+  min-height: 1.6em;
 }
 .tabs-container > input {
   display: none;
@@ -118,25 +107,24 @@ body {
   flex: 1; min-width: 0; justify-content: center;
   padding: 2px 8px;
   font-size: 1.1em;
-  min-height: 1.6em;
   overflow-wrap: anywhere;
   text-align: center;
   background: var(--bg-color);
-  color: var(--fg-color-text);
+  color: var(--fg-color-label);
   border-bottom: 3px solid transparent;
   opacity: 0.6;
   margin:0 auto;
 }
 
 .tabs-container > input:checked + label {
-  border-color: var(--main-color);
-  font-weight: 500;
+  border-color: var(--main-color-fixed);
+  font-weight: 700;
   opacity: 1;
 }
 
 .spectrum-container {
   position: relative;
-  height: 150px;
+  height: 120px;
   border-radius: 6px;
   overflow: hidden;
   margin-bottom: 6px;
@@ -164,7 +152,7 @@ body {
   display: flex;
   align-items: center;
   width: 100%;
-  margin-bottom: 8px;
+  margin-bottom: 5px;
 }
 
 #slider-type-switch{
@@ -176,13 +164,12 @@ body {
 }
 
 .switch-check {
-   display: none;
+   display: none !important;
 }
 .switch-label {
   padding: 2px 10px;
   text-align: center;
-  font-size: 0.9em;
-  line-height: 16px;
+  line-height: 18px;
   z-index: 1;
 }
 .switch-slider {
@@ -225,23 +212,11 @@ body {
 }
 
 #hexInput {
-  width: 100px;
-  padding: 6px 7px;
-  font-family: 'Courier New', monospace;
-  font-size: 1em;
-  border: 1px solid var(--border-color);
-  background:  var(--bg-color);
-  color: var(--fg-color-text);
   margin-left: 8px;
-}
-#hexInput:focus {
-  outline: none;
-  border-color: var(--main-color);
-  background: var(--focus-bg-box);
 }
 
 .slider-group {
-  margin-bottom: 6px;
+  margin-bottom: 5px;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -287,8 +262,8 @@ input[type="range"]::-webkit-slider-thumb {
 #lSlider::-webkit-slider-runnable-track {background: linear-gradient(to right, #000, #fff)}
 
 .value-input {
-  width: 75px;
-  padding: 6px 7px;
+  width: var(--input-width);
+  padding: 5px 6px;
   text-align: left;
   border: 1px solid var(--border-color);
   background: var(--bg-color);
@@ -300,7 +275,7 @@ input[type="range"]::-webkit-slider-thumb {
 .value-input:focus {
   outline: none;
   border-color: var(--main-color);
-  background: var(--focus-bg-box);
+  background: var(--focus-bg-item);
 }
 
 .bottom-container{
@@ -328,26 +303,23 @@ input[type="range"]::-webkit-slider-thumb {
 
 .saved-swatch.empty {
   background: var(--bg-color);
+  cursor: default;
 }
 
 .preview-container {
-  flex: 0 0 75px;
+  flex: 0 0 var(--input-width);
 }
 
 #saveColorBtn {
   padding: 1px 8px;
   width: 100%;
   font-size: 1em;
-  background: var(--main-color);
-  color: var(--button-fg-light);
-  border: none;
   border-radius: 10px;
   margin-bottom: 4px;
 }
 
-
 .color-preview {
-  width: 75px;
+  width: var(--input-width);
   height: 75px;
   border-radius: 6px;
   border: 1px solid var(--border-color);
@@ -363,38 +335,23 @@ input[type="range"]::-webkit-slider-thumb {
     conic-gradient(var(--checker-light) 25%, var(--checker-dark) 0 50%, var(--checker-light) 0 75%, var(--checker-dark) 0);
   background-size: auto, 12px 12px;
 }
-.color-item { width: 100%; background: transparent; text-align: left; cursor: pointer; font-family: inherit; }
+.color-item { width: 100%; background: transparent; text-align: left; font-family: inherit; }
 .color-item:focus-visible, .saved-swatch:focus-visible { outline: 2px solid var(--main-color-hover); }
 .saved-swatch.empty { background-image: none; }
-.percent-label { color: var(--fg-color-text); }
 .dialog-actions {
-  display: flex; justify-content: flex-end; gap: 8px;
-  margin: auto; padding: 12px 0 0; background: var(--bg-color);
-}
-.dialog-actions button {
-  color: var(--button-fg-text); background: var(--button-bg-normal);
-  border: 1px solid var(--border-color); border-radius: 4px; padding: 6px 20px; cursor: pointer;
-  max-width: 50%; overflow-wrap: anywhere;
+  margin-top: auto;
+  display: flex;
+  justify-content: flex-end;
+  padding: 12px 0 0;
+  background: var(--bg-color);
 }
 #spectrum { touch-action: none; }
-#alphaControls .slider-label { width: 10px; }
 #aSlider::-webkit-slider-runnable-track {
   background-image: var(--track-gradient), conic-gradient(var(--checker-light) 25%, var(--checker-dark) 0 50%, var(--checker-light) 0 75%, var(--checker-dark) 0);
   background-size: auto, 8px 8px;
 }
 
-.palette-select { position: relative; }
-.palette-select::before {
-  content: ""; position: absolute; top: 6px; left: 6px; width: 16px; height: 16px;
-  mask-image: var(--icon-combo-arrow); -webkit-mask-image: var(--icon-combo-arrow);
-  background: var(--icon-color); pointer-events: none;
-}
-#paletteCombo { width: 100%; }
-input, select, button { font-family: inherit; }
-.dialog-actions button:hover { background: var(--button-bg-hover); }
-#confirmBtn { background: var(--main-color); color: var(--button-fg-light); }
-#confirmBtn:hover, #saveColorBtn:hover { filter: brightness(1.1); }
 #hexInput:invalid, .value-input:invalid { border-color: var(--control-invalid); }
 input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px solid var(--main-color); outline-offset: 1px; }
-
+button {border:0}
 #selectionNotice { margin: 0 0 8px; color: var(--fg-color-label); }
