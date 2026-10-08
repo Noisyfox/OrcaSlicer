@@ -902,6 +902,85 @@ TEST_CASE("Each filament sets the pressure advance of its extruder variant on a 
     }
 }
 
+// A two-extruder printer, Standard nozzle on extruder 1 and High Flow on extruder 2, whose per-variant arrays
+// hold filament 1 Standard, filament 1 High Flow, filament 2 Standard and filament 2 High Flow.
+static DynamicPrintConfig two_extruder_pressure_advance_config(const std::string &filament_map, const std::string &adaptive_pressure_advance,
+                                                               int wall_filament, int infill_filament)
+{
+    DynamicPrintConfig config = multifilament_config(2, {
+        { "gcode_flavor",                   "klipper" },
+        { "single_extruder_multi_material", 0 },
+        { "nozzle_diameter",                "0.4,0.4" },
+        { "extruder_printable_height",      "0,0" },
+        { "printer_extruder_id",            "1,2" },
+        { "printer_extruder_variant",       "Direct Drive Standard;Direct Drive High Flow" },
+        { "extruder_variant_list",          "Direct Drive Standard;Direct Drive High Flow" },
+        { "filament_map",                   filament_map },
+        { "filament_extruder_variant",      "Direct Drive Standard;Direct Drive High Flow;Direct Drive Standard;Direct Drive High Flow" },
+        { "filament_self_index",            "1,1,2,2" },
+        { "enable_pressure_advance",        "1,1,1,1" },
+        { "pressure_advance",               "0.021,0.037,0.043,0.049" },
+        { "adaptive_pressure_advance",      adaptive_pressure_advance },
+        { "sparse_infill_filament_id",      infill_filament },
+        { "internal_solid_filament_id",     infill_filament },
+        { "top_surface_filament_id",        infill_filament },
+        { "bottom_surface_filament_id",     infill_filament },
+        { "outer_wall_filament_id",         wall_filament },
+        { "inner_wall_filament_id",         wall_filament },
+        { "enable_prime_tower",             0 },
+        { "skirt_loops",                    0 },
+        { "brim_type",                      "no_brim" },
+        // custom G-code indexes the per-filament arrays by filament
+        { "machine_start_gcode",            "; start pressure advance {pressure_advance[initial_extruder]}" },
+    });
+    config.option<ConfigOptionStrings>("adaptive_pressure_advance_model")->values = {
+        constant_pressure_advance_model("0.012"), constant_pressure_advance_model("0.034"),
+        constant_pressure_advance_model("0.056"), constant_pressure_advance_model("0.078") };
+    config.option<ConfigOptionEnumsGeneric>("extruder_type", true)->values = { etDirectDrive, etDirectDrive };
+    config.option<ConfigOptionEnumsGeneric>("nozzle_volume_type", true)->values = { nvtStandard, nvtHighFlow };
+    // print each filament on the extruder filament_map gives it
+    config.option<ConfigOptionEnum<FilamentMapMode>>("filament_map_mode", true)->value = fmmManual;
+    return config;
+}
+
+// Without a dynamic nozzle map the hotend placeholders carry no hotend index (-1) on a BBL printer: Bambu
+// firmware reads an explicit index as a request for the Filament Track Switch and rejects the job. Any other
+// printer gets the extruder index of the filament.
+TEST_CASE("Hotend placeholders resolve to -1 on a BBL printer and to the extruder index elsewhere", "[MultiFilament]")
+{
+    // filament 1 prints the walls on extruder 2, filament 2 the infill on extruder 1
+    auto [is_bbl, start, changes] = GENERATE(table<bool, std::string, std::set<std::string>>({
+        { true,  "; hotend start filament 0: -1 -1 -1",
+          { "; hotend change filament 0: -1 -1", "; hotend change filament 1: -1 -1" } },
+        // the first change loads filament 1 with no filament before it, so there is no outgoing extruder
+        { false, "; hotend start filament 0: 1 1 1",
+          { "; hotend change filament -1: -1 1", "; hotend change filament 0: 1 0", "; hotend change filament 1: 0 1" } },
+    }));
+    DynamicPrintConfig config = two_extruder_pressure_advance_config("2,1", "0,0,0,0", 1, 2);
+    config.set_key_value("machine_start_gcode", new ConfigOptionString(
+        "; hotend start filament [initial_no_support_extruder]: [initial_no_support_hotend] [current_hotend] {first_non_support_hotend[0]}"));
+    config.set_key_value("change_filament_gcode", new ConfigOptionString(
+        "; hotend change filament [current_filament_id]: [current_hotend] [next_hotend]"));
+    Print print;
+    print.is_BBL_printer() = is_bbl;
+    Model model;
+    init_print({ cube(20) }, print, model, config);
+    const std::string gcode = Slic3r::Test::gcode(print);
+
+    INFO("BBL printer: " << is_bbl);
+    std::vector<std::string> starts;
+    std::set<std::string>    found;
+    std::istringstream       stream(gcode);
+    for (std::string line; std::getline(stream, line);) {
+        if (line.rfind("; hotend start ", 0) == 0)
+            starts.push_back(line);
+        else if (line.rfind("; hotend change ", 0) == 0)
+            found.insert(line);
+    }
+    CHECK(starts == std::vector<std::string>{ start });
+    CHECK(found == changes);
+}
+
 // The speeds, in percent, a G-code turns a fan on at: the part cooling fan for `M106 S`, the auxiliary
 // fan for `M106 P2 S`.
 static std::set<int> fan_speeds(const std::string &gcode, const std::string &command)
