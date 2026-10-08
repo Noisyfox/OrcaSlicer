@@ -48,9 +48,25 @@
     return sectors[Math.floor(h)].map((channel) => Math.round((channel + m) * 255));
   }
 
+  // Rotate the hue by `hueShift` degrees and move lightness toward its opposite in proportion
+  // (0 = same color, 90 = moderate, 180 = complementary with flipped lightness). A negative
+  // value rotates the other way. Greys have no usable hue, so only their lightness moves.
+  // Keeps the original alpha.
+  function contrastColor(color, hueShift = 90) {
+    if (!Number.isFinite(hueShift)) hueShift = 90;
+    const degrees = Math.max(-180, Math.min(180, hueShift));
+    const amount = Math.abs(degrees) / 180;
+    const [h, s, l] = rgbToHsl(color[0], color[1], color[2]);
+    const grey = s < 10;
+    const target = grey ? (l < 50 ? 100 : 0) : 100 - l;
+    const rgb = hslToRgb(h + degrees, grey ? 0 : s, l + (target - l) * amount);
+    return [...rgb, color[3]];
+  }
+
   function createState(options = {}, selection = {type: "solid", colors: ["#808080"]}) {
     const capabilities = {allow_gradient: options.allow_gradient === true, allow_alpha: options.allow_alpha === true};
-    const state = {options: capabilities, mode: "solid", active: 0, solid: [128,128,128,255], gradient: [[255,255,255,255], [0,0,0,255]]};
+    // gradient stays null until a selection provides one or the user switches to gradient mode.
+    const state = {options: capabilities, mode: "solid", active: 0, solid: [128,128,128,255], gradient: null};
     if (!applySelection(state, selection)) return null;
     return state;
   }
@@ -69,6 +85,8 @@
 
   function setMode(state, mode) {
     if (mode !== "solid" && (mode !== "gradient" || !state.options.allow_gradient)) return false;
+    // A new gradient starts at the current solid color and ends at its contrast color.
+    if (mode === "gradient" && !state.gradient) state.gradient = [[...state.solid], contrastColor(state.solid, 90)];
     state.mode = mode;
     return true;
   }
