@@ -23,13 +23,12 @@
   const pageId = Date.now().toString(36) + Math.random().toString(36).slice(2);
   let state = model.createState(), favorites = [], dragging = false, initialized = false, favoritesWritable = true;
   let lastContentHeight = 0, resizePending = false;
-  // Last HSL the user set, with the RGB it produced. Greys, black and white lose hue and
-  // saturation in RGB, so reuse these values while the color is unchanged.
-  let hslMemory = null;
+  // Prefer the HSL sliders' own values while they still produce the current color: hue 360
+  // and 0 are both red, and greys, black and white have no hue or saturation in RGB.
   function displayHsl(color) {
-    const rgb = color.slice(0, 3);
-    if (hslMemory && hslMemory.rgb.every((value, index) => value === rgb[index])) return hslMemory.hsl;
-    return model.rgbToHsl(...rgb);
+    const current = hslPairs.map(([slider]) => Number(slider.value));
+    const rgb = model.hslToRgb(...current);
+    return rgb.every((value, index) => value === color[index]) ? current : model.rgbToHsl(...color.slice(0, 3));
   }
 
   function emit(command, data = {}) {
@@ -91,7 +90,7 @@
     endpointSwitch.checked = state.active === 1;
     byId("gradient-switch").classList.toggle("hidden", state.mode !== "gradient");
     setSwatch(preview, model.exportSelection(state));
-    updateIndicator(color);
+    updateIndicator(hsl);
   }
 
   function populatePalette() {
@@ -191,23 +190,24 @@
     context.fillStyle = shade; context.fillRect(0, 0, canvas.width, canvas.height);
   }
 
-  function updateIndicator(color) {
-    const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
-    let distance = Infinity, bestX = 0, bestY = 0;
-    for (let y = 0; y < canvas.height; y += 2) for (let x = 0; x < canvas.width; x += 2) {
-      const offset = (y * canvas.width + x) * 4;
-      const delta = color.slice(0, 3).reduce((sum, channel, i) => sum + (pixels[offset + i] - channel) ** 2, 0);
-      if (delta < distance) { distance = delta; bestX = x; bestY = y; }
-    }
+  function updateIndicator(hsl) {
     const indicator = byId("colorIndicator");
-    indicator.style.left = bestX + "px"; indicator.style.top = bestY + "px";
+    indicator.style.left = hsl[0] / 360 * (canvas.width - 1) + "px";
+    indicator.style.top = (1 - hsl[2] / 100) * (canvas.height - 1) + "px";
   }
 
+  // Spectrum position maps straight to HSL: x → hue 0..360, y → lightness 100..0, saturation 100.
+  // Setting the HSL sliders lets displayHsl() keep these exact values, including hue 360 at the
+  // right edge and the hue of the white and black corners.
   function sampleSpectrum(event) {
     const rect = canvas.getBoundingClientRect();
-    const x = Math.max(0, Math.min(canvas.width - 1, Math.floor((event.clientX - rect.left) * canvas.width / rect.width)));
-    const y = Math.max(0, Math.min(canvas.height - 1, Math.floor((event.clientY - rect.top) * canvas.height / rect.height)));
-    model.setRgb(state, Array.from(context.getImageData(x, y, 1, 1).data).slice(0, 3)); render();
+    const fraction = (client, start, size, pixels) =>
+      Math.max(0, Math.min(pixels - 1, Math.floor((client - start) * pixels / size))) / Math.max(1, pixels - 1);
+    const hsl = [fraction(event.clientX, rect.left, rect.width, canvas.width) * 360, 100,
+                 (1 - fraction(event.clientY, rect.top, rect.height, canvas.height)) * 100]
+      .map((value) => Math.round(value * 10) / 10);
+    hslPairs.forEach(([slider], index) => { slider.value = hsl[index]; });
+    model.setRgb(state, model.hslToRgb(...hsl)); render();
   }
 
   function bindPair(pair, update) {
@@ -230,12 +230,7 @@
   }
 
   rgbPairs.forEach((pair) => bindPair(pair, () => { model.setRgb(state, rgbPairs.map(([slider]) => Number(slider.value))); render(); }));
-  hslPairs.forEach((pair) => bindPair(pair, () => {
-    const hsl = hslPairs.map(([slider]) => Number(slider.value));
-    model.setRgb(state, model.hslToRgb(...hsl));
-    hslMemory = {rgb: model.activeColor(state).slice(0, 3), hsl};
-    render();
-  }));
+  hslPairs.forEach((pair) => bindPair(pair, () => { model.setRgb(state, model.hslToRgb(...hslPairs.map(([slider]) => Number(slider.value)))); render(); }));
   bindPair(alphaPair, () => { model.setAlphaPercent(state, Number(alphaPair[0].value)); render(); });
   hexInput.addEventListener("input", () => {
     const text = hexInput.value;

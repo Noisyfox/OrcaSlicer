@@ -1,6 +1,6 @@
 :root { 
   --thumb-size: 20px;
-  --input-width:68px;
+  --input-width:66px;
   --hex-input-width:90px;
 }
 
@@ -265,7 +265,7 @@ input[type="range"]::-webkit-slider-thumb {
 
 .value-input {
   width: var(--input-width);
-  padding: 5px 6px;
+  padding: 5px 0 5px 6px;
   text-align: left;
   border: 1px solid var(--border-color);
   background: var(--bg-color);
@@ -290,9 +290,9 @@ input[type="range"]::-webkit-slider-thumb {
 .saved-grid {
   display: grid;
   flex: 1; min-width: 0;
-  grid-template-columns: repeat(12, minmax(0, 1fr));
-  grid-template-rows: 1fr 1fr 1fr;
-  gap: 2px;
+  grid-template-columns: repeat(12, minmax(0, 20px));
+  grid-template-rows: repeat(3, minmax(0, 20px));
+  gap: 3px;
 }
 
 .saved-swatch {
