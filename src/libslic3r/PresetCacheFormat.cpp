@@ -444,6 +444,9 @@ bool write_cache_blob(const std::string& path, const std::string& blob)
 bool VendorCacheFile::save(const std::string& path, const std::string& vendor_name,
                            const std::string& vendor_version, const VendorCacheData& data)
 {
+#ifdef NEO_DISABLE_VENDOR_CACHE
+    return false;
+#else
     try {
         // Collected before anything is written: the dictionary sits ahead of the
         // entries so a reader resolves it once and then indexes.
@@ -469,12 +472,16 @@ bool VendorCacheFile::save(const std::string& path, const std::string& vendor_na
         BOOST_LOG_TRIVIAL(warning) << "VendorCacheFile: failed to save vendor cache " << path << ": " << e.what();
         return false;
     }
+#endif
 }
 
 // static
 bool VendorCacheFile::load(const std::string& path, const std::string& expected_vendor_name,
                            const Semver& expected_vendor_version, VendorCacheData& data)
 {
+#ifdef NEO_DISABLE_VENDOR_CACHE
+    return false;
+#else
     std::string blob;
     if (! read_cache_blob(path, blob))
         return false;
@@ -500,11 +507,15 @@ bool VendorCacheFile::load(const std::string& path, const std::string& expected_
         BOOST_LOG_TRIVIAL(warning) << "VendorCacheFile: rejecting vendor cache " << path << ": " << e.what();
         return false;
     }
+#endif
 }
 
 // static
 std::string VendorCacheFile::peek_version(const std::string& path, const std::string& expected_vendor_name)
 {
+#ifdef NEO_DISABLE_VENDOR_CACHE
+    return {};
+#else
     try {
         boost::nowide::ifstream ifs(path, std::ios::binary);
         CacheFileHeader fhdr;
@@ -523,11 +534,15 @@ std::string VendorCacheFile::peek_version(const std::string& path, const std::st
     } catch (const std::exception&) {
         return {};
     }
+#endif
 }
 
 // static
 Semver VendorCacheFile::usable_version(const std::string& path, const std::string& expected_vendor_name)
 {
+#ifdef NEO_DISABLE_VENDOR_CACHE
+    return Semver::invalid();
+#else
     std::string blob;
     if (! read_cache_blob(path, blob))
         return Semver::invalid();
@@ -539,12 +554,16 @@ Semver VendorCacheFile::usable_version(const std::string& path, const std::strin
     } catch (const std::exception&) {
         return Semver::invalid();
     }
+#endif
 }
 
 // static
 bool VendorCacheFile::carries_preset(const std::string& path, const std::string& vendor_name,
                                      Preset::Type type, const std::string& preset_name)
 {
+#ifdef NEO_DISABLE_VENDOR_CACHE
+    return false;
+#else
     std::string blob;
     if (! read_cache_blob(path, blob))
         return false;
@@ -577,6 +596,7 @@ bool VendorCacheFile::carries_preset(const std::string& path, const std::string&
         BOOST_LOG_TRIVIAL(warning) << "VendorCacheFile: could not read preset names from " << path << ": " << e.what();
         return false;
     }
+#endif
 }
 
 } // namespace Slic3r

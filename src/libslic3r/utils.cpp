@@ -2036,7 +2036,11 @@ std::set<std::string> vendor_names_in(const boost::filesystem::path& dir)
     std::set<std::string> names;
     for (auto& dir_entry : boost::filesystem::directory_iterator(dir)) {
         const auto& path = dir_entry.path();
-        if (Slic3r::is_json_file(path.string()) || path.extension() == ".opc")
+        if (Slic3r::is_json_file(path.string())
+#ifndef NEO_DISABLE_VENDOR_CACHE
+            || path.extension() == ".opc"
+#endif
+        )
             names.insert(path.stem().string());
     }
     return names;
@@ -2097,7 +2101,11 @@ bool install_vendor_bundles_from_resources(
             auto cache_in_vendors = (vendor_path / bundle).replace_extension(".opc");
 
             // Either form of the vendor will do: a build may ship it as a cache alone.
-            if (!fs::exists(path_in_rsrc) && !fs::exists(cache_in_rsrc)) {
+            if (!fs::exists(path_in_rsrc)
+#ifndef NEO_DISABLE_VENDOR_CACHE
+                && !fs::exists(cache_in_rsrc)
+#endif
+            ) {
                 BOOST_LOG_TRIVIAL(warning) << "Bundle not found in resources: " << bundle;
                 all_installed = false;
                 continue;
