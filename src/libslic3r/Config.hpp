@@ -1698,6 +1698,10 @@ public:
             serialize_single_value(ss, *iter);
         }
 
+        // getline does not emit a final empty token after a delimiter.
+        // Preserve an empty last Extruder region on serialize/deserialize.
+        if (!this->values.empty() && this->values.back().empty())
+            ss << "#";
         return ss.str();
     }
 
