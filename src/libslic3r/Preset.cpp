@@ -3178,6 +3178,7 @@ void PresetCollection::save_current_preset(const std::string &new_name, bool det
         }
         // Overwriting an existing preset.
         preset.config = std::move(curr_preset.config);
+        preset.neo_vector_overrides = std::move(curr_preset.neo_vector_overrides);
         // The newly saved preset will be activated -> make it visible.
         preset.is_visible = true;
         //TODO: remove the detach logic

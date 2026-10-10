@@ -279,6 +279,9 @@ public:
 
     //BBS: add type for project-embedded
     bool                is_project_embedded = false;
+    // Neo runtime-only sparse vector ownership: JSON null inherits; {value}
+    // owns a typed element. Ordinary Orca preset files remain flattened.
+    std::map<std::string, std::string> neo_vector_overrides;
     ConfigSubstitutions *loading_substitutions{nullptr};
     bool                is_user() const { return ! this->is_default && ! this->is_system && ! this->is_project_embedded && ! this->is_from_bundle(); }
     bool                can_overwrite() const { return ! this->is_default && ! this->is_system && ! this->is_from_bundle(); }
