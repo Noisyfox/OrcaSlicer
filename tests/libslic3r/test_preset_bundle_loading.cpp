@@ -1760,7 +1760,7 @@ TEST_CASE("Published 3MF overlays only the author-selected process keys onto the
         config.opt_string("print_settings_id", true) = "file process";
         config.opt<ConfigOptionFloats>("flush_multiplier")->values = { 2., 2. }; // must NOT cross over
         config.opt<ConfigOptionFloats>("wipe_tower_x")->values = { 100. };       // plate geometry, does cross over
-        config.opt<ConfigOptionFloat>("wipe_tower_rotation_angle")->value = 45.; // published-only plate geometry, crosses over
+        config.opt<ConfigOptionFloat>("wipe_tower_rotation_angle")->value = 45.; // plate geometry, restored in both load modes
         config.option("curr_bed_type")->setInt(BedType::btPC);                   // must NOT cross over
         return config;
     };
@@ -1837,6 +1837,8 @@ TEST_CASE("Published 3MF overlays only the author-selected process keys onto the
     CHECK(control_bundle.prints.size() > control_pre_size);
     // The file's layer_height reached the edited preset via the normal import, not the overlay.
     CHECK_THAT(control_bundle.prints.get_edited_preset().config.opt_float("layer_height"), Catch::Matchers::WithinAbs(0.28, 0.000001));
+    CHECK_THAT(control_bundle.project_config.opt<ConfigOptionFloat>("wipe_tower_rotation_angle")->value,
+               Catch::Matchers::WithinAbs(45., 0.000001));
 }
 
 // The published printer overlay is restricted to the publishable retraction/z-hop allowlist:
