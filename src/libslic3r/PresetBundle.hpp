@@ -248,6 +248,10 @@ public:
     // "different_settings_to_system" entry for the preset, plus the preset bookkeeping keys.
     static std::set<std::string> project_different_keys(const std::string &different_settings);
 
+    // Ordinary project-owned options. Print parameters use their preset
+    // collection; published-project import has its own reduced policy.
+    static const t_config_option_keys& project_options();
+
     PresetBundle();
     PresetBundle(const PresetBundle &rhs);
     PresetBundle& operator=(const PresetBundle &rhs);

@@ -91,6 +91,8 @@ namespace Slic3r {
 
 // Project-level options imported from a loaded 3MF into project_config. s_project_options_published
 // below is the reduced subset that crosses over in "published" 3MF mode; keep both in sync.
+// s_project_options_published additionally carries wipe_tower_rotation_angle, which normal
+// loads restore through the Print preset rather than project_config.
 static std::vector<std::string> s_project_options {
     "flush_volumes_vector",
     "flush_volumes_matrix",
@@ -100,7 +102,6 @@ static std::vector<std::string> s_project_options {
     "filament_multi_colour",
     "wipe_tower_x",
     "wipe_tower_y",
-    "wipe_tower_rotation_angle",
     "curr_bed_type",
     "flush_multiplier",
     // Fast-purge mode: project-level purge control, inert at Default.
@@ -133,7 +134,8 @@ static std::vector<std::string> s_project_options {
 };
 
 // Project options applied when loading a "published" 3MF project: s_project_options minus the
-// filament/purge keys. A published file must not port the author's filament data
+// filament/purge keys, plus wipe_tower_rotation_angle (plate geometry that only published
+// loads place in project_config). A published file must not port the author's filament data
 // (colors, colour types, filament/map/AMS slot state, purge/prime/flush volumes, nozzle
 // volume types, filament switcher state) to the receiver's project_config, which feeds the
 // scene colors, AMS slot colors and purge data. Only the plate/bed geometry keys cross over;
@@ -514,6 +516,11 @@ PresetBundle::PresetBundle()
     this->printers.select_preset(0);
 
     this->project_config.apply_only(FullPrintConfig::defaults(), s_project_options);
+}
+
+const t_config_option_keys& PresetBundle::project_options()
+{
+    return s_project_options;
 }
 
 bool PresetBundle::resolve_preset_config(DynamicPrintConfig &config, Preset::Type type,

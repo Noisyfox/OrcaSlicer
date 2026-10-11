@@ -144,6 +144,23 @@ struct RenameTestCollection : public PresetCollection
 
 } // namespace
 
+TEST_CASE("Fresh project defaults do not mask Print preset inheritance", "[Preset][Bundle][Regression]")
+{
+    PresetBundle bundle;
+    const auto& defaults = bundle.project_config;
+    for (const auto& key : Preset::print_options()) {
+        INFO(key);
+        CHECK_FALSE(defaults.has(key));
+    }
+    CHECK(defaults.has("filament_colour"));
+    CHECK(defaults.has("flush_volumes_matrix"));
+    CHECK(defaults.has("wipe_tower_x"));
+    // A nonzero Print baseline must be effective without an explicit project
+    // override; full_config applies project values after Print values.
+    bundle.prints.get_edited_preset().config.set_key_value("wipe_tower_rotation_angle", new ConfigOptionFloat(27.));
+    CHECK_THAT(bundle.full_config().opt_float("wipe_tower_rotation_angle"), Catch::Matchers::WithinAbs(27., 0.000001));
+}
+
 TEST_CASE("Preset identity is canonicalized from load path", "[Preset][Identity]")
 {
     ScopedTemporaryDir         temp_dir;
@@ -1760,7 +1777,7 @@ TEST_CASE("Published 3MF overlays only the author-selected process keys onto the
         config.opt_string("print_settings_id", true) = "file process";
         config.opt<ConfigOptionFloats>("flush_multiplier")->values = { 2., 2. }; // must NOT cross over
         config.opt<ConfigOptionFloats>("wipe_tower_x")->values = { 100. };       // plate geometry, does cross over
-        config.opt<ConfigOptionFloat>("wipe_tower_rotation_angle")->value = 45.; // plate geometry, restored in both load modes
+        config.opt<ConfigOptionFloat>("wipe_tower_rotation_angle")->value = 45.; // published plate geometry; ordinary loads restore the Print preset
         config.option("curr_bed_type")->setInt(BedType::btPC);                   // must NOT cross over
         return config;
     };
@@ -1837,8 +1854,12 @@ TEST_CASE("Published 3MF overlays only the author-selected process keys onto the
     CHECK(control_bundle.prints.size() > control_pre_size);
     // The file's layer_height reached the edited preset via the normal import, not the overlay.
     CHECK_THAT(control_bundle.prints.get_edited_preset().config.opt_float("layer_height"), Catch::Matchers::WithinAbs(0.28, 0.000001));
-    CHECK_THAT(control_bundle.project_config.opt<ConfigOptionFloat>("wipe_tower_rotation_angle")->value,
+    CHECK_FALSE(control_bundle.project_config.has("wipe_tower_rotation_angle"));
+    CHECK_THAT(control_bundle.prints.get_edited_preset().config.opt_float("wipe_tower_rotation_angle"),
                Catch::Matchers::WithinAbs(45., 0.000001));
+    control_bundle.prints.get_edited_preset().config.opt_float("wipe_tower_rotation_angle") = 63.;
+    CHECK_THAT(control_bundle.full_config().opt_float("wipe_tower_rotation_angle"),
+               Catch::Matchers::WithinAbs(63., 0.000001));
 }
 
 // The published printer overlay is restricted to the publishable retraction/z-hop allowlist:
