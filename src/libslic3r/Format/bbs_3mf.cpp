@@ -35,7 +35,7 @@
 #include <cstddef>
 #include <boost/algorithm/string/constants.hpp>
 #include <algorithm>
-#if defined(__EMSCRIPTEN__)
+#if ORC_NEO_WASM
 #include <boost/thread.hpp>
 #else
 #include <boost/thread/lock_types.hpp>
@@ -58,7 +58,7 @@
 #include <boost/date_time/posix_time/posix_time_duration.hpp>
 #include <boost/date_time/posix_time/posix_time_types.hpp>
 #include <boost/date_time/posix_time/ptime.hpp>
-#if !defined(__EMSCRIPTEN__)
+#if !ORC_NEO_WASM
 #include <boost/thread/thread_time.hpp>
 #endif
 #include <boost/core/ref.hpp>
@@ -8933,7 +8933,7 @@ static void handle_legacy_project_loaded(unsigned int version_project_file, Dyna
 }
 
 // backup backgroud thread to dispatch tasks and coperate with ui thread
-#ifndef ORCA_WASM_DISABLE_BBS_BACKUP_MANAGER
+#if !ORC_NEO_WASM
 class _BBS_Backup_Manager
 {
 public:
@@ -9293,7 +9293,7 @@ private:
     boost::thread m_thread;
 };
 
-#endif // ORCA_WASM_DISABLE_BBS_BACKUP_MANAGER
+#endif // !ORC_NEO_WASM
 
 //BBS: add plate data list related logic
 bool load_bbs_3mf(const char* path, DynamicPrintConfig* config, ConfigSubstitutionContext* config_substitutions, Model* model, PlateDataPtrs* plate_data_list, std::vector<Preset*>* project_presets,
@@ -9481,7 +9481,7 @@ void release_PlateData_list(PlateDataPtrs& plate_data_list)
 
 // backup interface
 
-#ifndef ORCA_WASM_DISABLE_BBS_BACKUP_MANAGER
+#if !ORC_NEO_WASM
 void save_object_mesh(ModelObject& object)
 {
     if (!object.get_model() || !object.get_model()->is_need_backup())
@@ -9579,7 +9579,7 @@ SaveObjectGaurd::~SaveObjectGaurd()
 {
     _BBS_Backup_Manager::get().pop_object_gaurd();
 }
-#endif // ORCA_WASM_DISABLE_BBS_BACKUP_MANAGER
+#endif // !ORC_NEO_WASM
 
 namespace{
 

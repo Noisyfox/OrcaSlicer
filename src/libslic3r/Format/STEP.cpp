@@ -486,7 +486,7 @@ Step::Step_Status Step::load()
     bool cb_cancel = false;
     int progress = 0;
     bool load_result = false;
-#ifdef __EMSCRIPTEN__
+#if ORC_NEO_WASM
     boost::thread* task = nullptr;
     auto task_body = [&]() -> void {
 #else
@@ -517,14 +517,14 @@ Step::Step_Status Step::load()
         progress = 10;
         load_result = true;
         task_result = true;
-#ifdef __EMSCRIPTEN__
+#if ORC_NEO_WASM
     };
     task_body();
 #else
     }));
 #endif
     while (!task_result) {
-#ifdef __EMSCRIPTEN__
+#if ORC_NEO_WASM
         std::this_thread::sleep_for(std::chrono::milliseconds(200));
 #else
         boost::this_thread::sleep_for(boost::chrono::milliseconds(200));
@@ -573,7 +573,7 @@ Step::Step_Status Step::mesh(Model* model,
     new_object->name.assign((last_slash == nullptr) ? m_path.c_str() : last_slash + 1);
     new_object->input_file = m_path.c_str();
 
-#ifdef __EMSCRIPTEN__
+#if ORC_NEO_WASM
     boost::thread* task = nullptr;
     auto task_body = [&]() -> void {
 #else
@@ -594,13 +594,13 @@ Step::Step_Status Step::mesh(Model* model,
 
         std::vector<stl_file> stl;
         stl.resize(namedSolids.size());
-#ifdef __EMSCRIPTEN__
+#if ORC_NEO_WASM
         for (size_t i = 0; i < namedSolids.size(); i++) {
 #else
         tbb::parallel_for(tbb::blocked_range<size_t>(0, namedSolids.size()), [&](const tbb::blocked_range<size_t>& range) {
             for (size_t i = range.begin(); i < range.end(); i++) {
 #endif
-#ifdef __EMSCRIPTEN__
+#if ORC_NEO_WASM
                 constexpr bool parallel_mesh = false;
 #else
                 constexpr bool parallel_mesh = true;
@@ -677,7 +677,7 @@ Step::Step_Status Step::mesh(Model* model,
                 }
                 meshed_solid_num.fetch_add(1, std::memory_order_relaxed);
             }
-#ifndef __EMSCRIPTEN__
+#if !ORC_NEO_WASM
         });
 #endif
 
@@ -699,7 +699,7 @@ Step::Step_Status Step::mesh(Model* model,
             }
         }
         task_result = true;
-#ifdef __EMSCRIPTEN__
+#if ORC_NEO_WASM
     };
     task_body();
 #else
@@ -707,7 +707,7 @@ Step::Step_Status Step::mesh(Model* model,
 #endif
 
     while (!task_result) {
-#ifdef __EMSCRIPTEN__
+#if ORC_NEO_WASM
         std::this_thread::sleep_for(std::chrono::milliseconds(300));
 #else
         boost::this_thread::sleep_for(boost::chrono::milliseconds(300));

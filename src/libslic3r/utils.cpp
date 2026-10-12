@@ -4,7 +4,7 @@
 
 #include <atomic>
 #include <boost/smart_ptr/shared_ptr.hpp>
-#if !defined(__EMSCRIPTEN__)
+#if !ORC_NEO_WASM
 #include <boost/log/sinks/sync_frontend.hpp>
 #endif
 #include <boost/log/keywords/severity.hpp>
@@ -97,12 +97,12 @@
 #include <boost/log/core.hpp>
 #include <boost/log/trivial.hpp>
 #include <boost/log/expressions.hpp>
-#if !defined(__EMSCRIPTEN__)
+#if !ORC_NEO_WASM
 #include <boost/log/sinks/async_frontend.hpp>
 #endif
 #include <boost/log/sinks/text_file_backend.hpp>
 #include <boost/log/sinks/text_ostream_backend.hpp>
-#if !defined(__EMSCRIPTEN__)
+#if !ORC_NEO_WASM
 // File logging is disabled below on WASM. Its synchronous frontend would
 // import native Boost.Thread types alongside the WASM compatibility shim.
 #include <boost/log/utility/setup/file.hpp>
@@ -194,7 +194,7 @@ void set_logging_level(unsigned int level)
 
 void set_logging_file(const std::string &file)
 {
-#if !defined(__EMSCRIPTEN__)
+#if !ORC_NEO_WASM
 	boost::log::add_file_log(file);
 #endif
 }
@@ -238,7 +238,7 @@ unsigned get_logging_level()
     }
 }
 
-#if !defined(__EMSCRIPTEN__)
+#if !ORC_NEO_WASM
 boost::shared_ptr<boost::log::sinks::synchronous_sink<boost::log::sinks::text_file_backend>> g_log_sink;
 boost::shared_ptr<boost::log::sinks::asynchronous_sink<boost::log::sinks::text_ostream_backend>> g_console_log_sink;
 #endif
@@ -422,7 +422,7 @@ namespace sinks = boost::log::sinks;
 
 void shutdown_console_logging()
 {
-#if !defined(__EMSCRIPTEN__)
+#if !ORC_NEO_WASM
 
 	if (!g_console_log_sink)
 		return;
@@ -436,7 +436,7 @@ void shutdown_console_logging()
 
 void set_log_path_and_level(const std::string& file, unsigned int level)
 {
-#if !defined(__EMSCRIPTEN__)
+#if !ORC_NEO_WASM
 
 #ifdef __APPLE__
 	//currently on old macos, the boost::log::add_file_log will crash
@@ -495,7 +495,7 @@ void set_log_path_and_level(const std::string& file, unsigned int level)
 
 void flush_logs()
 {
-#if !defined(__EMSCRIPTEN__)
+#if !ORC_NEO_WASM
 
 	if (g_log_sink)
 		g_log_sink->flush();
@@ -507,7 +507,7 @@ void flush_logs()
 // ORCA
 boost::filesystem::path get_log_file_name()
 {
-#if !defined(__EMSCRIPTEN__)
+#if !ORC_NEO_WASM
 
     if (g_log_sink)
         return g_log_sink->locked_backend()->get_current_file_name();
@@ -2037,7 +2037,7 @@ std::set<std::string> vendor_names_in(const boost::filesystem::path& dir)
     for (auto& dir_entry : boost::filesystem::directory_iterator(dir)) {
         const auto& path = dir_entry.path();
         if (Slic3r::is_json_file(path.string())
-#ifndef NEO_DISABLE_VENDOR_CACHE
+#if !ORC_NEO_WASM
             || path.extension() == ".opc"
 #endif
         )
@@ -2102,7 +2102,7 @@ bool install_vendor_bundles_from_resources(
 
             // Either form of the vendor will do: a build may ship it as a cache alone.
             if (!fs::exists(path_in_rsrc)
-#ifndef NEO_DISABLE_VENDOR_CACHE
+#if !ORC_NEO_WASM
                 && !fs::exists(cache_in_rsrc)
 #endif
             ) {

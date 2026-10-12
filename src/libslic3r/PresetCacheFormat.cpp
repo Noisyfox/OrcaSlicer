@@ -444,7 +444,7 @@ bool write_cache_blob(const std::string& path, const std::string& blob)
 bool VendorCacheFile::save(const std::string& path, const std::string& vendor_name,
                            const std::string& vendor_version, const VendorCacheData& data)
 {
-#ifdef NEO_DISABLE_VENDOR_CACHE
+#if ORC_NEO_WASM
     return false;
 #else
     try {
@@ -479,7 +479,7 @@ bool VendorCacheFile::save(const std::string& path, const std::string& vendor_na
 bool VendorCacheFile::load(const std::string& path, const std::string& expected_vendor_name,
                            const Semver& expected_vendor_version, VendorCacheData& data)
 {
-#ifdef NEO_DISABLE_VENDOR_CACHE
+#if ORC_NEO_WASM
     return false;
 #else
     std::string blob;
@@ -513,7 +513,7 @@ bool VendorCacheFile::load(const std::string& path, const std::string& expected_
 // static
 std::string VendorCacheFile::peek_version(const std::string& path, const std::string& expected_vendor_name)
 {
-#ifdef NEO_DISABLE_VENDOR_CACHE
+#if ORC_NEO_WASM
     return {};
 #else
     try {
@@ -540,7 +540,7 @@ std::string VendorCacheFile::peek_version(const std::string& path, const std::st
 // static
 Semver VendorCacheFile::usable_version(const std::string& path, const std::string& expected_vendor_name)
 {
-#ifdef NEO_DISABLE_VENDOR_CACHE
+#if ORC_NEO_WASM
     return Semver::invalid();
 #else
     std::string blob;
@@ -561,7 +561,7 @@ Semver VendorCacheFile::usable_version(const std::string& path, const std::strin
 bool VendorCacheFile::carries_preset(const std::string& path, const std::string& vendor_name,
                                      Preset::Type type, const std::string& preset_name)
 {
-#ifdef NEO_DISABLE_VENDOR_CACHE
+#if ORC_NEO_WASM
     return false;
 #else
     std::string blob;

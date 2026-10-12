@@ -87,7 +87,7 @@ void detect_platform()
 			::fclose(f);
 		}
 	}
-#elif defined(__EMSCRIPTEN__)
+#elif ORC_NEO_WASM
     BOOST_LOG_TRIVIAL(info) << "Platform: Emscripten";
     s_platform         = Platform::Linux;
     s_platform_flavor  = PlatformFlavor::GenericLinux;

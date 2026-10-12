@@ -50,7 +50,7 @@
 #include "ArcFitter.hpp"
 #include <cstdio>
 #include <boost/filesystem/operations.hpp>
-#if defined(__EMSCRIPTEN__)
+#if ORC_NEO_WASM
 #include <boost/thread.hpp>
 #else
 #include <boost/thread/lock_types.hpp>

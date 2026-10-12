@@ -626,7 +626,7 @@ const PresetBundle *PresetBundle::load_source_vendor(const boost::filesystem::pa
                                                     ForwardCompatibilitySubstitutionRule compatibility_rule,
                                                     std::string &error, bool allow_cache)
 {
-#ifdef NEO_DISABLE_VENDOR_CACHE
+#if ORC_NEO_WASM
     allow_cache = false;
 #endif
     auto key = std::make_tuple(root_dir.string(), vendor_id, compatibility_rule, allow_cache);
@@ -703,7 +703,7 @@ bool PresetBundle::resolve_system_preset(DynamicPrintConfig &config, Preset::Typ
     // Release builds ship a vendor as its preset cache alone, without the profile JSONs.
     auto installed = [&vendor_id](const fs::path &root) {
         return fs::is_regular_file(root / (vendor_id + ".json"))
-#ifndef NEO_DISABLE_VENDOR_CACHE
+#if !ORC_NEO_WASM
             || fs::is_regular_file(root / (vendor_id + ".opc"))
 #endif
             ;
@@ -1545,7 +1545,7 @@ bool PresetBundle::apply_vendor_config(
         ? app_config->get_section(AppConfig::SECTION_FILAMENTS)
         : std::map<std::string, std::string>();
 
-#ifndef NEO_DISABLE_VENDOR_INSTALLATION
+#if !ORC_NEO_WASM
     // Find vendors that need installation
     std::vector<std::string> install_bundles;
     for (const auto &it : new_vendors) {
@@ -2611,7 +2611,7 @@ std::pair<PresetsConfigSubstitutions, std::string> PresetBundle::load_system_pre
     // The vendors below are loaded whole and against each other — the filament
     // library first, then every other vendor with it as the base — so each parse
     // is complete enough to be worth caching.
-#ifdef NEO_DISABLE_VENDOR_CACHE
+#if ORC_NEO_WASM
     allow_cache = false;
 #endif
     m_generate_vendor_caches = allow_cache && (m_generate_vendor_caches || !validation_mode);
@@ -2634,7 +2634,7 @@ std::pair<PresetsConfigSubstitutions, std::string> PresetBundle::load_vendors(co
     ForwardCompatibilitySubstitutionRule compatibility_rule, bool allow_cache, const std::atomic<bool>* cancel,
     std::vector<std::string>* failed)
 {
-#ifdef NEO_DISABLE_VENDOR_CACHE
+#if ORC_NEO_WASM
     allow_cache = false;
 #endif
     const auto load_t0  = std::chrono::steady_clock::now();
@@ -7149,7 +7149,7 @@ std::pair<PresetsConfigSubstitutions, size_t> PresetBundle::load_vendor_configs_
 PresetBundle::VendorRead PresetBundle::read_vendor(const std::string& dir, const std::string& vendor_name,
     LoadConfigBundleAttributes flags, ForwardCompatibilitySubstitutionRule compatibility_rule, bool allow_cache)
 {
-#ifdef NEO_DISABLE_VENDOR_CACHE
+#if ORC_NEO_WASM
     allow_cache = false;
 #endif
     VendorRead read { dir, vendor_name, flags, compatibility_rule };
