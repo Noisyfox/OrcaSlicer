@@ -329,6 +329,12 @@ public:
     void remove_user_presets_directory(const std::string preset_folder);
     void update_system_preset_setting_ids(std::map<std::string, std::map<std::string, std::string>>& system_presets);
 
+    // Normalize the activation record using this bundle's already loaded vendor
+    // metadata, before loading the requested vendor configuration.
+    std::map<std::string, std::string> normalize_system_filament_activation(
+        const std::map<std::string, std::map<std::string, std::set<std::string>>>& new_vendors,
+        const std::map<std::string, std::string>& new_filaments) const;
+
     // Apply vendor configuration changes (Core library version, no GUI dependencies)
     // This function installs vendors from resources and loads them into the preset bundle
     //
@@ -341,12 +347,6 @@ public:
     //   preferred_filament: Optional preferred filament to select
     //
     // Returns: true if successful, false otherwise
-    // Normalize the activation record using this bundle's already loaded vendor
-    // metadata, before loading the requested vendor configuration.
-    std::map<std::string, std::string> normalize_system_filament_activation(
-        const std::map<std::string, std::map<std::string, std::set<std::string>>>& new_vendors,
-        const std::map<std::string, std::string>& new_filaments) const;
-
     bool apply_vendor_config(
         const std::map<std::string, std::map<std::string, std::set<std::string>>>& new_vendors,
         const std::map<std::string, std::string>& new_filaments,
