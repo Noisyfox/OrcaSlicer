@@ -1528,44 +1528,10 @@ PresetsConfigSubstitutions PresetBundle::load_user_presets(AppConfig &          
     return substitutions;
 }
 
-bool PresetBundle::apply_vendor_config(
+std::map<std::string, std::string> PresetBundle::normalize_system_filament_activation(
     const std::map<std::string, std::map<std::string, std::set<std::string>>>& new_vendors,
-    const std::map<std::string, std::string>& new_filaments,
-    AppConfig* app_config,
-    bool overwrite,
-    const std::string& preferred_printer_model,
-    const std::string& preferred_printer_variant,
-    const std::string& preferred_filament)
+    const std::map<std::string, std::string>& new_filaments) const
 {
-    namespace fs = boost::filesystem;
-
-    // Get current configuration from AppConfig
-    const auto old_vendors = app_config->vendors();
-    const auto old_filaments = app_config->has_section(AppConfig::SECTION_FILAMENTS)
-        ? app_config->get_section(AppConfig::SECTION_FILAMENTS)
-        : std::map<std::string, std::string>();
-
-    // Find vendors that need installation
-    std::vector<std::string> install_bundles;
-    for (const auto &it : new_vendors) {
-        if (it.second.size() > 0) {
-            if (!is_vendor_installed(it.first)) {
-                install_bundles.emplace_back(it.first);
-            }
-        }
-    }
-
-    // Install bundles from resources
-    if (!install_bundles.empty()) {
-        BOOST_LOG_TRIVIAL(info) << "Installing " << install_bundles.size() << " vendor bundles from resources";
-        if (!Slic3r::install_vendor_bundles_from_resources(install_bundles)) {
-            BOOST_LOG_TRIVIAL(error) << "Failed to install vendor bundles";
-            return false;
-        }
-    } else {
-        BOOST_LOG_TRIVIAL(info) << "No bundles need to be installed from resource directory";
-    }
-
     // For each @System filament, check if a vendor-specific override exists
     // in the loaded profiles. If so, replace the @System variant with the
     // override (e.g. replace "Generic ABS @System" with BBL "Generic ABS").
@@ -1626,6 +1592,49 @@ bool PresetBundle::apply_vendor_config(
         }
         supplemented_filaments[name] = value;
     }
+
+    return supplemented_filaments;
+}
+
+bool PresetBundle::apply_vendor_config(
+    const std::map<std::string, std::map<std::string, std::set<std::string>>>& new_vendors,
+    const std::map<std::string, std::string>& new_filaments,
+    AppConfig* app_config,
+    bool overwrite,
+    const std::string& preferred_printer_model,
+    const std::string& preferred_printer_variant,
+    const std::string& preferred_filament)
+{
+    namespace fs = boost::filesystem;
+
+    // Get current configuration from AppConfig
+    const auto old_vendors = app_config->vendors();
+    const auto old_filaments = app_config->has_section(AppConfig::SECTION_FILAMENTS)
+        ? app_config->get_section(AppConfig::SECTION_FILAMENTS)
+        : std::map<std::string, std::string>();
+
+    // Find vendors that need installation
+    std::vector<std::string> install_bundles;
+    for (const auto &it : new_vendors) {
+        if (it.second.size() > 0) {
+            if (!is_vendor_installed(it.first)) {
+                install_bundles.emplace_back(it.first);
+            }
+        }
+    }
+
+    // Install bundles from resources
+    if (!install_bundles.empty()) {
+        BOOST_LOG_TRIVIAL(info) << "Installing " << install_bundles.size() << " vendor bundles from resources";
+        if (!Slic3r::install_vendor_bundles_from_resources(install_bundles)) {
+            BOOST_LOG_TRIVIAL(error) << "Failed to install vendor bundles";
+            return false;
+        }
+    } else {
+        BOOST_LOG_TRIVIAL(info) << "No bundles need to be installed from resource directory";
+    }
+
+    const auto supplemented_filaments = normalize_system_filament_activation(new_vendors, new_filaments);
 
     // Update AppConfig - merge with existing values instead of overwriting depending on bool
     if (overwrite) {
