@@ -3158,6 +3158,10 @@ std::map<std::string, std::vector<Preset const *>> PresetCollection::get_filamen
 void PresetCollection::save_current_preset(const std::string &new_name, bool detach, bool save_to_project, Preset* _curr_preset)
 {
     Preset curr_preset = _curr_preset ? *_curr_preset : m_edited_preset;
+#ifdef ORC_NEO_WASM
+    const std::string selected_name = get_selected_preset_name();
+    const Preset edited_before = m_edited_preset;
+#endif
     //BBS: add lock logic for sync preset in background
     std::string final_inherits;
     lock();
@@ -3253,8 +3257,16 @@ void PresetCollection::save_current_preset(const std::string &new_name, bool det
         final_inherits = inherits;
         unlock();
     }
+    // Neo's independent editor owns selection separately from persistence.
+#ifdef ORC_NEO_WASM
+    this->select_preset_by_name(save_to_project ? new_name : selected_name, true);
+    if (!save_to_project) m_edited_preset = edited_before;
+    Preset& saved_preset = *this->find_preset(new_name, false, true);
+#else
     // 2) Activate the saved preset.
     this->select_preset_by_name(new_name, true);
+    Preset& saved_preset = this->get_selected_preset();
+#endif
     // 2) Store the active preset to disk.
     //BBS: only save difference for user preset
     Preset* parent_preset = nullptr;
@@ -3262,17 +3274,19 @@ void PresetCollection::save_current_preset(const std::string &new_name, bool det
         parent_preset = this->find_preset2(final_inherits, true);
         if (parent_preset) {
             // Orca: take the saved diff against the resolved parent (renamed / library-matched).
-            Preset::normalize_inherits(this->get_selected_preset().config, parent_preset);
-            if (this->get_selected_preset().base_id.empty()) {
-                this->get_selected_preset().base_id = parent_preset->setting_id;
+            Preset::normalize_inherits(saved_preset.config, parent_preset);
+            if (saved_preset.base_id.empty()) {
+                saved_preset.base_id = parent_preset->setting_id;
                 BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " base_id: " << parent_preset->setting_id;
             }
         }
     }
-    if (parent_preset)
-        this->get_selected_preset().save(&(parent_preset->config));
-    else
-        this->get_selected_preset().save(nullptr);
+    const bool saved = saved_preset.save(parent_preset ? &parent_preset->config : nullptr);
+#ifdef ORC_NEO_WASM
+    if (!saved) throw std::runtime_error("could not write user preset: " + new_name);
+#else
+    (void)saved;
+#endif
 
     {
         LifecycleEventContext ctx;
