@@ -84,10 +84,10 @@ public:
 		return Semver(ver);
 	}
 
-	Semver(Semver &&other) : ver(other.ver) { other.ver = semver_zero(); }
+	Semver(Semver &&other) noexcept : ver(other.ver) { other.ver = semver_zero(); }
 	Semver(const Semver &other) : ver(::semver_copy(&other.ver)) {}
 
-	Semver &operator=(Semver &&other)
+	Semver &operator=(Semver &&other) noexcept
 	{
 		::semver_free(&ver);
 		ver = other.ver;

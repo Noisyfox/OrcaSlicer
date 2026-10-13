@@ -694,6 +694,9 @@ public:
     // returns true if the preset was deleted successfully.
     // When force=true, bypasses the can_overwrite() check (used for bundle preset cleanup).
     bool            delete_preset(const std::string& name, bool force = false);
+    // Remove an unselected, fileless external preset without persistence or
+    // alias side effects. Preserve the selected, edited and saved presets.
+    bool            erase_runtime_preset(const std::string& name) noexcept;
 
     // Verify and correct the sync metadata for the preset to ensure proper cloud synchronization.
     void check_and_fix_syncinfo(Preset& preset, const std::string& user_id);

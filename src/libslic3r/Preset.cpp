@@ -25,6 +25,7 @@
 #include <deque>
 #include <regex>
 #include <initializer_list>
+#include <type_traits>
 
 #include "Config.hpp"
 #include "Exception.hpp"
@@ -4024,6 +4025,21 @@ bool PresetCollection::select_preset_by_name(const std::string &name_w_suffix, b
     else
         BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << boost::format(": %1%, select %2%, failed")%Preset::get_type_string(m_type) %name_w_suffix;
     return false;
+}
+
+bool PresetCollection::erase_runtime_preset(const std::string &name) noexcept
+{
+    static_assert(std::is_nothrow_move_assignable<Preset>::value,
+                  "runtime preset removal must not throw while shifting the collection");
+    const auto it = std::find_if(m_presets.begin(), m_presets.end(),
+                               [&](const Preset &preset) { return preset.name == name; });
+    if (it == m_presets.end()) return false;
+    const size_t idx = size_t(it - m_presets.begin());
+    if (idx == m_idx_selected || !it->is_external || !it->file.empty() || it->is_default || it->is_system)
+        return false;
+    m_presets.erase(it);
+    if (m_idx_selected != size_t(-1) && idx < m_idx_selected) --m_idx_selected;
+    return true;
 }
 
 bool PresetCollection::select_preset_by_name_strict(const std::string &name)
