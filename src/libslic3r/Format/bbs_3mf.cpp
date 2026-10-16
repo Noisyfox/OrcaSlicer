@@ -6063,6 +6063,7 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
         std::string m_auxiliary_archive;
         std::vector<std::pair<std::string, std::string>> m_auxiliary_relations;
         std::map<std::string, std::string> m_auxiliary_content_types;
+        std::map<std::string, std::string> m_auxiliary_default_types;
         bool _add_preserved_auxiliaries(mz_zip_archive& archive, PackingTemporaryData& data);
         bool m_skip_auxiliary { false };    // skip normal axuiliary files
         bool m_minimal_published { false }; // published 3MF: omit the project config, the embedded preset files and the slicer tags
@@ -6809,23 +6810,15 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
                     return false;
             }
             const auto types = read_xml("[Content_Types].xml");
-            std::map<std::string, std::string> defaults, overrides;
             for (const auto& root : types) if (local_name(root.first) == "Types") {
                 for (const auto& node : root.second) {
                     if (local_name(node.first) == "Default")
-                        defaults[boost::algorithm::to_lower_copy(node.second.get<std::string>("<xmlattr>.Extension"))] = node.second.get<std::string>("<xmlattr>.ContentType");
-                    else if (local_name(node.first) == "Override")
-                        overrides[uri_part(node.second.get<std::string>("<xmlattr>.PartName"))] = node.second.get<std::string>("<xmlattr>.ContentType");
-                }
-            }
-            for (const auto& part : parts) {
-                if (part.back() == '/') continue;
-                auto type = overrides.find(part);
-                if (type != overrides.end()) m_auxiliary_content_types[part] = type->second;
-                else {
-                    const auto dot = part.find_last_of('.');
-                    auto def = defaults.find(dot == std::string::npos ? "" : boost::algorithm::to_lower_copy(part.substr(dot + 1)));
-                    if (def != defaults.end()) m_auxiliary_content_types[part] = def->second;
+                        m_auxiliary_default_types[node.second.get<std::string>("<xmlattr>.Extension")] = node.second.get<std::string>("<xmlattr>.ContentType");
+                    else if (local_name(node.first) == "Override") {
+                        const auto part = target_part(node.second.get<std::string>("<xmlattr>.PartName"));
+                        if (boost::algorithm::istarts_with(part, "Auxiliaries/"))
+                            m_auxiliary_content_types[part] = node.second.get<std::string>("<xmlattr>.ContentType");
+                    }
                 }
             }
             const auto relationships = read_xml("_rels/.rels");
@@ -6833,13 +6826,15 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
                 for (const auto& node : root.second) if (local_name(node.first) == "Relationship") {
                     const auto target = node.second.get<std::string>("<xmlattr>.Target", "");
                     const auto type = node.second.get<std::string>("<xmlattr>.Type", "");
-                    if (node.second.get<std::string>("<xmlattr>.TargetMode", "") == "External" || !parts.count(uri_part(target))) continue;
+                    const auto literal = target_part(target);
+                    const auto part = parts.count(literal) ? literal : uri_part(target);
+                    if (node.second.get<std::string>("<xmlattr>.TargetMode", "") == "External" || !parts.count(part)) continue;
                     if (type == "http://schemas.openxmlformats.org/package/2006/relationships/metadata/thumbnail")
-                        data._3mf_thumbnail = target_part(target);
+                        data._3mf_thumbnail = part;
                     else if (type == "http://schemas.bambulab.com/package/2021/cover-thumbnail-middle")
-                        data._3mf_printer_thumbnail_middle = target_part(target);
+                        data._3mf_printer_thumbnail_middle = part;
                     else if (type == "http://schemas.bambulab.com/package/2021/cover-thumbnail-small")
-                        data._3mf_printer_thumbnail_small = target_part(target);
+                        data._3mf_printer_thumbnail_small = part;
                     else m_auxiliary_relations.emplace_back(target, type);
                 }
             }
@@ -6865,18 +6860,13 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
         stream << " <Default Extension=\"model\" ContentType=\"application/vnd.ms-package.3dmanufacturing-3dmodel+xml\"/>\n";
         stream << " <Default Extension=\"png\" ContentType=\"image/png\"/>\n";
         stream << " <Default Extension=\"gcode\" ContentType=\"text/x.gcode\"/>\n";
-        const auto part_uri = [](const std::string& part) {
-            static constexpr char hex[] = "0123456789ABCDEF";
-            std::string uri;
-            for (unsigned char c : part) {
-                if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
-                    c == '/' || c == '-' || c == '_' || c == '.' || c == '~') uri += c;
-                else { uri += '%'; uri += hex[c >> 4]; uri += hex[c & 15]; }
-            }
-            return uri;
-        };
+        for (const auto& [extension, type] : m_auxiliary_default_types) {
+            const auto lower = boost::algorithm::to_lower_copy(extension);
+            if (lower != "rels" && lower != "model" && lower != "png" && lower != "gcode")
+                stream << " <Default Extension=\"" << xml_escape(extension) << "\" ContentType=\"" << xml_escape(type) << "\"/>\n";
+        }
         for (const auto& [part, type] : m_auxiliary_content_types)
-            stream << " <Override PartName=\"/" << xml_escape(part_uri(part)) << "\" ContentType=\"" << xml_escape(type) << "\"/>\n";
+            stream << " <Override PartName=\"/" << xml_escape(part) << "\" ContentType=\"" << xml_escape(type) << "\"/>\n";
         stream << "</Types>";
 
         std::string out = stream.str();
