@@ -6911,32 +6911,27 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
             //generate small size of thumbnail
             std::vector<unsigned char> small_pixels;
             small_pixels.resize(PLATE_THUMBNAIL_SMALL_WIDTH * PLATE_THUMBNAIL_SMALL_HEIGHT * 4);
-            /* step width and step height */
-            int sw = thumbnail_data.width / PLATE_THUMBNAIL_SMALL_WIDTH;
-            int sh = thumbnail_data.height / PLATE_THUMBNAIL_SMALL_HEIGHT;
-            int clampped_width = sw * PLATE_THUMBNAIL_SMALL_WIDTH;
-            int clampped_height = sh * PLATE_THUMBNAIL_SMALL_HEIGHT;
-
-            for (int i = 0; i < clampped_height; i += sh) {
-                for (int j = 0; j < clampped_width; j += sw) {
-                    int r = 0, g = 0, b = 0, a = 0;
-                    for (int m = 0; m < sh; m++) {
-                        for (int n = 0; n < sw; n++) {
-                            r += (int)thumbnail_data.pixels[4 * ((i + m) * thumbnail_data.width + j + n) + 0];
-                            g += (int)thumbnail_data.pixels[4 * ((i + m) * thumbnail_data.width + j + n) + 1];
-                            b += (int)thumbnail_data.pixels[4 * ((i + m) * thumbnail_data.width + j + n) + 2];
-                            a += (int)thumbnail_data.pixels[4 * ((i + m) * thumbnail_data.width + j + n) + 3];
+            // Partition the full source along each axis, including odd-sized
+            // edges. Sub-128 inputs repeat source pixels instead of producing
+            // a zero step; rectangular images use independent X/Y indices.
+            for (size_t y = 0; y < PLATE_THUMBNAIL_SMALL_HEIGHT; ++y) {
+                const size_t y_begin = y * thumbnail_data.height / PLATE_THUMBNAIL_SMALL_HEIGHT;
+                const size_t y_end = std::max(y_begin + 1, (y + 1) * thumbnail_data.height / PLATE_THUMBNAIL_SMALL_HEIGHT);
+                for (size_t x = 0; x < PLATE_THUMBNAIL_SMALL_WIDTH; ++x) {
+                    const size_t x_begin = x * thumbnail_data.width / PLATE_THUMBNAIL_SMALL_WIDTH;
+                    const size_t x_end = std::max(x_begin + 1, (x + 1) * thumbnail_data.width / PLATE_THUMBNAIL_SMALL_WIDTH);
+                    std::uint64_t sums[4] = {};
+                    for (size_t sy = y_begin; sy < y_end; ++sy) {
+                        for (size_t sx = x_begin; sx < x_end; ++sx) {
+                            const size_t source = 4 * (sy * thumbnail_data.width + sx);
+                            for (size_t channel = 0; channel < 4; ++channel)
+                                sums[channel] += thumbnail_data.pixels[source + channel];
                         }
                     }
-                    r = std::clamp(0, r / sw / sh, 255);
-                    g = std::clamp(0, g / sw / sh, 255);
-                    b = std::clamp(0, b / sw / sh, 255);
-                    a = std::clamp(0, a / sw / sh, 255);
-                    small_pixels[4 * (i / sw * PLATE_THUMBNAIL_SMALL_WIDTH + j / sh) + 0] = (unsigned char)r;
-                    small_pixels[4 * (i / sw * PLATE_THUMBNAIL_SMALL_WIDTH + j / sh) + 1] = (unsigned char)g;
-                    small_pixels[4 * (i / sw * PLATE_THUMBNAIL_SMALL_WIDTH + j / sh) + 2] = (unsigned char)b;
-                    small_pixels[4 * (i / sw * PLATE_THUMBNAIL_SMALL_WIDTH + j / sh) + 3] = (unsigned char)a;
-                    //memcpy((void*)&small_pixels[4*(i / sw * PLATE_THUMBNAIL_SMALL_WIDTH + j / sh)], thumbnail_data.pixels.data() + 4*(i * thumbnail_data.width + j), 4);
+                    const size_t count = (x_end - x_begin) * (y_end - y_begin);
+                    const size_t target = 4 * (y * PLATE_THUMBNAIL_SMALL_WIDTH + x);
+                    for (size_t channel = 0; channel < 4; ++channel)
+                        small_pixels[target + channel] = static_cast<unsigned char>(sums[channel] / count);
                 }
             }
             size_t small_png_size = 0;
