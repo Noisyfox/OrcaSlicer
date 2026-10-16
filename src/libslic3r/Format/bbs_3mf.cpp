@@ -6813,7 +6813,7 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
             for (const auto& root : types) if (local_name(root.first) == "Types") {
                 for (const auto& node : root.second) {
                     if (local_name(node.first) == "Default")
-                        defaults[node.second.get<std::string>("<xmlattr>.Extension")] = node.second.get<std::string>("<xmlattr>.ContentType");
+                        defaults[boost::algorithm::to_lower_copy(node.second.get<std::string>("<xmlattr>.Extension"))] = node.second.get<std::string>("<xmlattr>.ContentType");
                     else if (local_name(node.first) == "Override")
                         overrides[uri_part(node.second.get<std::string>("<xmlattr>.PartName"))] = node.second.get<std::string>("<xmlattr>.ContentType");
                 }
@@ -6824,7 +6824,7 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
                 if (type != overrides.end()) m_auxiliary_content_types[part] = type->second;
                 else {
                     const auto dot = part.find_last_of('.');
-                    auto def = defaults.find(dot == std::string::npos ? "" : part.substr(dot + 1));
+                    auto def = defaults.find(dot == std::string::npos ? "" : boost::algorithm::to_lower_copy(part.substr(dot + 1)));
                     if (def != defaults.end()) m_auxiliary_content_types[part] = def->second;
                 }
             }
@@ -6845,6 +6845,10 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
             }
             if (data._3mf_thumbnail.empty() && parts.count("Auxiliaries/.thumbnails/thumbnail_3mf.png"))
                 data._3mf_thumbnail = "Auxiliaries/.thumbnails/thumbnail_3mf.png";
+            // Consumers prefer the Bambu cover when present. Do not let a
+            // newly generated plate preview hide an imported standard cover.
+            if (data._3mf_printer_thumbnail_middle.empty()) data._3mf_printer_thumbnail_middle = data._3mf_thumbnail;
+            if (data._3mf_printer_thumbnail_small.empty()) data._3mf_printer_thumbnail_small = data._3mf_thumbnail;
         } catch (const std::exception& e) {
             add_error(std::string("Cannot preserve project attachments: ") + e.what());
             return false;
@@ -6861,8 +6865,18 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
         stream << " <Default Extension=\"model\" ContentType=\"application/vnd.ms-package.3dmanufacturing-3dmodel+xml\"/>\n";
         stream << " <Default Extension=\"png\" ContentType=\"image/png\"/>\n";
         stream << " <Default Extension=\"gcode\" ContentType=\"text/x.gcode\"/>\n";
+        const auto part_uri = [](const std::string& part) {
+            static constexpr char hex[] = "0123456789ABCDEF";
+            std::string uri;
+            for (unsigned char c : part) {
+                if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
+                    c == '/' || c == '-' || c == '_' || c == '.' || c == '~') uri += c;
+                else { uri += '%'; uri += hex[c >> 4]; uri += hex[c & 15]; }
+            }
+            return uri;
+        };
         for (const auto& [part, type] : m_auxiliary_content_types)
-            stream << " <Override PartName=\"/" << xml_escape(part) << "\" ContentType=\"" << xml_escape(type) << "\"/>\n";
+            stream << " <Override PartName=\"/" << xml_escape(part_uri(part)) << "\" ContentType=\"" << xml_escape(type) << "\"/>\n";
         stream << "</Types>";
 
         std::string out = stream.str();
