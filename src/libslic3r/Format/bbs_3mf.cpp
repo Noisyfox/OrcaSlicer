@@ -6060,6 +6060,10 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
         bool m_split_model { false };       // save object per file with Production Extention
         bool m_save_gcode { false };        // whether to save gcode for normal save
         bool m_skip_model { false };        // skip model when exporting .gcode.3mf
+        std::string m_auxiliary_archive;
+        std::vector<std::pair<std::string, std::string>> m_auxiliary_relations;
+        std::map<std::string, std::string> m_auxiliary_content_types;
+        bool _add_preserved_auxiliaries(mz_zip_archive& archive, PackingTemporaryData& data);
         bool m_skip_auxiliary { false };    // skip normal axuiliary files
         bool m_minimal_published { false }; // published 3MF: omit the project config, the embedded preset files and the slicer tags
         bool m_use_loaded_id { false };        // whether to use loaded id for identify_id
@@ -6155,6 +6159,7 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
         m_zip64 = store_params.strategy & SaveStrategy::Zip64;
         m_production_ext = store_params.strategy & SaveStrategy::ProductionExt;
 
+        m_auxiliary_archive = store_params.auxiliary_archive;
         m_skip_static = store_params.strategy & SaveStrategy::SkipStatic;
         m_split_model = store_params.strategy & SaveStrategy::SplitModel;
         m_save_gcode = store_params.strategy & SaveStrategy::WithGcode;
@@ -6305,6 +6310,8 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
             if (cb_cancel)
                 return false;
         }
+
+        if (!_add_preserved_auxiliaries(archive, temp_data)) return false;
 
         // Adds content types file ("[Content_Types].xml";).
         // The content of this file is the same for each OrcaSlicer 3mf.
@@ -6689,7 +6696,7 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
                 return false;
         }
 
-        if (!m_skip_static && !_add_auxiliary_dir_to_archive(archive, model.get_auxiliary_file_temp_path(), temp_data)) {
+        if (m_auxiliary_archive.empty() && !m_skip_static && !_add_auxiliary_dir_to_archive(archive, model.get_auxiliary_file_temp_path(), temp_data)) {
             BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << ":" <<__LINE__ << boost::format(", _add_auxiliary_dir_to_archive failed\n");
             return false;
         }
@@ -6751,6 +6758,100 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
         return result;
     }
 
+    bool _BBS_3MF_Exporter::_add_preserved_auxiliaries(mz_zip_archive& output, PackingTemporaryData& data)
+    {
+        if (m_auxiliary_archive.empty()) return true;
+        MZ_Archive input;
+        if (!open_zip_reader(&input.arch, m_auxiliary_archive)) return false;
+        struct Close { mz_zip_archive& archive; ~Close() { close_zip_reader(&archive); } } close{input.arch};
+        std::set<std::string> parts;
+        auto read_xml = [&](const char* name) {
+            pt::ptree tree;
+            const int index = mz_zip_reader_locate_file(&input.arch, name, nullptr, 0);
+            if (index < 0) return tree;
+            size_t size = 0;
+            void* bytes = mz_zip_reader_extract_to_heap(&input.arch, index, &size, 0);
+            if (!bytes) throw std::runtime_error("Cannot read auxiliary package metadata");
+            std::unique_ptr<void, decltype(&mz_free)> owner(bytes, mz_free);
+            std::istringstream text(std::string(static_cast<char*>(bytes), size));
+            pt::read_xml(text, tree);
+            return tree;
+        };
+        auto local_name = [](const std::string& name) { return name.substr(name.find(':') + 1); };
+        auto target_part = [](std::string name) {
+            if (!name.empty() && name.front() == '/') name.erase(0, 1);
+            return name;
+        };
+        auto uri_part = [&](const std::string& uri) {
+            const auto name = target_part(uri);
+            std::string decoded;
+            auto hex = [](char c) -> int {
+                if (c >= '0' && c <= '9') return c - '0';
+                if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+                if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+                return -1;
+            };
+            for (size_t i = 0; i < name.size(); ++i) {
+                if (name[i] == '%' && i + 2 < name.size() && hex(name[i+1]) >= 0 && hex(name[i+2]) >= 0) {
+                    decoded += static_cast<char>(hex(name[i+1]) * 16 + hex(name[i+2]));
+                    i += 2;
+                } else decoded += name[i];
+            }
+            return decoded;
+        };
+        try {
+            for (mz_uint i = 0; i < mz_zip_reader_get_num_files(&input.arch); ++i) {
+                mz_zip_archive_file_stat stat;
+                if (!mz_zip_reader_file_stat(&input.arch, i, &stat)) return false;
+                const std::string name = decode_archive_entry_path(&input.arch, stat);
+                if (!boost::algorithm::istarts_with(name, "Auxiliaries/")) continue;
+                if (!parts.insert(name).second || !mz_zip_writer_add_from_zip_reader(&output, &input.arch, i))
+                    return false;
+            }
+            const auto types = read_xml("[Content_Types].xml");
+            std::map<std::string, std::string> defaults, overrides;
+            for (const auto& root : types) if (local_name(root.first) == "Types") {
+                for (const auto& node : root.second) {
+                    if (local_name(node.first) == "Default")
+                        defaults[node.second.get<std::string>("<xmlattr>.Extension")] = node.second.get<std::string>("<xmlattr>.ContentType");
+                    else if (local_name(node.first) == "Override")
+                        overrides[uri_part(node.second.get<std::string>("<xmlattr>.PartName"))] = node.second.get<std::string>("<xmlattr>.ContentType");
+                }
+            }
+            for (const auto& part : parts) {
+                if (part.back() == '/') continue;
+                auto type = overrides.find(part);
+                if (type != overrides.end()) m_auxiliary_content_types[part] = type->second;
+                else {
+                    const auto dot = part.find_last_of('.');
+                    auto def = defaults.find(dot == std::string::npos ? "" : part.substr(dot + 1));
+                    if (def != defaults.end()) m_auxiliary_content_types[part] = def->second;
+                }
+            }
+            const auto relationships = read_xml("_rels/.rels");
+            for (const auto& root : relationships) if (local_name(root.first) == "Relationships") {
+                for (const auto& node : root.second) if (local_name(node.first) == "Relationship") {
+                    const auto target = node.second.get<std::string>("<xmlattr>.Target", "");
+                    const auto type = node.second.get<std::string>("<xmlattr>.Type", "");
+                    if (node.second.get<std::string>("<xmlattr>.TargetMode", "") == "External" || !parts.count(uri_part(target))) continue;
+                    if (type == "http://schemas.openxmlformats.org/package/2006/relationships/metadata/thumbnail")
+                        data._3mf_thumbnail = target_part(target);
+                    else if (type == "http://schemas.bambulab.com/package/2021/cover-thumbnail-middle")
+                        data._3mf_printer_thumbnail_middle = target_part(target);
+                    else if (type == "http://schemas.bambulab.com/package/2021/cover-thumbnail-small")
+                        data._3mf_printer_thumbnail_small = target_part(target);
+                    else m_auxiliary_relations.emplace_back(target, type);
+                }
+            }
+            if (data._3mf_thumbnail.empty() && parts.count("Auxiliaries/.thumbnails/thumbnail_3mf.png"))
+                data._3mf_thumbnail = "Auxiliaries/.thumbnails/thumbnail_3mf.png";
+        } catch (const std::exception& e) {
+            add_error(std::string("Cannot preserve project attachments: ") + e.what());
+            return false;
+        }
+        return true;
+    }
+
     bool _BBS_3MF_Exporter::_add_content_types_file_to_archive(mz_zip_archive& archive)
     {
         std::stringstream stream;
@@ -6760,6 +6861,8 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
         stream << " <Default Extension=\"model\" ContentType=\"application/vnd.ms-package.3dmanufacturing-3dmodel+xml\"/>\n";
         stream << " <Default Extension=\"png\" ContentType=\"image/png\"/>\n";
         stream << " <Default Extension=\"gcode\" ContentType=\"text/x.gcode\"/>\n";
+        for (const auto& [part, type] : m_auxiliary_content_types)
+            stream << " <Override PartName=\"/" << xml_escape(part) << "\" ContentType=\"" << xml_escape(type) << "\"/>\n";
         stream << "</Types>";
 
         std::string out = stream.str();
@@ -6935,6 +7038,12 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
                 for (auto & type : types)
                     stream << " <Relationship Target=\"/" << xml_escape(path) << "\" Id=\"rel-" << std::to_string(++i) << "\" Type=\"" << type << "\"/>\n";
             }
+        }
+        if (from.empty()) {
+            size_t id = 0;
+            for (const auto& [target, type] : m_auxiliary_relations)
+                stream << " <Relationship Target=\"" << xml_escape(target) << "\" Id=\"aux-" << ++id
+                       << "\" Type=\"" << xml_escape(type) << "\"/>\n";
         }
         stream << "</Relationships>";
 
