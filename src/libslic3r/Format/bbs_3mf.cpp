@@ -6927,7 +6927,8 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
             }
             size_t small_png_size = 0;
             void* small_png_data = tdefl_write_image_to_png_file_in_memory_ex((const void*)small_pixels.data(), PLATE_THUMBNAIL_SMALL_WIDTH, PLATE_THUMBNAIL_SMALL_HEIGHT, 4, &small_png_size, MZ_DEFAULT_COMPRESSION, 1);
-            if (png_data != nullptr) {
+            res = false;
+            if (small_png_data != nullptr) {
                 std::string thumbnail_name = (boost::format("%1%_%2%_small.png") % local_path % (index + 1)).str();
                 res = mz_zip_writer_add_mem(&archive, thumbnail_name.c_str(), (const void*)small_png_data, small_png_size, MZ_NO_COMPRESSION);
                 mz_free(small_png_data);
