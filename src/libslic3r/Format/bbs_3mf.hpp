@@ -287,9 +287,6 @@ struct StoreParams
     std::vector<ThumbnailData*> top_thumbnail_data;
     std::vector<ThumbnailData*> pick_thumbnail_data;
     std::vector<ThumbnailData*> calibration_thumbnail_data;
-    // Optional immutable project assets ZIP (Auxiliaries plus package metadata).
-    // Independent of Model backup paths and copied without recompression.
-    std::string auxiliary_archive;
     SaveStrategy strategy = SaveStrategy::Zip64;
     Export3mfProgressFn proFn = nullptr;
     std::vector<PlateBBoxData*> id_bboxes;
