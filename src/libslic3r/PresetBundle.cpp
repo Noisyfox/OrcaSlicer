@@ -3871,6 +3871,62 @@ void PresetBundle::get_ams_cobox_infos(AMSComboInfo& combox_info)
     }
 }
 
+PresetBundle::FilamentSyncMatch PresetBundle::resolve_filament_sync(
+    const std::string& filament_id, const std::string& material_type, const std::string& previous_preset) const
+{
+    bool has_type = false;
+    auto iter = std::find_if(filaments.begin(), filaments.end(), [&](const auto& f) {
+        has_type |= f.config.opt_string("filament_type", 0u) == material_type;
+        return !filament_id.empty() && f.is_compatible && filaments.get_preset_base(f) == &f && f.filament_id == filament_id;
+    });
+    warn_ambiguous_filament_id_match(filaments, iter, filament_id);
+    const bool exact = iter != filaments.end();
+    std::string generic_type = "Generic " + material_type;
+    if (!exact && !material_type.empty()) {
+        iter = std::find_if(filaments.begin(), filaments.end(), [&](const auto& f) {
+            return f.is_compatible && f.is_system && boost::algorithm::starts_with(f.name, generic_type);
+        });
+        if (iter == filaments.end()) {
+            const auto upper_type = boost::to_upper_copy(material_type);
+            const auto contains_word = [](const std::string& haystack, const std::string& needle) {
+                auto pos = haystack.find(needle);
+                while (!needle.empty() && pos != std::string::npos) {
+                    if ((pos == 0 || !std::isalnum(static_cast<unsigned char>(haystack[pos - 1]))) &&
+                        (pos + needle.size() >= haystack.size() || !std::isalnum(static_cast<unsigned char>(haystack[pos + needle.size()])))) return true;
+                    pos = haystack.find(needle, pos + 1);
+                }
+                return false;
+            };
+            size_t best_len = 0;
+            for (auto it = filaments.begin(); it != filaments.end(); ++it) {
+                if (!it->is_compatible || !it->is_system || !boost::algorithm::starts_with(it->name, "Generic ")) continue;
+                const auto type = boost::to_upper_copy(it->config.opt_string("filament_type", 0u));
+                if (type.size() > best_len && contains_word(upper_type, type)) {
+                    iter = it; best_len = type.size(); generic_type = "Generic " + it->config.opt_string("filament_type", 0u);
+                }
+            }
+        }
+    }
+    if (iter == filaments.end()) {
+        if (const auto* previous = filaments.find_preset(previous_preset, false); previous && previous->is_compatible)
+            return {previous, has_type ? L("The filament may not be compatible with the current machine settings. Generic filament presets will be used.") :
+                L("The filament model is unknown. Still using the previous filament preset.")};
+        iter = std::find_if(filaments.begin(), filaments.end(), [](const auto& f) {
+            return f.is_compatible && f.is_system && boost::algorithm::starts_with(f.name, "Generic ");
+        });
+        if (iter == filaments.end()) iter = std::find_if(filaments.begin(), filaments.end(), [](const auto& f) { return f.is_compatible && f.is_system; });
+    }
+    if (iter == filaments.end()) return {};
+    std::string warning;
+    if (!exact) warning = boost::algorithm::starts_with(iter->name, generic_type)
+        ? (has_type ? L("The filament may not be compatible with the current machine settings. Generic filament presets will be used.") : L("The filament model is unknown. Generic filament presets will be used."))
+        : (has_type ? L("The filament may not be compatible with the current machine settings. A random filament preset will be used.") : L("The filament model is unknown. A random filament preset will be used."));
+    if (exact && std::count_if(filaments.begin(), filaments.end(), [&](const auto& preset) {
+        return preset.is_compatible && filaments.get_preset_base(preset) == &preset && preset.filament_id == filament_id;
+    }) > 1) warning = L("Multiple compatible filament presets match this material. The first native catalogue match is used.");
+    return {&*iter, std::move(warning), exact};
+}
+
 unsigned int PresetBundle::sync_ams_list(std::vector<std::pair<DynamicPrintConfig *,std::string>> &unknowns, bool use_map, std::map<int, AMSMapInfo> &maps, bool enable_append, MergeFilamentInfo &merge_info, bool color_only)
 {
     BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << "use_map:" << use_map << " enable_append:" << enable_append;
@@ -3938,81 +3994,11 @@ unsigned int PresetBundle::sync_ams_list(std::vector<std::pair<DynamicPrintConfi
             ams_multi_color_filment.push_back(filament_multi_color);
             continue;
         }
-        bool has_type = false;
-        auto filament_type = ams.opt_string("filament_type", 0u);
-        auto iter = std::find_if(filaments.begin(), filaments.end(), [this, &filament_id, &has_type, filament_type](auto &f) {
-            has_type |= f.config.opt_string("filament_type", 0u) == filament_type;
-            return f.is_compatible && filaments.get_preset_base(f) == &f && f.filament_id == filament_id; });
-        warn_ambiguous_filament_id_match(filaments, iter, filament_id);
-        if (iter == filaments.end()) {
-            BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << boost::format(": filament_id %1% not found or system or compatible") % filament_id;
-            if (!filament_type.empty()) {
-                auto original_type = filament_type;
-                filament_type = "Generic " + filament_type;
-                iter = std::find_if(filaments.begin(), filaments.end(), [&filament_type](auto &f) {
-                    return f.is_compatible && f.is_system
-                        && boost::algorithm::starts_with(f.name, filament_type);
-                });
-                if (iter == filaments.end()) {
-                    // Similarity fallback: find a generic preset whose filament_type
-                    // appears as a whole word in the AMS type (e.g. "ASA" in "ASA Sparkle").
-                    auto upper_type = boost::to_upper_copy(original_type);
-                    auto contains_word = [](const std::string& haystack, const std::string& needle) {
-                        auto pos = haystack.find(needle);
-                        while (pos != std::string::npos) {
-                            bool start_ok = (pos == 0 || !std::isalnum(static_cast<unsigned char>(haystack[pos - 1])));
-                            bool end_ok   = (pos + needle.size() >= haystack.size() ||
-                                             !std::isalnum(static_cast<unsigned char>(haystack[pos + needle.size()])));
-                            if (start_ok && end_ok)
-                                return true;
-                            pos = haystack.find(needle, pos + 1);
-                        }
-                        return false;
-                    };
-                    // Find the longest-matching preset type to prefer e.g. "PA-CF" over "PA".
-                    size_t best_len = 0;
-                    for (auto it = filaments.begin(); it != filaments.end(); ++it) {
-                        if (!it->is_compatible || !it->is_system || !boost::algorithm::starts_with(it->name, "Generic "))
-                            continue;
-                        auto preset_type = boost::to_upper_copy(it->config.opt_string("filament_type", 0u));
-                        if (preset_type.size() > best_len && contains_word(upper_type, preset_type)) {
-                            iter = it;
-                            best_len = preset_type.size();
-                            filament_type = "Generic " + it->config.opt_string("filament_type", 0u);
-                        }
-                    }
-                }
-            }
-            if (iter == filaments.end()) {
-                // Prefer old selection
-                if (ams_filament_presets.size() < this->filament_presets.size()) {
-                    ams_filament_presets.push_back(this->filament_presets[ams_filament_presets.size()]);
-                    ams_filament_colors.push_back(filament_color);
-                    ams_filament_color_types.push_back(filament_color_type);
-                    ams_multi_color_filment.push_back(filament_multi_color);
-                    unknowns.emplace_back(&ams, has_type ? L("The filament may not be compatible with the current machine settings. Generic filament presets will be used.") :
-                                                           L("The filament model is unknown. Still using the previous filament preset."));
-                    continue;
-                }
-                iter = std::find_if(filaments.begin(), filaments.end(), [](auto &f) {
-                    return f.is_compatible && f.is_system
-                        && boost::algorithm::starts_with(f.name, "Generic ");
-                });
-                if (iter == filaments.end())
-                    iter = std::find_if(filaments.begin(), filaments.end(), [](auto &f) {
-                        return f.is_compatible && f.is_system;
-                    });
-                if (iter == filaments.end())
-                    continue;
-            }
-            unknowns.emplace_back(&ams, boost::algorithm::starts_with(iter->name, filament_type) ?
-                                            (has_type ? L("The filament may not be compatible with the current machine settings. Generic filament presets will be used.") :
-                                                        L("The filament model is unknown. Generic filament presets will be used.")) :
-                                            (has_type ? L("The filament may not be compatible with the current machine settings. A random filament preset will be used.") :
-                                                        L("The filament model is unknown. A random filament preset will be used.")));
-            filament_id = iter->filament_id;
-        }
-        ams_filament_presets.push_back(iter->name);
+        const auto match = resolve_filament_sync(filament_id, ams.opt_string("filament_type", 0u),
+            ams_filament_presets.size() < filament_presets.size() ? filament_presets[ams_filament_presets.size()] : "");
+        if (!match.preset) continue;
+        if (!match.warning.empty()) unknowns.emplace_back(&ams, match.warning);
+        ams_filament_presets.push_back(match.preset->name);
         ams_filament_colors.push_back(filament_color);
         ams_filament_color_types.push_back(filament_color_type);
         ams_multi_color_filment.push_back(filament_multi_color);

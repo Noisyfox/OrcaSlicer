@@ -396,6 +396,15 @@ public:
     void         update_num_filaments(unsigned int to_del_flament_id);
 
     void get_ams_cobox_infos(AMSComboInfo &combox_info);
+    struct FilamentSyncMatch {
+        const Preset* preset = nullptr;
+        std::string warning;
+        bool exact = false;
+    };
+    // Read-only catalogue policy shared by AMS sync and other material importers.
+    FilamentSyncMatch resolve_filament_sync(const std::string& filament_id,
+        const std::string& filament_type, const std::string& previous_preset) const;
+
     unsigned int sync_ams_list(std::vector<std::pair<DynamicPrintConfig *,std::string>> &unknowns, bool use_map, std::map<int, AMSMapInfo> &maps, bool enable_append, MergeFilamentInfo &merge_info, bool color_only = false);
     //BBS: check whether this is the only edited filament
     bool is_the_only_edited_filament(unsigned int filament_index);
