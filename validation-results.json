@@ -1,0 +1,79 @@
+{
+  "fix_commit": "1084b3d87702326abad8c954cff8ba91eba445e9",
+  "base_commit": "fcab66ca9ef4113f6fd2489b0378924fd82d0384",
+  "os": "macOS 15.7.7 (24G720), arm64",
+  "configuration": "existing build_arm64 / RelWithDebInfo",
+  "printer": "Bambu Lab H2D 0.4 nozzle",
+  "filament": "Generic PETG @BBL H2D",
+  "process": "0.20mm Standard @BBL H2D",
+  "before": {
+    "plate_1": {
+      "gcode_xy": [
+        165.323,
+        151.093
+      ],
+      "hud_xy": [
+        165.323,
+        151.093
+      ]
+    },
+    "plate_2": {
+      "gcode_xy": [
+        165.323,
+        151.093
+      ],
+      "hud_xy": [
+        585.323,
+        151.093
+      ]
+    },
+    "plate_3": {
+      "gcode_xy": [
+        165.323,
+        151.093
+      ],
+      "hud_xy": [
+        165.323,
+        -232.907
+      ]
+    }
+  },
+  "after": {
+    "plate_1": {
+      "gcode_xy": [
+        165.323,
+        151.093
+      ],
+      "hud_xy": [
+        165.323,
+        151.093
+      ]
+    },
+    "plate_2": {
+      "gcode_xy": [
+        165.323,
+        151.093
+      ],
+      "hud_xy": [
+        165.323,
+        151.093
+      ]
+    },
+    "plate_3": {
+      "gcode_xy": [
+        165.323,
+        151.093
+      ],
+      "hud_xy": [
+        165.323,
+        151.093
+      ]
+    }
+  },
+  "gcode_commands_identical": true,
+  "gcode_command_count": 7993,
+  "build_passed": true,
+  "clang_tidy_passed": true,
+  "tested_binary_sha256": "2d6d7bd40bffbc8536c319821145722fbb1cb29364f84c37567f321996ce9c23",
+  "standalone_gcode_preview_passed": true
+}
