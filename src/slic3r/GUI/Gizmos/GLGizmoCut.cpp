@@ -1777,8 +1777,14 @@ void GLGizmoCut3D::dragging_grabber_move(const GLGizmoBase::UpdateData &data)
         projection = m_snap_step * std::round(projection / m_snap_step);
 
     const Vec3d shift = starting_vec * projection;
-    if (shift != Vec3d::Zero())
+    if (shift != Vec3d::Zero()) {
+        if (m_part_selection.has_custom_assignment()) {
+            // Save the grouping before moving the plane discards the generated parts.
+            Plater::TakeSnapshot snapshot(wxGetApp().plater(), _u8L("Move cut plane"), UndoRedo::SnapshotType::GizmoAction);
+            m_dragging_grouping_snapshot = true;
+        }
         reset_cut_by_contours();
+    }
 
     // move  cut plane center
     set_center(m_plane_center + shift, true);
@@ -1816,8 +1822,13 @@ void GLGizmoCut3D::dragging_grabber_rotation(const GLGizmoBase::UpdateData &data
     if (m_hover_id != Y)
         theta += 0.5 * PI;
 
-    if (!is_approx(theta, 0.0))
+    if (!is_approx(theta, 0.0)) {
+        if (m_part_selection.has_custom_assignment()) {
+            Plater::TakeSnapshot snapshot(wxGetApp().plater(), _u8L("Rotate cut plane"), UndoRedo::SnapshotType::GizmoAction);
+            m_dragging_grouping_snapshot = true;
+        }
         reset_cut_by_contours();
+    }
 
     Vec3d rotation = Vec3d::Zero();
     rotation[m_hover_id == CutPlaneZRotation ? Z : m_hover_id] = theta;
@@ -1867,6 +1878,7 @@ void GLGizmoCut3D::on_dragging(const UpdateData& data)
 
 void GLGizmoCut3D::on_start_dragging()
 {
+    m_dragging_grouping_snapshot = false;
     m_angle = 0.0;
     if (m_hover_id >= m_connectors_group_id && m_connector_mode == CutConnectorMode::Manual)
         Plater::TakeSnapshot snapshot(wxGetApp().plater(), _u8L("Move connector"), UndoRedo::SnapshotType::GizmoAction);
@@ -1880,15 +1892,17 @@ void GLGizmoCut3D::on_stop_dragging()
     if (m_hover_id == X || m_hover_id == Y || m_hover_id == CutPlaneZRotation) {
         m_angle_arc.reset();
         m_angle = 0.0;
-        Plater::TakeSnapshot snapshot(wxGetApp().plater(), _u8L("Rotate cut plane"), UndoRedo::SnapshotType::GizmoAction);
+        if (!m_dragging_grouping_snapshot)
+            Plater::TakeSnapshot snapshot(wxGetApp().plater(), _u8L("Rotate cut plane"), UndoRedo::SnapshotType::GizmoAction);
         m_start_dragging_m = m_rotation_m;
     }
     else if (m_hover_id == Z || m_hover_id == CutPlane || m_hover_id == CutPlaneXMove|| m_hover_id == CutPlaneYMove) {
-        if (m_was_cut_plane_dragged)
+        if (m_was_cut_plane_dragged && !m_dragging_grouping_snapshot)
             Plater::TakeSnapshot snapshot(wxGetApp().plater(), _u8L("Move cut plane"), UndoRedo::SnapshotType::GizmoAction);
         m_ar_plane_center = m_plane_center;
     }
 
+    m_dragging_grouping_snapshot = false;
     if (CutMode(m_mode) == CutMode::cutTongueAndGroove)
         reset_cut_by_contours();
     //check_and_update_connectors_state();

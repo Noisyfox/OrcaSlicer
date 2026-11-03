@@ -236,6 +236,7 @@ class GLGizmoCut3D : public GLGizmoBase
         std::vector<bool> selected;
     };
     std::optional<PartSelectionSnapshot> m_pending_part_selection;
+    bool m_dragging_grouping_snapshot{ false };
 
     bool uses_part_selection() const;
     bool keep_as_parts() const;
