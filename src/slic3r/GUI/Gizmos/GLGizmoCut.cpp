@@ -2295,8 +2295,13 @@ bool GLGizmoCut3D::uses_part_selection() const
 
 bool GLGizmoCut3D::keep_as_parts() const
 {
-    // Preserve the user's preference while custom grouping or a groove makes it unavailable.
-    return m_keep_as_parts && CutMode(m_mode) == CutMode::cutPlanar && !m_part_selection.has_custom_assignment();
+    // Preserve the user's preference while grouping, a groove or connectors make it unavailable.
+    if (!m_keep_as_parts || CutMode(m_mode) != CutMode::cutPlanar || m_part_selection.has_custom_assignment())
+        return false;
+
+    const Selection& selection = m_parent.get_selection();
+    const int object_idx = selection.get_object_idx();
+    return object_idx >= 0 && selection.get_model()->objects[object_idx]->cut_connectors.empty();
 }
 
 bool GLGizmoCut3D::PartSelection::is_one_object() const
@@ -2999,7 +3004,7 @@ void GLGizmoCut3D::render_cut_plane_input_window(CutConnectors &connectors, floa
         render_move_center_input(Z);
         ImGui::SameLine();
 
-        m_imgui->disabled_begin(is_cut_plane_init);
+        m_imgui->disabled_begin(is_cut_plane_init && !m_part_selection.has_custom_assignment());
             std::string act_name = _u8L("Reset cutting plane");
             if (render_reset_button("cut_plane", act_name)) {
                 Plater::TakeSnapshot snapshot(wxGetApp().plater(), act_name, UndoRedo::SnapshotType::GizmoAction);
@@ -3103,8 +3108,8 @@ void GLGizmoCut3D::render_cut_plane_input_window(CutConnectors &connectors, floa
 
     if (mode == CutMode::cutPlanar) {
         ImGui::SameLine();
-        m_imgui->disabled_begin(is_cut_plane_init && !has_connectors);
-        if (m_imgui->button(_L("Reset"), _L("Reset cutting plane and remove connectors"))) {
+        m_imgui->disabled_begin(is_cut_plane_init && !has_connectors && !m_part_selection.has_custom_assignment());
+        if (m_imgui->button(_L("Reset"), _L("Reset cutting plane and part grouping, and remove connectors"))) {
             Plater::TakeSnapshot snapshot(wxGetApp().plater(), _u8L("Reset Cut"), UndoRedo::SnapshotType::GizmoAction);
             reset_cut_plane();
             reset_connectors();
