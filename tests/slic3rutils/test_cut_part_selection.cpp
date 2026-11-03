@@ -1,3 +1,8 @@
+#ifdef _WIN32
+    #include <wx/msw/wrapwin.h>
+    #include <commctrl.h>
+#endif
+
 #include <catch2/catch_test_macros.hpp>
 
 #include "slic3r/GUI/Gizmos/GLGizmoCut.hpp"
@@ -81,4 +86,23 @@ TEST_CASE("Restored cut assignments rebuild ignored contours", "[CutPartSelectio
     parts.set_selection(grouped);
     CHECK(parts.has_custom_assignment());
     CHECK(*parts.get_ignored_contours_ptr() == std::vector<size_t>{0});
+}
+
+TEST_CASE("Restoring flipped cut assignments retains the flipped default", "[CutPartSelection][Regression]")
+{
+    CutPartSelectionTestAccess::PartSelection original;
+    CutPartSelectionTestAccess::init(original);
+    original.toggle_selection(0);
+    original.turn_over_selection();
+    const auto saved = original.selection();
+
+    CutPartSelectionTestAccess::PartSelection restored;
+    CutPartSelectionTestAccess::init(restored);
+    restored.turn_over_selection();
+    restored.set_selection(saved);
+    CHECK(restored.has_custom_assignment());
+    CHECK(*restored.get_ignored_contours_ptr() == std::vector<size_t>{0});
+    restored.toggle_selection(0);
+    CHECK_FALSE(restored.has_custom_assignment());
+    CHECK(restored.get_ignored_contours_ptr()->empty());
 }

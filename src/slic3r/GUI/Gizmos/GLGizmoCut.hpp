@@ -227,6 +227,16 @@ class GLGizmoCut3D : public GLGizmoBase
 
     PartSelection m_part_selection;
 
+    // Rebuild snapshot parts in their original order even after flipping the plane.
+    Transform3d m_part_selection_rotation{ Transform3d::Identity() };
+    bool m_part_selection_flipped{ false };
+    struct PartSelectionSnapshot {
+        Transform3d rotation{ Transform3d::Identity() };
+        bool flipped{ false };
+        std::vector<bool> selected;
+    };
+    std::optional<PartSelectionSnapshot> m_pending_part_selection;
+
     bool uses_part_selection() const;
     bool keep_as_parts() const;
 

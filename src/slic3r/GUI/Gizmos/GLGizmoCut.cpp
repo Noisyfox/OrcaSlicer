@@ -1,3 +1,8 @@
+#ifdef _WIN32
+    #include <wx/msw/wrapwin.h>
+    #include <commctrl.h>
+#endif
+
 #include "GLGizmoCut.hpp"
 #include "slic3r/GUI/GLCanvas3D.hpp"
 
@@ -5,6 +10,8 @@
 #include <cstddef>
 #include <Standard_Real.hxx>
 #include <cereal/archives/binary.hpp>
+#include <cereal/types/vector.hpp>
+#include <optional>
 #include <cassert>
 #include <cstdlib>
 #include <functional>
@@ -440,8 +447,11 @@ bool GLGizmoCut3D::on_mouse(const wxMouseEvent &mouse_event)
             // Check the internal part raycasters.
             if (! m_part_selection.valid())
                 process_contours();
-            if (const auto part_id = m_part_selection.part_at(mouse_pos))
+            if (const auto part_id = m_part_selection.part_at(mouse_pos)) {
+                // TRN Undo/redo action for assigning a cut piece to the upper or lower group.
+                Plater::TakeSnapshot snapshot(wxGetApp().plater(), _u8L("Change cut part grouping"), UndoRedo::SnapshotType::GizmoAction);
                 m_part_selection.toggle_selection(*part_id);
+            }
             toggle_model_objects_visibility();
             check_and_update_connectors_state(); // after a contour is deactivated, its connectors are inside the object
             return true;
@@ -1392,6 +1402,7 @@ bool GLGizmoCut3D::on_init()
 
 void GLGizmoCut3D::on_load(cereal::BinaryInputArchive& ar)
 {
+    m_part_selection = PartSelection();
     size_t mode;
     float groove_depth;
     float groove_width;
@@ -1430,6 +1441,11 @@ void GLGizmoCut3D::on_load(cereal::BinaryInputArchive& ar)
         reset_cut_by_contours();
     }
 
+    PartSelectionSnapshot parts;
+    ar(m_keep_as_parts, m_place_on_cut_upper, m_place_on_cut_lower,
+       parts.rotation, parts.flipped, parts.selected);
+    // Selection and common gizmo data are refreshed after the archive is loaded.
+    m_pending_part_selection = std::move(parts);
     m_parent.request_extra_frame();
 }
 
@@ -1438,6 +1454,11 @@ void GLGizmoCut3D::on_save(cereal::BinaryOutputArchive& ar) const
     ar( m_keep_upper, m_keep_lower, m_rotate_lower, m_rotate_upper, m_hide_cut_plane, m_mode, m_connectors_editing,
         m_ar_plane_center, m_start_dragging_m,
         m_groove.depth, m_groove.width, m_groove.flaps_angle, m_groove.angle, m_groove.depth_tolerance, m_groove.width_tolerance);
+    const PartSelectionSnapshot parts = m_pending_part_selection.value_or(PartSelectionSnapshot{
+        m_part_selection_rotation, m_part_selection_flipped,
+        m_part_selection.has_custom_assignment() ? m_part_selection.selection() : std::vector<bool>()});
+    ar(m_keep_as_parts, m_place_on_cut_upper, m_place_on_cut_lower,
+       parts.rotation, parts.flipped, parts.selected);
 }
 
 std::string GLGizmoCut3D::on_get_name() const
@@ -1470,6 +1491,7 @@ void GLGizmoCut3D::on_set_state()
         m_parent.request_extra_frame();
     }
     else {
+        m_pending_part_selection.reset();
         if (auto oc = m_c->object_clipper()) {
             oc->set_behavior(true, true, 0.);
             oc->release();
@@ -2627,6 +2649,7 @@ void GLGizmoCut3D::flip_cut_plane()
 
     update_clipper();
     m_part_selection.turn_over_selection();
+    m_part_selection_flipped = !m_part_selection_flipped;
 
     if (CutMode(m_mode) == CutMode::cutTongueAndGroove)
         reset_cut_by_contours();
@@ -2668,6 +2691,8 @@ void GLGizmoCut3D::process_contours()
     else {
         reset_cut_by_contours();
         m_part_selection = PartSelection(model_objects[object_idx], get_cut_matrix(selection), instance_idx, m_plane_center, m_cut_normal, *m_c->object_clipper());
+        m_part_selection_rotation = m_rotation_m;
+        m_part_selection_flipped = false;
     }
 
     toggle_model_objects_visibility();
@@ -4108,6 +4133,30 @@ void GLGizmoCut3D::data_changed(bool is_serializing)
     update_bb();
     if (auto oc = m_c->object_clipper())
         oc->set_behavior(m_connectors_editing, m_connectors_editing, double(m_contour_width));
+
+    // reload_scene also calls this while undo/redo has temporarily cleared the selection.
+    // Keep the snapshot pending until update_after_undo_redo restores the selected instance.
+    if (m_pending_part_selection && m_c->selection_info() && m_c->selection_info()->model_object() &&
+        m_parent.get_selection().get_instance_idx() >= 0) {
+        const PartSelectionSnapshot parts = std::move(*m_pending_part_selection);
+        m_pending_part_selection.reset();
+        if (CutMode(m_mode) == CutMode::cutPlanar && !parts.selected.empty()) {
+            const Transform3d rotation = m_rotation_m;
+            m_rotation_m = parts.rotation;
+            update_clipper();
+            process_contours();
+            if (parts.flipped)
+                m_part_selection.turn_over_selection();
+            m_part_selection_flipped = parts.flipped;
+            m_part_selection.set_selection(parts.selected);
+            m_rotation_m = rotation;
+        }
+        else
+            reset_cut_by_contours();
+        update_clipper();
+        toggle_model_objects_visibility();
+        check_and_update_connectors_state();
+    }
 }
 
 
