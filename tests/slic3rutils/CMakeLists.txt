@@ -20,6 +20,7 @@ add_executable(${_TEST_NAME}_tests
     test_device_manager_integration.cpp
     test_web_media_controller.cpp
     test_scene_raycaster.cpp
+    test_cut_part_selection.cpp
     test_scene_benchmark.cpp
     test_lazy.cpp
     test_prebuild_queue.cpp

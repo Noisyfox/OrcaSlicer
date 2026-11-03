@@ -14,6 +14,7 @@
 #include <map>
 #include <vector>
 #include <memory>
+#include <optional>
 #include "slic3r/GUI/SceneRaycaster.hpp"
 #include <cstddef>
 #include <utility>
@@ -39,6 +40,7 @@ namespace CommonGizmosDataObjects { class ObjectClipper; }
 
 class GLGizmoCut3D : public GLGizmoBase
 {
+    friend struct CutPartSelectionTestAccess;
     enum GrabberID {
         X = 0,
         Y,
@@ -178,6 +180,7 @@ class GLGizmoCut3D : public GLGizmoBase
     std::vector<Vec3d> m_groove_vertices;
 
     class PartSelection {
+        friend struct CutPartSelectionTestAccess;
     public:
         PartSelection() = default;
         PartSelection(const ModelObject* mo, const Transform3d& cut_matrix, int instance_idx, const Vec3d& center, const Vec3d& normal, const CommonGizmosDataObjects::ObjectClipper& oc);
@@ -189,13 +192,18 @@ class GLGizmoCut3D : public GLGizmoBase
             MeshRaycaster raycaster;
             bool selected;
             bool is_modifier;
+            bool default_selected;
         };
 
         void render(const Vec3d* normal, GLModel& sphere_model);
-        void toggle_selection(const Vec2d& mouse_pos);
+        std::optional<size_t> part_at(const Vec2d& mouse_pos) const;
+        void toggle_selection(size_t part_id);
+        std::vector<bool> selection() const;
+        void set_selection(const std::vector<bool>& selected);
         void turn_over_selection();
         ModelObject* model_object() { return m_model.objects.front(); }
         bool valid() const { return m_valid; }
+        bool has_custom_assignment() const;
         bool is_one_object() const;
         const std::vector<Part>& parts() const { return m_parts; }
         const std::vector<size_t>* get_ignored_contours_ptr() const { return (valid() ? &m_ignored_contours : nullptr); }
@@ -214,9 +222,13 @@ class GLGizmoCut3D : public GLGizmoBase
         std::vector<std::vector<Vec3d>> m_debug_pts; // Debugging
 
         void add_object(const ModelObject* object);
+        void update_ignored_contours();
     };
 
     PartSelection m_part_selection;
+
+    bool uses_part_selection() const;
+    bool keep_as_parts() const;
 
     // Contains all shortcuts in the format of {shortcut, description}, e.g. {alt + _L("Left mouse button"), _L("Part_selection")}
     std::vector<std::pair<wxString, wxString>> m_shortcuts_cut;

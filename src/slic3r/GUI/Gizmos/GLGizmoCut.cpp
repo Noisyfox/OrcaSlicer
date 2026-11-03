@@ -298,7 +298,7 @@ std::string GLGizmoCut3D::get_tooltip() const
         std::string unit_str = " " + (m_imperial_units ? _u8L_CONTEXT("in", "inches") : _u8L("mm"));
         const BoundingBoxf3& tbb = m_transformed_bounding_box;
 
-        const std::string name = m_keep_as_parts ? _u8L("Part") : _u8L("Object");
+        const std::string name = keep_as_parts() ? _u8L("Part") : _u8L("Object");
         if (tbb.max.z() >= 0.0) {
             double top = (tbb.min.z() <= 0.0 ? tbb.max.z() : tbb.size().z()) * koef;
             tooltip += format(static_cast<float>(top), 2) + " " + unit_str + " (" + name + " A)";
@@ -440,7 +440,9 @@ bool GLGizmoCut3D::on_mouse(const wxMouseEvent &mouse_event)
             // Check the internal part raycasters.
             if (! m_part_selection.valid())
                 process_contours();
-            m_part_selection.toggle_selection(mouse_pos);
+            if (const auto part_id = m_part_selection.part_at(mouse_pos))
+                m_part_selection.toggle_selection(*part_id);
+            toggle_model_objects_visibility();
             check_and_update_connectors_state(); // after a contour is deactivated, its connectors are inside the object
             return true;
         }
@@ -2095,7 +2097,7 @@ GLGizmoCut3D::PartSelection::PartSelection(const ModelObject* mo, const Transfor
     m_parts.clear();
     for (const ModelVolume* volume : volumes) {
         assert(volume != nullptr);
-        m_parts.emplace_back(Part{GLModel(), MeshRaycaster(volume->mesh()), true, !volume->is_model_part()});
+        m_parts.emplace_back(Part{GLModel(), MeshRaycaster(volume->mesh()), true, !volume->is_model_part(), true});
         m_parts.back().glmodel.set_color({ 0.f, 0.f, 1.f, 1.f });
         m_parts.back().glmodel.init_from(volume->mesh());
 
@@ -2106,7 +2108,7 @@ GLGizmoCut3D::PartSelection::PartSelection(const ModelObject* mo, const Transfor
         for (const Vec3f& v : volume->mesh().its.vertices) {
             double p = (v - pos).dot(norm);
             if (std::abs(p) > EPSILON) {
-                m_parts.back().selected = p > 0.;
+                m_parts.back().default_selected = m_parts.back().selected = p > 0.;
                 break;
             }
         }
@@ -2164,11 +2166,11 @@ GLGizmoCut3D::PartSelection::PartSelection(const ModelObject* object, int instan
 
     for (const ModelVolume* volume : object->volumes) {
         assert(volume != nullptr);
-        m_parts.emplace_back(Part{ GLModel(), MeshRaycaster(volume->mesh()), true, !volume->is_model_part() });
+        m_parts.emplace_back(Part{ GLModel(), MeshRaycaster(volume->mesh()), true, !volume->is_model_part(), true });
         m_parts.back().glmodel.init_from(volume->mesh());
 
         // Now check whether this part is below or above the plane.
-        m_parts.back().selected = volume->is_from_upper();
+        m_parts.back().default_selected = m_parts.back().selected = volume->is_from_upper();
     }
     
     m_valid = true;
@@ -2256,6 +2258,25 @@ void GLGizmoCut3D::PartSelection::render(const Vec3d* normal, GLModel& sphere_mo
 }
 
 
+bool GLGizmoCut3D::PartSelection::has_custom_assignment() const
+{
+    return std::any_of(m_parts.begin(), m_parts.end(), [](const Part& part) {
+        return part.selected != part.default_selected;
+    });
+}
+
+bool GLGizmoCut3D::uses_part_selection() const
+{
+    return m_part_selection.valid() &&
+        (CutMode(m_mode) == CutMode::cutTongueAndGroove || m_part_selection.has_custom_assignment());
+}
+
+bool GLGizmoCut3D::keep_as_parts() const
+{
+    // Preserve the user's preference while custom grouping or a groove makes it unavailable.
+    return m_keep_as_parts && CutMode(m_mode) == CutMode::cutPlanar && !m_part_selection.has_custom_assignment();
+}
+
 bool GLGizmoCut3D::PartSelection::is_one_object() const
 {
     // In theory, the implementation could be just this:
@@ -2281,7 +2302,7 @@ std::vector<Cut::Part> GLGizmoCut3D::PartSelection::get_cut_parts()
 }
 
 
-void GLGizmoCut3D::PartSelection::toggle_selection(const Vec2d& mouse_pos)
+std::optional<size_t> GLGizmoCut3D::PartSelection::part_at(const Vec2d& mouse_pos) const
 {
     // FIXME: Cache the transforms.
     const Camera& camera     = wxGetApp().plater()->get_camera();
@@ -2293,37 +2314,65 @@ void GLGizmoCut3D::PartSelection::toggle_selection(const Vec2d& mouse_pos)
     std::vector<std::pair<size_t, double>> hits_id_and_sqdist;
 
     for (size_t id=0; id<m_parts.size(); ++id) {
-//        const Vec3d volume_offset = model_object()->volumes[id]->get_offset();
-        Transform3d tr = translation_transform(model_object()->instances[m_instance_idx]->get_offset()) * translation_transform(model_object()->volumes[id]->get_offset());
+//        const Vec3d volume_offset = m_model.objects.front()->volumes[id]->get_offset();
+        Transform3d tr = translation_transform(m_model.objects.front()->instances[m_instance_idx]->get_offset()) * translation_transform(m_model.objects.front()->volumes[id]->get_offset());
         if (m_parts[id].raycaster.unproject_on_mesh(mouse_pos, tr, camera, pos, normal)) {
             hits_id_and_sqdist.emplace_back(id, (camera_pos - tr*(pos.cast<double>())).squaredNorm());
         }
     }
-    if (! hits_id_and_sqdist.empty()) {
-        size_t id = std::min_element(hits_id_and_sqdist.begin(), hits_id_and_sqdist.end(),
-            [](const std::pair<size_t, double>& a, const std::pair<size_t, double>& b) { return a.second < b.second; })->first;
-        m_parts[id].selected = ! m_parts[id].selected;
+    if (hits_id_and_sqdist.empty())
+        return std::nullopt;
+    return std::min_element(hits_id_and_sqdist.begin(), hits_id_and_sqdist.end(),
+        [](const auto& a, const auto& b) { return a.second < b.second; })->first;
+}
 
-        // And now recalculate the contours which should be ignored.
-        m_ignored_contours.clear();
-        size_t cont_id = 0;
-        for (const auto& [parts_above, parts_below] : m_contour_to_parts) {
-            for (size_t upper : parts_above) {
-                bool upper_sel = m_parts[upper].selected;
-                if (std::find_if(parts_below.begin(), parts_below.end(), [this, &upper_sel](const size_t& i) { return m_parts[i].selected == upper_sel; }) != parts_below.end()) {
-                    m_ignored_contours.emplace_back(cont_id);
-                    break;
-                }
+void GLGizmoCut3D::PartSelection::toggle_selection(size_t part_id)
+{
+    m_parts[part_id].selected = !m_parts[part_id].selected;
+    update_ignored_contours();
+}
+
+std::vector<bool> GLGizmoCut3D::PartSelection::selection() const
+{
+    std::vector<bool> selected;
+    selected.reserve(m_parts.size());
+    for (const Part& part : m_parts)
+        selected.push_back(part.selected);
+    return selected;
+}
+
+void GLGizmoCut3D::PartSelection::set_selection(const std::vector<bool>& selected)
+{
+    assert(selected.size() == m_parts.size());
+    if (selected.size() != m_parts.size())
+        return;
+    for (size_t id = 0; id < m_parts.size(); ++id)
+        m_parts[id].selected = selected[id];
+    update_ignored_contours();
+}
+
+void GLGizmoCut3D::PartSelection::update_ignored_contours()
+{
+    m_ignored_contours.clear();
+    size_t cont_id = 0;
+    for (const auto& [parts_above, parts_below] : m_contour_to_parts) {
+        for (size_t upper : parts_above) {
+            const bool upper_sel = m_parts[upper].selected;
+            if (std::any_of(parts_below.begin(), parts_below.end(), [this, upper_sel](size_t i) { return m_parts[i].selected == upper_sel; })) {
+                m_ignored_contours.emplace_back(cont_id);
+                break;
             }
-            ++cont_id;
         }
+        ++cont_id;
     }
 }
 
 void GLGizmoCut3D::PartSelection::turn_over_selection()
 {
-    for (Part& part : m_parts)
+    for (Part& part : m_parts) {
         part.selected = !part.selected;
+        part.default_selected = !part.default_selected;
+    }
 }
 
 void GLGizmoCut3D::on_render()
@@ -2345,10 +2394,8 @@ void GLGizmoCut3D::on_render()
 
     render_connectors();
 
-    if (!m_connectors_editing)
-        m_part_selection.render(nullptr, m_sphere.model);
-    else
-        m_part_selection.render(&m_cut_normal, m_sphere.model);
+    if (uses_part_selection())
+        m_part_selection.render(m_connectors_editing ? &m_cut_normal : nullptr, m_sphere.model);
 
     render_clipper_cut();
 
@@ -2938,7 +2985,7 @@ void GLGizmoCut3D::render_cut_plane_input_window(CutConnectors &connectors, floa
         if (mode == CutMode::cutPlanar) {
             ImGui::Separator();
 
-            m_imgui->disabled_begin(!m_keep_upper || !m_keep_lower || m_keep_as_parts || (m_part_selection.valid() && m_part_selection.is_one_object()));
+            m_imgui->disabled_begin(!m_keep_upper || !m_keep_lower || keep_as_parts() || (uses_part_selection() && m_part_selection.is_one_object()));
                 if (m_imgui->button(has_connectors ? _L("Edit connectors") : _L("Add connectors")))
                     set_connectors_editing(true);
             m_imgui->disabled_end();
@@ -2993,13 +3040,13 @@ void GLGizmoCut3D::render_cut_plane_input_window(CutConnectors &connectors, floa
 
             ImGui::SameLine(h_shift);
 
-            m_imgui->disabled_begin(!connectors.empty() || m_keep_as_parts);
+            m_imgui->disabled_begin(!connectors.empty() || keep_as_parts());
             m_imgui->bbl_checkbox(_L("Keep") + suffix, connectors.empty() ? keep_part : keep);
             m_imgui->disabled_end();
 
             ImGui::SameLine();
 
-            m_imgui->disabled_begin(!keep_part || m_keep_as_parts);
+            m_imgui->disabled_begin(!keep_part || keep_as_parts());
             if (m_imgui->bbl_checkbox(_L("Place on cut") + suffix, place_on_cut_part))
                 rotate_part = false;
             ImGui::SameLine();
@@ -3012,13 +3059,12 @@ void GLGizmoCut3D::render_cut_plane_input_window(CutConnectors &connectors, floa
         render_part_action_line(_L("Upper part"), "##upper", m_keep_upper, m_place_on_cut_upper, m_rotate_upper);
         render_part_action_line(_L("Lower part"), "##lower", m_keep_lower, m_place_on_cut_lower, m_rotate_lower);
 
-        m_imgui->disabled_begin(has_connectors || m_part_selection.valid() || mode == CutMode::cutTongueAndGroove);
+        m_imgui->disabled_begin(has_connectors || m_part_selection.has_custom_assignment() || mode == CutMode::cutTongueAndGroove);
 
-            if (m_part_selection.valid())
-                m_keep_as_parts = false;
-
-            m_imgui->bbl_checkbox(_L("Cut to parts"), m_keep_as_parts);
-            if (m_keep_as_parts) {
+            bool cut_to_parts = keep_as_parts();
+            if (m_imgui->bbl_checkbox(_L("Cut to parts"), cut_to_parts))
+                m_keep_as_parts = cut_to_parts;
+            if (keep_as_parts()) {
                 m_keep_upper = m_keep_lower = true;
                 m_place_on_cut_upper = m_place_on_cut_lower = false;
                 m_rotate_upper = m_rotate_lower = false;
@@ -3252,7 +3298,7 @@ bool GLGizmoCut3D::is_outside_of_cut_contour(size_t idx, const CutConnectors& co
         if (m_c->object_clipper()) {
             int contour_idx = m_c->object_clipper()->is_projection_inside_cut(vertex.cast<double>());
             bool is_invalid = (contour_idx == -1);
-            if (m_part_selection.valid() && ! is_invalid) {
+            if (uses_part_selection() && ! is_invalid) {
                 assert(contour_idx >= 0);
                 const std::vector<size_t>& ignored = *(m_part_selection.get_ignored_contours_ptr());
                 is_invalid = (std::find(ignored.begin(), ignored.end(), size_t(contour_idx)) != ignored.end());
@@ -3332,9 +3378,9 @@ void GLGizmoCut3D::toggle_model_objects_visibility()
             break;
         }
 
-    if (m_part_selection.valid() && has_active_volume)
+    if (uses_part_selection() && has_active_volume)
         m_parent.toggle_model_objects_visibility(false);
-    else if (!m_part_selection.valid() && !has_active_volume) {
+    else if (!uses_part_selection() && !has_active_volume) {
         const Selection& selection = m_parent.get_selection();
         const ModelObjectPtrs& model_objects = selection.get_model()->objects;
         m_parent.toggle_model_objects_visibility(true, model_objects[selection.get_object_idx()], selection.get_instance_idx());        
@@ -3427,7 +3473,7 @@ bool GLGizmoCut3D::can_perform_cut() const
     if (CutMode(m_mode) == CutMode::cutTongueAndGroove)
         return has_valid_groove();
 
-    if (m_part_selection.valid())
+    if (uses_part_selection())
         return ! m_part_selection.is_one_object();
 
     return true;
@@ -3601,7 +3647,7 @@ void GLGizmoCut3D::perform_cut(const Selection& selection)
         ScopeGuard part_selection_killer([this]() { m_part_selection = PartSelection(); });
 
         const bool cut_with_groove = CutMode(m_mode) == CutMode::cutTongueAndGroove;
-        const bool cut_by_contour = !cut_with_groove && m_part_selection.valid();
+        const bool cut_by_contour = !cut_with_groove && m_part_selection.has_custom_assignment();
 
         ModelObject* cut_mo = cut_by_contour ? m_part_selection.model_object() : nullptr;
         if (cut_mo)
@@ -3619,7 +3665,7 @@ void GLGizmoCut3D::perform_cut(const Selection& selection)
         const bool keep_painting = GUI::wxGetApp().app_config->get_bool("keep_painting");
         ModelObjectCutAttributes attributes = only_if(has_connectors ? true : m_keep_upper, ModelObjectCutAttribute::KeepUpper) |
                                               only_if(has_connectors ? true : m_keep_lower, ModelObjectCutAttribute::KeepLower) |
-                                              only_if(has_connectors ? false : m_keep_as_parts, ModelObjectCutAttribute::KeepAsParts) |
+                                              only_if(has_connectors ? false : keep_as_parts(), ModelObjectCutAttribute::KeepAsParts) |
                                               only_if(m_place_on_cut_upper, ModelObjectCutAttribute::PlaceOnCutUpper) |
                                               only_if(m_place_on_cut_lower, ModelObjectCutAttribute::PlaceOnCutLower) |
                                               only_if(m_rotate_upper, ModelObjectCutAttribute::FlipUpper) |
