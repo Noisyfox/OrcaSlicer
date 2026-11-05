@@ -185,6 +185,12 @@ public:
         std::shared_ptr<T> new_data(std::make_shared<T>(std::move(new_value)));
         std::unique_ptr<node> p(new node);
         {
+#if defined(ORC_NEO_WASM)
+            // Publish under the wait predicate's mutex so notification cannot
+            // be lost between its empty check and entering the wait. Keep the
+            // same head-then-tail lock order as the consumer.
+            std::lock_guard<std::mutex> head_lock(head_mutex);
+#endif
             std::lock_guard<std::mutex> tail_lock(tail_mutex);
             tail->data = new_data;
             node* const new_tail = p.get();
