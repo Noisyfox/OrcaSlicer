@@ -43,6 +43,9 @@
 #include <memory>
 #include <string>
 #include <chrono>
+#if defined(ORC_NEO_WASM) && !defined(ORCA_WASM_THREADING)
+#include <random>
+#endif
 
 #include "mcut/internal/tpool.h"
 
@@ -456,6 +459,12 @@ void fn_delete_cc(connected_component_t* p)
 struct context_t {
 private:
     std::atomic<bool> m_done;
+#if defined(ORC_NEO_WASM) && !defined(ORCA_WASM_THREADING)
+    // A serial Neo Worker has no manager thread to own perturbation state.
+    std::mt19937 m_perturbation_generator{std::default_random_engine{1}()};
+    std::uniform_real_distribution<double> m_perturbation_distribution{-1.0, 1.0};
+#endif
+#if !defined(ORC_NEO_WASM) || defined(ORCA_WASM_THREADING)
     std::vector<thread_safe_queue<function_wrapper>> m_queues;
     // Master/Manager thread(s) which are responsible for running the API calls
     // When a user of MCUT calls one of the APIs (e.g. mcEnqueueDispatch) the task
@@ -467,6 +476,7 @@ private:
     // submit tasks to the shared compute threadpool ("m_compute_threadpool").
     // NOTE: must be declared after "thread_pool_terminate" and "work_queues"
     std::vector<std::thread> m_api_threads;
+#endif
     // join_threads m_joiner;
 
 #if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
@@ -482,6 +492,7 @@ private:
     std::atomic<McUint32> m_max_num_perturbation_attempts;
     std::atomic<McConnectedComponentFaceWindingOrder> m_connected_component_winding_order;
 
+#if !defined(ORC_NEO_WASM) || defined(ORCA_WASM_THREADING)
     void api_thread_main(uint32_t thread_id)
     {
         log_msg("[MCUT] Launch API thread " << std::this_thread::get_id() << " (" << thread_id << ")");
@@ -506,8 +517,12 @@ private:
 
         log_msg("[MCUT] Shutdown API thread " << std::this_thread::get_id() << " (" << thread_id << ")");
     }
+#endif
 
 public:
+#if defined(ORC_NEO_WASM) && !defined(ORCA_WASM_THREADING)
+    double next_perturbation_random() { return m_perturbation_distribution(m_perturbation_generator); }
+#endif
     context_t(McContext handle, McFlags flags
 #if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
         ,
@@ -528,6 +543,7 @@ public:
         log_msg("\n[MCUT] Create context " << m_user_handle);
 
         try {
+#if !defined(ORC_NEO_WASM) || defined(ORCA_WASM_THREADING)
             const uint32_t manager_thread_count = (flags & MC_OUT_OF_ORDER_EXEC_MODE_ENABLE) ? 2 : 1;
 
             m_queues = std::vector<thread_safe_queue<function_wrapper>>(manager_thread_count);
@@ -536,6 +552,7 @@ public:
                 m_queues[i].set_done_ptr(&m_done);
                 m_api_threads.push_back(std::thread(&context_t::api_thread_main, this, i));
             }
+#endif
 #if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
             // create the pool of compute threads. These are the worker threads that
             // can be tasked with work from any manager-thread. Thus, manager threads
@@ -565,12 +582,14 @@ public:
 #if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
         m_compute_threadpool.reset();
 #endif
+#if !defined(ORC_NEO_WASM) || defined(ORCA_WASM_THREADING)
         for (int i = (int)m_api_threads.size() - 1; i >= 0; --i) {
             m_queues[i].disrupt_wait_for_data();
             if (m_api_threads[i].joinable()) {
                 m_api_threads[i].join();
             }
         }
+#endif
     }
 
     McContext m_user_handle;
@@ -654,6 +673,7 @@ public:
         //
 
         // the id of manager thread that will be assigned the current task
+#if !defined(ORC_NEO_WASM) || defined(ORCA_WASM_THREADING)
         uint32_t responsible_thread_id = UINT32_MAX;
 
         for (std::vector<McEvent>::const_iterator waitlist_iter = event_waitlist.cbegin(); waitlist_iter != event_waitlist.cend(); ++waitlist_iter) {
@@ -696,6 +716,7 @@ public:
                 responsible_thread_id = 0; // just pick thread 0
             }
         }
+#endif
 
         //
         // Package-up the task as a synchronised operation that will wait for
@@ -754,9 +775,14 @@ public:
             });
 
         event_ptr->m_future = task.get_future(); // the future we can later wait on via mcWaitForEVents
+#if !defined(ORC_NEO_WASM) || defined(ORCA_WASM_THREADING)
         event_ptr->m_responsible_thread_id = responsible_thread_id;
 
         m_queues[responsible_thread_id].push(std::move(task)); // enqueue task to be executed when responsible API thread is free
+#else
+        event_ptr->m_responsible_thread_id = 0;
+        task();
+#endif
 
         return event_ptr->m_user_handle;
     }

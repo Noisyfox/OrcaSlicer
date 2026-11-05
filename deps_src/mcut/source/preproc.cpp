@@ -1499,6 +1499,11 @@ extern "C" void preproc(
 
             MCUT_ASSERT(relative_perturbation_constant != double(0.0));
 
+#if defined(ORC_NEO_WASM) && !defined(ORCA_WASM_THREADING)
+            for (int i = 0; i < 3; ++i) {
+                perturbation[i] = context_ptr->next_perturbation_random() * relative_perturbation_constant;
+            }
+#else
             static thread_local std::default_random_engine random_engine(1);
             static thread_local std::mt19937 mersenne_twister_generator(random_engine());
             static thread_local std::uniform_real_distribution<double> uniform_distribution(-1.0, 1.0);
@@ -1506,6 +1511,7 @@ extern "C" void preproc(
             for (int i = 0; i < 3; ++i) {
                 perturbation[i] = uniform_distribution(mersenne_twister_generator) * relative_perturbation_constant;
             }
+#endif
 
             cut_mesh_perturbation_count++;
         } // if (general_position_assumption_was_violated) {
