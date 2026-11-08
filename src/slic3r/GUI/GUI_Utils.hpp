@@ -6,6 +6,7 @@
 #include <cmath>
 #include <boost/optional/optional.hpp>
 #include <memory>
+#include <optional>
 #include <string>
 #include <ostream>
 #include <functional>
@@ -36,6 +37,10 @@
 #include "Event.hpp"
 #include "libslic3r/Utils.hpp"
 #include "libslic3r/Color.hpp"
+
+#ifdef __WXGTK__
+#include "wx/gauge.h"
+#endif 
 
 
 class wxCheckBox;
@@ -490,11 +495,14 @@ void dataview_remove_insets(wxDataViewCtrl* dv);
 void staticbox_remove_margin(wxStaticBox* sb);
 // Clip a top-level window (and its webview) to a rounded rect with a native layer.
 void set_window_corner_radius(wxWindow* win, int radius);
+// Returns an opaque sRGB color, or std::nullopt on cancel, on the GUI thread.
+void sample_screen_color(std::function<void(std::optional<ColorRGBA>)> done);
 #endif
 
 #ifdef __WXGTK__
 void RemoveButtonBorder(wxWindow* win);   // for wxButton/wxBitmapToggleButton based controls (SwitchButton, CheckBox)
 void RemoveInputBorder(wxWindow* win);    // for TextCtrl based controls (TextInput, ComboBox, SpinInput..)
+void SetGaugeColor(wxGauge* gauge, const wxString& barColor, const wxString& troughColor);
 #endif
 
 #if defined(__WXOSX__) || defined(__linux__)

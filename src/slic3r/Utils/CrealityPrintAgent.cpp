@@ -87,7 +87,7 @@ std::vector<std::string> name_words(const std::string& name)
 //   can collapse a brand-specific match back to "Generic PLA" via the inherited id.
 // Requires the preset's declared filament_type to equal the spool's base type
 // (PLA/PETG/ABS/...) so we never auto-pick a PETG preset for a PLA spool.
-// Falls back to filaments.filament_id_by_type(base_type) when nothing scores.
+// Falls back to a visible system base of the same type when nothing scores.
 std::string CrealityPrintAgent::match_filament_preset(const PresetCollection& filaments,
                                                       const std::string&      vendor,
                                                       const std::string&      brand_name,
@@ -147,13 +147,17 @@ std::string CrealityPrintAgent::match_filament_preset(const PresetCollection& fi
     }
 
     if (matches.empty()) {
-        const std::string fallback = filaments.filament_id_by_type(base_type);
-        const bool        fallback_ok = has_visible_base_preset(filaments, fallback);
+        // first_visible_idx_by_type() returns any visible preset when no base of this
+        // type exists. Never sync an unrelated material to the CFS.
+        const auto&       fallback_preset = filaments.preset(filaments.first_visible_idx_by_type(base_type));
+        const std::string fallback        = fallback_preset.filament_id;
+        const bool        fallback_ok     = fallback_preset.config.opt_string("filament_type", 0u) == base_type &&
+                                    has_visible_base_preset(filaments, fallback);
         BOOST_LOG_TRIVIAL(info)
             << "CrealityPrintAgent: no preset scored for spool {" << vendor << " "
             << brand_name << " (" << base_type << ")} after considering " << considered
             << " presets; falling back to generic preset id \"" << fallback << "\""
-            << (fallback_ok ? "" : " (NOT visible — returning empty)");
+            << (fallback_ok ? "" : " (no visible base of this type; returning empty)");
         return fallback_ok ? fallback : std::string();
     }
 
@@ -214,7 +218,6 @@ bool CrealityPrintAgent::parse_cfs_response(const std::string&    response,
                                             int&                  box_count,
                                             std::string&          error)
 {
-    using nlohmann::json;
 
     slots.clear();
     box_count = 0;
@@ -307,25 +310,29 @@ bool CrealityPrintAgent::fetch_filament_info(std::string dev_id, FilamentSyncMod
     cfg.set_key_value("printhost_apikey",            new ConfigOptionString(device_info.api_key));
     cfg.set_key_value("printhost_ssl_ignore_revoke", new ConfigOptionBool(false));
 
-    CrealityPrint host(&cfg);
+    CrealityPrint             host(&cfg);
+    const CrealityPrinterInfo info = host.read_printer_info();
 
     // Defer to base if this isn't a K-series board with CFS firmware support.
-    if (!host.supports_multi_color_print()) {
+    if (!info.multi_color) {
         BOOST_LOG_TRIVIAL(info)
-            << "CrealityPrintAgent: " << host.model_name()
+            << "CrealityPrintAgent: " << (info.reachable ? info.model_name : std::string("unreachable"))
             << " is not CFS-capable, deferring to base Moonraker agent";
         return MoonrakerPrinterAgent::fetch_filament_info(std::move(dev_id));
     }
 
-    BOOST_LOG_TRIVIAL(info)
-        << "CrealityPrintAgent: querying CFS slots on " << host.model_name();
+    if (info.no_cfs) {
+        BOOST_LOG_TRIVIAL(info) << "CrealityPrintAgent: " << info.model_name << " reports no CFS connected, deferring to base agent";
+        return MoonrakerPrinterAgent::fetch_filament_info(std::move(dev_id));
+    }
 
-    const std::string response = host.query_boxes_info();
+    BOOST_LOG_TRIVIAL(info)
+        << "CrealityPrintAgent: read CFS slots from " << info.model_name;
 
     std::vector<CFSSlot> slots;
     int                  box_count = 0;
     std::string          parse_err;
-    if (!parse_cfs_response(response, slots, box_count, parse_err)) {
+    if (!parse_cfs_response(info.boxes_json, slots, box_count, parse_err)) {
         BOOST_LOG_TRIVIAL(warning)
             << "CrealityPrintAgent: CFS query failed (" << parse_err << "), "
             << "falling back to base agent";

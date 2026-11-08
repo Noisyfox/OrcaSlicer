@@ -8,7 +8,10 @@
 #include <cstddef>
 #include "libslic3r/Model.hpp"
 #include "libslic3r/Print.hpp"
+#include <sstream>
 #include <string>
+#include <string_view>
+#include <utility>
 #include <vector>
 
 #include <catch2/catch_test_macros.hpp>
@@ -21,10 +24,15 @@
 #include "libslic3r/BoundingBox.hpp"
 #include "libslic3r/ClipperUtils.hpp"
 #include "libslic3r/GCode/GCodeProcessor.hpp"
+#include "libslic3r/GCodeReader.hpp"
 #include "libslic3r/GCode/WipeTower.hpp"
+#include "libslic3r/LocalesUtils.hpp"
 #include "libslic3r/PrintConfig.hpp"
 
 #include "test_helpers.hpp"
+#include "test_utils.hpp"
+#include "libslic3r/PrintBase.hpp"
+#include "libslic3r/TriangleMesh.hpp"
 
 using namespace Slic3r;
 using namespace Slic3r::Test;
@@ -187,17 +195,169 @@ static std::string slice_with_prime_tower(const DynamicPrintConfig &config)
     return gcode(print);
 }
 
+// change_filament_gcode for the Klipper sections: a marker comment, so no slicer output changes.
+static const char *const toolchange_mark = "; TOOLCHANGE_MARK\n";
+
+// On Klipper the tower syncs motion only right before a temperature command and, with
+// `sync_before_change`, once per toolchange at the end of the unload, so change_filament_gcode
+// can't run while the unload is still queued. Any other M400 just stalls the toolhead.
+static bool m400_only_where_needed(const std::string &gcode, bool sync_before_change)
+{
+    bool synced = false; // a bare M400 since the last change_filament_gcode
+    std::istringstream lines(gcode);
+    for (std::string line, prev; std::getline(lines, line); prev = line) {
+        if (prev == "M400" && line.rfind("M104", 0) != 0 && line.rfind("M109", 0) != 0) {
+            if (!sync_before_change || synced)
+                return false;
+            synced = true;
+        }
+        if (line.find("; TOOLCHANGE_MARK") != std::string::npos) {
+            if (sync_before_change && !synced)
+                return false;
+            synced = false;
+        }
+    }
+    return true;
+}
+
+// The cooldown back to the base temperature after an interface wipe closes the toolchange, so a
+// wipe tower region ends right after it. Returns how many there are, or 0 if any of them is synced.
+static size_t unsynced_interface_cooldowns(const std::string &tower)
+{
+    const std::string next_region = ";" + GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Wipe_Tower_Start);
+    size_t cooldowns = 0;
+    for (size_t pos = tower.find("\nM104 "); pos != std::string::npos; pos = tower.find("\nM104 ", pos + 1)) {
+        const size_t eol = tower.find('\n', pos + 1);
+        if (eol == std::string::npos
+            || (tower.compare(eol + 1, std::string::npos, ";") != 0 && tower.compare(eol + 1, next_region.size(), next_region) != 0))
+            continue; // not the last line of its region
+        if (pos >= 4 && tower.compare(pos - 4, 4, "M400") == 0)
+            return 0;
+        ++cooldowns;
+    }
+    return cooldowns;
+}
+
+// The wipe tower regions of a slice under `config`. Post-processed tower moves start with "G1  "
+// (two spaces); a bare "G1 Y" is a move glued to a placeholder line, which skipped
+// post_process_wipe_tower_moves and kept tower-local coordinates.
+static std::string sliced_wipe_tower(const DynamicPrintConfig &config)
+{
+    const std::string tower = wipe_tower_regions(slice_with_prime_tower(config));
+    REQUIRE_FALSE(tower.empty());
+    CHECK_THAT(tower, !Catch::Matchers::ContainsSubstring("\nG1 Y"));
+    return tower;
+}
+
 TEST_CASE("The wipe tower's toolchange planner flush follows the gcode flavor", "[WipeTower]")
 {
-    auto [flavor, expected, unexpected] = GENERATE(table<std::string, std::string, std::string>({
-        { "klipper", "M400",  "G4 S0" },
-        { "marlin",  "G4 S0", "M400"  } }));
-    DYNAMIC_SECTION(flavor) {
-        const std::string tower = wipe_tower_regions(slice_with_prime_tower(wipe_tower_toolchange_config(flavor)));
-        REQUIRE_FALSE(tower.empty());
-        CHECK_THAT(tower, Catch::Matchers::ContainsSubstring(expected));
-        CHECK_THAT(tower, !Catch::Matchers::ContainsSubstring(unexpected));
+    SECTION("klipper") {
+        const std::string tower_type = GENERATE("type1", "type2");
+        CAPTURE(tower_type);
+        DynamicPrintConfig config = wipe_tower_toolchange_config("klipper");
+        config.set_deserialize_strict({ { "wipe_tower_type", tower_type }, { "change_filament_gcode", toolchange_mark } });
+        const std::string tower = sliced_wipe_tower(config);
+        CHECK_THAT(tower, !Catch::Matchers::ContainsSubstring("G4 S0"));
+        // Only type2 syncs at the end of the unload; type1's toolchange_Unload is compiled out.
+        CHECK(m400_only_where_needed(tower, tower_type == std::string("type2")));
     }
+    SECTION("marlin") {
+        const std::string tower = sliced_wipe_tower(wipe_tower_toolchange_config("marlin"));
+        CHECK_THAT(tower, Catch::Matchers::ContainsSubstring("G4 S0"));
+        CHECK_THAT(tower, !Catch::Matchers::ContainsSubstring("M400"));
+    }
+    SECTION("klipper, single extruder multi material") {
+        // The SEMM path changes the temperature inside the tower; the sync before M104 must stay.
+        DynamicPrintConfig config = wipe_tower_toolchange_config("klipper");
+        config.set_deserialize_strict({ { "single_extruder_multi_material", "1" }, { "change_filament_gcode", toolchange_mark } });
+        const std::string tower = sliced_wipe_tower(config);
+        CHECK_THAT(tower, Catch::Matchers::ContainsSubstring("M400\nM104"));
+        CHECK(m400_only_where_needed(tower, true));
+    }
+    SECTION("klipper, tower interface features") {
+        // The interface M109 is stripped from the tower by GCode.cpp; its sync line must go with it.
+        // The cooldown back to the base temperature after the wipe isn't synced either; other M104s
+        // (the single extruder multi material path of this config) still are.
+        DynamicPrintConfig config = wipe_tower_toolchange_config("klipper");
+        config.set_deserialize_strict({ { "enable_tower_interface_features", "1" },
+                                        { "nozzle_temperature_range_high", "250,250" },
+                                        { "change_filament_gcode", toolchange_mark } });
+        const std::string tower = sliced_wipe_tower(config);
+        CHECK(m400_only_where_needed(tower, true));
+        CHECK(unsynced_interface_cooldowns(tower) > 0);
+    }
+}
+
+TEST_CASE("The wipe tower sets Klipper's acceleration and accel_to_decel on one line", "[WipeTower]")
+{
+    // On separate lines, current Klipper finds nothing it reads on the ACCEL_TO_DECEL one and 0.13
+    // derives the cruise ratio from the acceleration before the change.
+    DynamicPrintConfig config = wipe_tower_toolchange_config("klipper");
+    // Type 2 towers leave the acceleration to the main G-code writer.
+    config.set_deserialize_strict({ { "wipe_tower_type", "type1" },
+                                    { "accel_to_decel_enable", "1" }, { "accel_to_decel_factor", "50%" },
+                                    { "default_acceleration", "1000" }, { "travel_acceleration", "2000" },
+                                    { "machine_max_acceleration_extruding", "5000" } });
+    const std::string tower = wipe_tower_regions(slice_with_prime_tower(config));
+    REQUIRE_THAT(tower, Catch::Matchers::ContainsSubstring("SET_VELOCITY_LIMIT ACCEL="));
+    CHECK_THAT(tower, Catch::Matchers::ContainsSubstring(" MINIMUM_CRUISE_RATIO=0.5\n"));
+    CHECK_THAT(tower, !Catch::Matchers::ContainsSubstring("SET_VELOCITY_LIMIT ACCEL_TO_DECEL") &&
+                      !Catch::Matchers::ContainsSubstring("M204"));
+}
+
+TEST_CASE("The wipe tower's G-code moves keep a decimal point in a comma-decimal locale", "[WipeTower]")
+{
+    // The GUI slices on a thread that keeps the user's numeric locale.
+    CommaNumericLocale comma;
+    CNumericLocalesSetter restore;
+    if (! comma.apply())
+        SKIP("no locale with a comma decimal separator is installed");
+    DynamicPrintConfig config = wipe_tower_toolchange_config("klipper");
+    // Type 1 towers join their toolchange blocks with a travel move of their own.
+    config.set_deserialize_strict({ { "wipe_tower_type", "type1" } });
+    const std::string gcode = slice_with_prime_tower(config);
+    REQUIRE_FALSE(wipe_tower_regions(gcode).empty());
+    std::istringstream lines(gcode);
+    for (std::string line; std::getline(lines, line);)
+        if (! line.empty() && line.front() == 'G' && line.find(',') != std::string::npos)
+            FAIL_CHECK(line);
+}
+
+TEST_CASE("The wipe tower's flow tags keep a decimal point in a comma-decimal locale", "[WipeTower]")
+{
+    // GCodeProcessor parses these values with the C locale: a comma makes it log an error and
+    // ignore the tag, leaving the extrusion width and height it assumes to its own defaults.
+    CommaNumericLocale comma;
+    CNumericLocalesSetter restore;
+    if (! comma.apply())
+        SKIP("no locale with a comma decimal separator is installed");
+    DynamicPrintConfig config = wipe_tower_toolchange_config("klipper");
+    config.set_deserialize_strict({ { "wipe_tower_type", "type1" } });
+    const std::string gcode = slice_with_prime_tower(config);
+    // WipeTowerWriter forces the BBL flag, so the tower writes these spellings on every printer.
+    // By the time the test asks, export has reset the flag for this Klipper config and
+    // reserved_tag() would hand back the main G-code's ";HEIGHT:" / ";WIDTH:" instead.
+    // The width and height tags are both written by the writer's constructor, before the
+    // tower's start tag, so scan the whole slice.
+    const std::string height_tag = "; LAYER_HEIGHT: ";
+    const std::string width_tag  = "; LINE_WIDTH: ";
+    size_t heights = 0;
+    size_t widths  = 0;
+    std::istringstream lines(gcode);
+    for (std::string line; std::getline(lines, line);) {
+        const bool is_height = line.compare(0, height_tag.size(), height_tag) == 0;
+        const bool is_width  = line.compare(0, width_tag.size(), width_tag) == 0;
+        if (! is_height && ! is_width)
+            continue;
+        if (is_height)
+            ++heights;
+        else
+            ++widths;
+        if (line.find(',') != std::string::npos)
+            FAIL_CHECK(line);
+    }
+    CHECK(heights > 0);
+    CHECK(widths > 0);
 }
 
 // What Print feeds the shared estimate. The libslic3r WipeTowerEstimate cases cannot see this:
@@ -456,4 +616,140 @@ TEST_CASE("A tower printed without a tool change is still validated against the 
     REQUIRE(print.has_wipe_tower());
     CHECK(print.wipe_tower_data(1).depth > 0.f);
     CHECK_THAT(print.validate().string, Catch::Matchers::ContainsSubstring("printable area"));
+}
+
+TEST_CASE("Only a cone wall gives the tower a stabilization cone", "[WipeTower]")
+{
+    // The cone angle stays in the config for every wall type, but only a cone wall prints the
+    // cone. A 120 mm object makes the tower tall enough that a 30 degree cone would reach the
+    // thin plate in front of the tower, which the real rectangle or rib tower stays clear of.
+    const std::string wall_type = GENERATE("rectangle", "rib", "cone");
+    DynamicPrintConfig config = tower_estimate_config(wall_type.c_str());
+    config.set_deserialize_strict({ { "wipe_tower_type",       "type2" },
+                                    { "wipe_tower_cone_angle", "30" },
+                                    { "wipe_tower_x",          "30" },
+                                    { "wipe_tower_y",          "80" },
+                                    { "layer_height",          "0.3" } });
+
+    TriangleMesh tall = make_cube(20., 20., 120.);
+    tall.translate(150.f, 150.f, 0.f);
+    TriangleMesh plate = make_cube(30., 32., 2.);
+    plate.translate(40.f, 30.f, 0.f);
+    const double plate_max_y = 30. + 32.;
+
+    Print print;
+    Model model;
+    init_print({ std::move(tall), std::move(plate) }, print, model, config, nullptr, false);
+    print.apply(model, config);
+    print.process();
+    REQUIRE(print.has_wipe_tower());
+
+    const BoundingBox footprint(print.first_layer_wipe_tower_corners());
+    INFO("wall type " << wall_type << ", tower depth " << print.wipe_tower_data().depth << ", footprint min y "
+                      << unscaled(footprint.min.y()));
+    if (wall_type == "cone") {
+        CHECK(unscaled(footprint.min.y()) < plate_max_y);
+        CHECK(print.get_conflict_result().has_value());
+    } else {
+        CHECK(unscaled(footprint.min.y()) > plate_max_y);
+        CHECK_FALSE(print.get_conflict_result().has_value());
+    }
+}
+
+TEST_CASE("Without sparse layers the filament change starts at the tallest printed layer", "[WipeTower]")
+{
+    // Filament 2 on top surfaces only, so the layers between the short cube's top and the tall
+    // cube's top have no toolchange and the tower skips them: at the tall cube's top it is still
+    // about 2 mm high. A custom change_filament_gcode may travel anywhere, and so may the firmware
+    // Tn of a switch to another physical extruder, so neither may start that low.
+    const std::string tower_type   = GENERATE("type1", "type2");
+    const bool        two_nozzles  = GENERATE(false, true);
+    const bool        custom_macro = GENERATE(true, false);
+    DynamicPrintConfig config = multifilament_config(2, {
+        { "top_surface_filament_id",     2     },
+        { "enable_prime_tower",          true  },
+        { "wipe_tower_type",             tower_type },
+        { "wipe_tower_no_sparse_layers", true  },
+        { "wipe_tower_x",                30    },
+        { "wipe_tower_y",                30    },
+        { "layer_height",                0.2   },
+        { "change_filament_gcode",       custom_macro ? "; TOOLCHANGE_MARK\n" : "" },
+        { "gcode_comments",              true  },
+        { "timelapse_type",              "0"   },
+        { "enable_wrapping_detection",   false },
+        { "raft_layers",                 "0"   } });
+    if (two_nozzles) {
+        config.set_num_extruders(2);
+        config.set_deserialize_strict({
+            { "single_extruder_multi_material", false },
+            { "nozzle_diameter",                "0.4,0.4" },
+            { "printer_extruder_id",            "1,2" },
+            { "printer_extruder_variant",       "Direct Drive Standard,Direct Drive Standard" },
+            { "extruder_printable_height",      "0,0" },
+            { "filament_map_mode",              "Manual" },
+            { "filament_map",                   "1,2" } });
+        size_flush_to_nozzles(config);
+    }
+
+    const double short_height = 2., tall_height = 10.;
+    TriangleMesh tall = make_cube(10., 10., tall_height);
+    tall.translate(120.f, 120.f, 0.f);
+    TriangleMesh low = make_cube(10., 10., short_height);
+    low.translate(150.f, 120.f, 0.f);
+
+    Print print;
+    Model model;
+    init_print({ std::move(tall), std::move(low) }, print, model, config, nullptr, false);
+    print.apply(model, config);
+    const std::string gcode = Slic3r::Test::gcode(print);
+
+    // Z where each change_filament_gcode or Tn starts, next to the highest Z of the objects
+    // extruded before it; and the Z of each tower extrusion once the objects pass the short cube.
+    std::vector<std::pair<double, double>> changes;
+    std::vector<std::pair<double, double>> tower_extrusions;
+    double object_z = 0.;
+    bool   in_tower = false;
+    size_t lifts    = 0;
+    GCodeReader parser;
+    parser.parse_buffer(gcode, [&](GCodeReader &self, const GCodeReader::GCodeLine &line) {
+        const std::string_view raw = line.raw();
+        // Objects are tagged with the processor's ;TYPE:, the tower with its own ; FEATURE:.
+        if (raw.rfind(";TYPE:", 0) == 0 || raw.rfind("; FEATURE: ", 0) == 0)
+            in_tower = raw.find("Prime tower") != std::string_view::npos;
+        else if (line.extruding(self) && (line.has_x() || line.has_y())) { // not an unretract
+            if (!in_tower)
+                object_z = std::max(object_z, double(self.z()));
+            // Above the tall cube is the final unload, printed over the finished parts on purpose.
+            else if (object_z > short_height + EPSILON && self.z() <= tall_height + EPSILON)
+                tower_extrusions.emplace_back(self.z(), object_z);
+        } else if (raw.find("; TOOLCHANGE_MARK") != std::string_view::npos
+                   || (raw.size() > 1 && raw[0] == 'T' && raw[1] >= '0' && raw[1] <= '9'))
+            changes.emplace_back(self.z(), object_z);
+        if (raw.find("Restore layer Z before toolchange") != std::string_view::npos)
+            ++lifts;
+    });
+    INFO(tower_type << (two_nozzles ? ", two nozzles" : ", one nozzle") << (custom_macro ? ", custom macro" : ", empty macro"));
+
+    if (!custom_macro && !two_nozzles) {
+        // Nothing travels during the change, so the toolhead stays down at the tower.
+        CHECK(lifts == 0);
+    } else {
+        size_t above_short = 0;
+        for (const auto &[change_z, printed_z] : changes) {
+            if (printed_z <= short_height + EPSILON)
+                continue;
+            ++above_short;
+            INFO("toolchange at Z " << change_z << ", printed up to Z " << printed_z);
+            CHECK(change_z >= printed_z - EPSILON);
+        }
+        // The tall cube's top surface needs at least one change above the short cube.
+        CHECK(above_short > 0);
+    }
+
+    // Every lift has to come back down: the tower keeps printing at its compacted height.
+    REQUIRE_FALSE(tower_extrusions.empty());
+    for (const auto &[tower_z, printed_z] : tower_extrusions) {
+        INFO("tower extrusion at Z " << tower_z << ", printed up to Z " << printed_z);
+        CHECK(tower_z < printed_z - EPSILON);
+    }
 }

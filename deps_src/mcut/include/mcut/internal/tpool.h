@@ -197,7 +197,7 @@ public:
             tail->next = std::move(p);
             tail = new_tail;
         }
-        data_cond.notify_one();
+        disrupt_wait_for_data();
     }
 
     void wait_and_pop(T& value)
